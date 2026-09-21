@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Band Log
 
-## Getting Started
+Workouts, meals by voice, streaks. Next.js 16 + Supabase + Claude Haiku 4.5.
 
-First, run the development server:
+## One-time setup
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+This app shares an existing Supabase project and keeps its tables in its own Postgres schema, `bandlog`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. **Schema** — in the existing project, open SQL Editor, paste `supabase/schema.sql`, run it. It creates the `bandlog` schema and everything inside it.
+2. **Expose it** — Project Settings > API > **Exposed schemas**: add `bandlog` (keep `public`). Save.
+3. **Auth** — Authentication > Providers > Email: "Confirm email" off if you want instant sign-in. If you already have an account in this project, just sign in with it; the SQL created your profile row.
+4. **Keys** — Project Settings > API. Fill `.env.local`:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+   SUPABASE_SERVICE_ROLE_KEY=eyJ...
+   ANTHROPIC_API_KEY=sk-ant-...
+   ```
+5. `npm run dev`, open http://localhost:3000, create your account, set targets in Settings.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy (Vercel)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`vercel` from this folder, then add the four env vars in the Vercel project settings. On your phone, open the site and use "Add to Home Screen" for the app icon.
 
-## Learn More
+## How meals work
 
-To learn more about Next.js, take a look at the following resources:
+Dictate into the box on Today. The text goes to `/api/parse-meal`, which asks Haiku for structured items and prices them from `src/lib/foods.ts` (per-100 g Indian food table). Foods not in the table use Haiku's estimate and are marked "estimated". Rice, dal and sabzi are treated as cooked weights unless you say raw. Edit any grams in the review card, then Save.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Add a food
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Add a line to `src/lib/foods.ts`: id, name, aliases, calories, protein, carbs, fat per 100 g, and an optional household unit with its gram weight.
