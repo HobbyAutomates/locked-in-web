@@ -35,7 +35,7 @@ export default function LoginPage() {
     <main className="min-h-full flex items-center justify-center px-4 py-10">
       <form onSubmit={submit} className="card w-full max-w-sm flex flex-col gap-4">
         <div>
-          <p className="label">Band Log</p>
+          <p className="label">Locked In</p>
           <h1 className="text-3xl font-extrabold">{mode === "in" ? "Sign in" : "Create account"}</h1>
         </div>
         <div>

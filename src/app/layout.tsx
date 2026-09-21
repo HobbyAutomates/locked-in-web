@@ -6,10 +6,10 @@ const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-disp
 const body = DM_Sans({ subsets: ["latin"], variable: "--font-body", weight: ["400", "500", "700"] });
 
 export const metadata: Metadata = {
-  title: "Band Log",
+  title: "Locked In",
   description: "Workouts, meals by voice, streaks.",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Band Log" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Locked In" },
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
 };
 

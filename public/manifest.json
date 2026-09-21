@@ -1,6 +1,6 @@
 {
-  "name": "Band Log",
-  "short_name": "Band Log",
+  "name": "Locked In",
+  "short_name": "Locked In",
   "description": "Workouts, meals by voice, streaks.",
   "start_url": "/",
   "display": "standalone",

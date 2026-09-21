@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 180;
 
 /**
  * Photo of a packaged food's ingredients / nutrition label → structured verdict.
@@ -67,7 +67,7 @@ You receive a photo of a packaged food's ingredients list and/or nutrition panel
    - "unsafe": banned or hazardous ingredients, undeclared allergens, dosages beyond safe limits, or a product with a recall / regulator action.
    - "misleading": the marketing claims are not supported by the label (e.g. "high protein" with low protein per 100 kcal, "sugar-free" with maltodextrin, amino-spiked protein, "natural" with artificial additives, serving-size tricks).
    - "fake": signs of counterfeit (misspelled brand, missing FSSAI/licence number, wrong batch/MRP format, known counterfeit reports for that brand).
-3. Use web search when it would change the answer: the brand + product name plus "recall", "fake", "lab test", "FSSAI", "amino spiking". Report only what you actually found, with the source name. Do not invent recalls.
+3. Do at most two quick web searches, only if the brand is legible: "<brand product> fake OR recall OR lab test". Report only what you actually found, with the source name. Do not invent recalls. If the label alone answers the question, skip searching.
 4. Protein: rate per serving and per 100 kcal against his goal; call out incomplete sources and amino spiking (glycine/taurine/creatine counted as protein).
 5. Suggestions must be specific to him: grams per day, timing around band workouts, what to add to hit ${profile.protein_target_g} g, and whether to keep buying it. Alternatives should be things sold in India.
 Be direct and concrete. Always call the label_report tool exactly once at the end.`;
@@ -94,9 +94,10 @@ export async function POST(req: Request) {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const msg = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 3000,
+    max_tokens: 2500,
     system: system(profile),
-    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 4 } as unknown as Anthropic.Tool, REPORT_TOOL],
+    // Two searches max keeps a scan under ~40 s; the label itself carries most of the answer.
+    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 } as unknown as Anthropic.Tool, REPORT_TOOL],
     messages: [
       {
         role: "user",
