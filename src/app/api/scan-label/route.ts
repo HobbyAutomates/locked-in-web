@@ -6,12 +6,16 @@ export const runtime = "nodejs";
 export const maxDuration = 180;
 
 /**
- * Photo of a packaged food's ingredients / nutrition label → structured verdict.
+ * An ingredients / nutrition label → structured verdict.
  * Three steps so each model does what it is best at and the output is always structured:
- *   1. Sonnet transcribes the label (best vision/OCR we can call without new infra).
+ *   1. Transcribe. The phone now does this on-device (ML Kit) and posts `text`; when that text is
+ *      long enough we skip straight to step 2. Otherwise Sonnet reads the photo as before.
  *   2. Haiku analyses the transcript, may web-search the brand for recalls / fakes / lab tests.
  *   3. Haiku is FORCED to emit the label_report tool from that analysis, so a report always comes back.
  */
+
+/** Below this many characters the on-device OCR is treated as a failed read. */
+const OCR_MIN_CHARS = 120;
 const REPORT_TOOL: Anthropic.Tool = {
   name: "label_report",
   description: "Return the structured assessment of the food label.",
@@ -42,8 +46,31 @@ const REPORT_TOOL: Anthropic.Tool = {
       research: { type: "array", items: { type: "string" } },
       suggestions: { type: "array", items: { type: "string" } },
       alternatives: { type: "array", items: { type: "string" } },
+      infographic: {
+        type: "object",
+        description: "Everything the phone needs to draw the report as a picture. Fill every field.",
+        properties: {
+          serving_share: {
+            type: "object",
+            description: "ONE serving as a percentage of this user's daily targets, integers 0-100 (clamp above 100 to 100).",
+            properties: {
+              protein_pct: { type: "integer" },
+              carbs_pct: { type: "integer" },
+              fat_pct: { type: "integer" },
+              calories_pct: { type: "integer" },
+            },
+            required: ["protein_pct", "carbs_pct", "fat_pct", "calories_pct"],
+          },
+          sugar_teaspoons_per_serving: { type: "number", description: "sugar grams per serving divided by 4" },
+          sodium_pct_of_2000mg: { type: "integer", description: "sodium mg per serving as a percentage of 2000 mg" },
+          score_out_of_10: { type: "integer", description: "overall score for THIS user, 0-10" },
+          one_liner: { type: "string", description: "12 words or fewer, plain English, e.g. 'Great protein, watch the sodium'" },
+          eat_it: { type: "string", enum: ["yes", "sometimes", "skip"] },
+        },
+        required: ["serving_share", "sugar_teaspoons_per_serving", "sodium_pct_of_2000mg", "score_out_of_10", "one_liner", "eat_it"],
+      },
     },
-    required: ["product", "readable", "verdict", "verdict_reason", "protein", "concerns", "claims", "suggestions", "alternatives"],
+    required: ["product", "readable", "verdict", "verdict_reason", "protein", "concerns", "claims", "suggestions", "alternatives", "infographic"],
   },
 };
 
@@ -73,27 +100,42 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 });
 
-  const { image, media_type, note } = (await req.json()) as { image?: string; media_type?: string; note?: string };
-  if (!image) return NextResponse.json({ error: "No image" }, { status: 400 });
+  const body = (await req.json()) as { image?: string; media_type?: string; note?: string; text?: string };
+  const { image, media_type, note } = body;
+  const ocrText = (body.text ?? "").trim();
+  if (!image && ocrText.length === 0) return NextResponse.json({ error: "No image" }, { status: 400 });
   const mt = (media_type ?? "image/jpeg") as "image/jpeg" | "image/png" | "image/webp";
 
   const { createClient: createAdmin } = await import("@supabase/supabase-js");
   const admin = createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { db: { schema: "bandlog" } });
-  const { data: prof } = await admin.from("profiles").select("protein_target_g, calorie_target, weekly_workout_target").eq("id", user.id).maybeSingle();
-  const profile = prof ?? { protein_target_g: 120, calorie_target: 2200, weekly_workout_target: 3 };
+  const { data: prof } = await admin
+    .from("profiles")
+    .select("protein_target_g, calorie_target, weekly_workout_target, carb_target_g, fat_target_g")
+    .eq("id", user.id)
+    .maybeSingle();
+  const profile = prof ?? { protein_target_g: 120, calorie_target: 2200, weekly_workout_target: 3, carb_target_g: null, fat_target_g: null };
+  // Same fallback the app uses when the macro goals were never set explicitly.
+  const fatTarget = profile.fat_target_g ?? Math.round((profile.calorie_target * 0.25) / 9);
+  const carbTarget =
+    profile.carb_target_g ?? Math.max(0, Math.round((profile.calorie_target - profile.protein_target_g * 4 - fatTarget * 9) / 4));
+  const targets = `DAILY TARGETS for this user: ${profile.calorie_target} kcal, ${profile.protein_target_g} g protein, ${carbTarget} g carbs, ${fatTarget} g fat.`;
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const text = (m: Anthropic.Message) => m.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("\n");
 
   try {
-    // 1. Transcribe (vision).
-    const t = await client.messages.create({
-      model: "claude-sonnet-5",
-      max_tokens: 2000,
-      system: TRANSCRIBE,
-      messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: image } }, { type: "text", text: "Transcribe this label." }] }],
-    });
-    const transcript = text(t).trim();
+    // 1. Transcribe. The phone's own OCR wins when it read enough; otherwise Sonnet looks at the photo.
+    let transcript = ocrText.length >= OCR_MIN_CHARS ? ocrText : "";
+    if (!transcript) {
+      if (!image) return NextResponse.json({ error: "Couldn't read enough text — retake the photo." }, { status: 400 });
+      const t = await client.messages.create({
+        model: "claude-sonnet-5",
+        max_tokens: 2000,
+        system: TRANSCRIBE,
+        messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: image } }, { type: "text", text: "Transcribe this label." }] }],
+      });
+      transcript = text(t).trim();
+    }
     if (!transcript || transcript.startsWith("NOT_A_LABEL")) {
       return NextResponse.json({ readable: false, product: "", verdict: "caution", verdict_reason: transcript.replace("NOT_A_LABEL", "").trim() || "Couldn't read a food label in that photo.", protein: { rating: "poor", quality: "", note: "" }, concerns: [], claims: [], research: [], suggestions: [], alternatives: [], transcript });
     }
@@ -104,7 +146,14 @@ export async function POST(req: Request) {
       max_tokens: 2500,
       system: analyseSystem(profile),
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 } as unknown as Anthropic.Tool],
-      messages: [{ role: "user", content: `LABEL TRANSCRIPT:\n${transcript}\n\n${note ? `User note: ${note.slice(0, 300)}\n\n` : ""}Analyse it.` }],
+      messages: [
+        {
+          role: "user",
+          content:
+            `LABEL TRANSCRIPT${ocrText.length >= OCR_MIN_CHARS ? " (read on the user's phone, so odd line breaks and the occasional misread character are expected — use judgement)" : ""}:\n${transcript}\n\n` +
+            `${note ? `User note: ${note.slice(0, 300)}\n\n` : ""}${targets}\n\nAnalyse it.`,
+        },
+      ],
     });
     const analysis = text(a).trim();
 
@@ -114,7 +163,22 @@ export async function POST(req: Request) {
       max_tokens: 2000,
       tools: [REPORT_TOOL],
       tool_choice: { type: "tool", name: "label_report" },
-      messages: [{ role: "user", content: `Convert this label analysis into the label_report tool call. Keep every number as written. Set readable=true.\n\nTRANSCRIPT:\n${transcript}\n\nANALYSIS:\n${analysis}` }],
+      messages: [
+        {
+          role: "user",
+          content:
+            `Convert this label analysis into the label_report tool call. Keep every number as written. Set readable=true.\n\n` +
+            `${targets}\n\n` +
+            `Fill the infographic object from the transcript and those targets:\n` +
+            `- serving_share: take ONE serving (use serving_g; if the label has no serving size, use 100 g and say so in one_liner) and express its calories/protein/carbs/fat as whole percentages of the daily targets above. Clamp each to 0-100.\n` +
+            `- sugar_teaspoons_per_serving: sugar grams in one serving divided by 4. Use 0 when there is no sugar figure.\n` +
+            `- sodium_pct_of_2000mg: sodium mg in one serving as a whole percentage of 2000 mg. Use 0 when unknown.\n` +
+            `- score_out_of_10: how good this product is for THIS user overall (protein quality, sugar, sodium, additives, honesty of the claims). 0 is awful, 10 is excellent.\n` +
+            `- one_liner: at most 12 words, plain English, no jargon, e.g. "Great protein, watch the sodium".\n` +
+            `- eat_it: "yes" for a regular staple, "sometimes" for an occasional treat, "skip" if he shouldn't buy it.\n\n` +
+            `TRANSCRIPT:\n${transcript}\n\nANALYSIS:\n${analysis}`,
+        },
+      ],
     });
     const block = s.content.find((b) => b.type === "tool_use");
     if (!block || block.type !== "tool_use") return NextResponse.json({ error: "Could not structure the report" }, { status: 500 });
