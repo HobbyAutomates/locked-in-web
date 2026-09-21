@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Lock } from "@/components/icons";
+import { ErrorNote, PillButton } from "@/components/ui";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,32 +27,68 @@ export default function LoginPage() {
     if (error) return setMsg(error.message);
     if (mode === "up") {
       const { data } = await supabase.auth.getSession();
-      if (!data.session) return setMsg("Account created. Check your email to confirm, then sign in.");
+      if (!data.session) return setMsg("Account created. Confirm the email we sent, then sign in.");
     }
     router.replace("/");
     router.refresh();
   }
 
   return (
-    <main className="min-h-full flex items-center justify-center px-4 py-10">
-      <form onSubmit={submit} className="card w-full max-w-sm flex flex-col gap-4">
-        <div>
-          <p className="label">Locked In</p>
-          <h1 className="text-3xl font-extrabold">{mode === "in" ? "Sign in" : "Create account"}</h1>
+    <main className="mx-auto flex min-h-full w-full max-w-[480px] flex-col justify-center px-6 py-10">
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <span className="flex items-center gap-2 text-[11px] font-bold tracking-[0.15em] muted">
+          <Lock size={18} />
+          LOCKED IN
+        </span>
+        <h1 className="text-3xl font-extrabold">{mode === "in" ? "Sign in" : "Create account"}</h1>
+        <p className="text-[13px] muted">One sign-in on this phone. You&apos;ll stay logged in.</p>
+
+        <div className="mt-3 flex flex-col gap-2">
+          <label className="text-[13px] font-semibold muted" htmlFor="email">
+            Email
+          </label>
+          <input
+            id="email"
+            className="field"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </div>
-        <div>
-          <label className="label" htmlFor="email">Email</label>
-          <input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <div className="flex flex-col gap-2">
+          <label className="text-[13px] font-semibold muted" htmlFor="password">
+            Password
+          </label>
+          <input
+            id="password"
+            className="field"
+            type="password"
+            autoComplete={mode === "in" ? "current-password" : "new-password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+          />
         </div>
-        <div>
-          <label className="label" htmlFor="password">Password</label>
-          <input id="password" type="password" autoComplete={mode === "in" ? "current-password" : "new-password"} value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+
+        <ErrorNote text={msg} />
+
+        <div className="mt-2">
+          <PillButton type="submit" disabled={busy || !email || password.length < 6}>
+            {busy ? "Working…" : mode === "in" ? "Sign in" : "Create account"}
+          </PillButton>
         </div>
-        {msg && <p className="text-sm text-warn">{msg}</p>}
-        <button className="btn btn-primary" disabled={busy} type="submit">
-          {busy ? "Working…" : mode === "in" ? "Sign in" : "Sign up"}
-        </button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setMode(mode === "in" ? "up" : "in")}>
+        <button
+          type="button"
+          className="press mx-auto py-2 text-[13px] muted"
+          style={{ background: "none", border: 0 }}
+          onClick={() => {
+            setMode(mode === "in" ? "up" : "in");
+            setMsg(null);
+          }}
+        >
           {mode === "in" ? "New here? Create an account" : "Have an account? Sign in"}
         </button>
       </form>
