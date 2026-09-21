@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
-import type { MealItem, Profile } from "./types";
+import type { MealItem, Profile, SavedMeal } from "./types";
 
 async function userOrThrow() {
   const supabase = await createClient();
@@ -80,6 +80,46 @@ export async function deleteMeal(id: string) {
 export async function saveTargets(p: Profile) {
   const { supabase, user } = await userOrThrow();
   const { error } = await supabase.from("profiles").upsert({ id: user.id, ...p });
+  if (error) throw new Error(error.message);
+  revalidatePath("/", "layout");
+}
+
+/** Repeat meals: the one-tap cards at the top of the Meal form. */
+export async function listSavedMeals(): Promise<SavedMeal[]> {
+  const { supabase, user } = await userOrThrow();
+  const { data, error } = await supabase
+    .from("saved_meals")
+    .select("id, name, items, calories, protein_g")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    name: (r.name ?? "") as string,
+    items: ((r.items ?? []) as MealItem[]),
+    calories: Number(r.calories ?? 0),
+    protein_g: Number(r.protein_g ?? 0),
+  }));
+}
+
+export async function createSavedMeal(input: { name: string; items: MealItem[] }) {
+  const { supabase, user } = await userOrThrow();
+  const calories = input.items.reduce((a, i) => a + Number(i.calories), 0);
+  const protein = input.items.reduce((a, i) => a + Number(i.protein_g), 0);
+  const { error } = await supabase.from("saved_meals").insert({
+    user_id: user.id,
+    name: input.name,
+    items: input.items,
+    calories: Math.round(calories * 10) / 10,
+    protein_g: Math.round(protein * 10) / 10,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/", "layout");
+}
+
+export async function deleteSavedMeal(id: string) {
+  const { supabase, user } = await userOrThrow();
+  const { error } = await supabase.from("saved_meals").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
 }
