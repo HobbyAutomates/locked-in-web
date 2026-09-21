@@ -19,6 +19,16 @@ export async function getWorkouts(from: string, to: string): Promise<Workout[]> 
   return (data ?? []) as Workout[];
 }
 
+export async function getWorkout(id: string): Promise<Workout | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("workouts")
+    .select("id, date, muscles, band_level, resistance_kg, minutes, exercises, notes")
+    .eq("id", id)
+    .maybeSingle();
+  return (data as Workout) ?? null;
+}
+
 export async function getMeals(from: string, to: string): Promise<Meal[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -44,15 +54,4 @@ export async function getDashboard() {
   return { today: t, profile, workouts, meals };
 }
 
-export function totalsFor(meals: Meal[], date: string) {
-  const items = meals.filter((m) => m.date === date).flatMap((m) => m.items);
-  return items.reduce(
-    (a, i) => ({
-      calories: a.calories + Number(i.calories),
-      protein: a.protein + Number(i.protein_g),
-      carbs: a.carbs + Number(i.carbs_g),
-      fat: a.fat + Number(i.fat_g),
-    }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0 },
-  );
-}
+export { totalsFor } from "./totals";
