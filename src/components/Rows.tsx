@@ -4,37 +4,21 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteMeal } from "@/lib/actions";
 import type { Meal, Workout } from "@/lib/types";
-import { today } from "@/lib/dates";
+import { formatTime, relativeDay } from "@/lib/display";
 import { Bowl, Dumbbell, Flame, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
 import { Card, CardButton, IconTile, MacroDot, fmt } from "./ui";
-
-function relative(date: string) {
-  const t = today();
-  if (date === t) return "Today";
-  const d = new Date(date + "T00:00:00");
-  const y = new Date(new Date(t + "T00:00:00").getTime() - 864e5);
-  if (d.getTime() === y.getTime()) return "Yesterday";
-  return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
-}
-
-function timeOf(createdAt: string) {
-  if (!createdAt) return "";
-  const withZone = /[Z+]|-\d\d:\d\d$/.test(createdAt.replace(" ", "T")) ? createdAt.replace(" ", "T") : `${createdAt.replace(" ", "T")}Z`;
-  const d = new Date(withZone);
-  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
-}
 
 export function WorkoutRow({ workout, onOpen }: { workout: Workout; onOpen: () => void }) {
   const w = workout;
   return (
-    <CardButton onClick={onOpen} ariaLabel={`Edit workout on ${relative(w.date)}`}>
+    <CardButton onClick={onOpen} ariaLabel={`Edit workout on ${relativeDay(w.date)}`}>
       <div className="flex items-center gap-3">
         <IconTile>
           <Dumbbell size={26} />
         </IconTile>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[15px] font-semibold">{relative(w.date)}</span>
+            <span className="text-[15px] font-semibold">{relativeDay(w.date)}</span>
             <span className="text-xs muted">
               {w.band_level}
               {w.resistance_kg != null ? ` · ${fmt(Number(w.resistance_kg))} kg` : ""}
@@ -80,7 +64,7 @@ export function MealRow({ meal, feedback = true }: { meal: Meal; feedback?: bool
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-[15px] font-semibold">{meal.items.map((i) => i.name).join(", ") || "Meal"}</span>
-            <span className="shrink-0 text-xs muted">{timeOf(meal.created_at)}</span>
+            <span className="shrink-0 text-xs muted">{formatTime(meal.created_at)}</span>
           </div>
           <span className="flex items-center gap-1.5 text-[15px] font-bold">
             <Flame size={15} />

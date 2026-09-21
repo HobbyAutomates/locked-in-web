@@ -208,7 +208,8 @@ function Celebration({ thisWeek, target, streakWeeks }: { thisWeek: number; targ
       >
         <div className="relative mx-auto grid place-items-center" style={{ width: 96, height: 96 }}>
           <BreathingFlame size={96} />
-          <span className="absolute text-[26px] font-extrabold" style={{ color: "#fff", top: 34 }}>
+          {/* Sits inside the flame's body, like the Compose dialog's 18dp downward nudge. */}
+          <span className="num absolute text-[26px] font-extrabold" style={{ color: "#fff", transform: "translateY(18px)" }}>
             {thisWeek}
           </span>
         </div>
