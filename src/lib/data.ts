@@ -1,12 +1,61 @@
 import { addDays, today } from "./dates";
 import { createClient } from "./supabase/server";
-import type { ExerciseEntry, Meal, MealItem, Profile, ScanHistoryItem, Workout } from "./types";
+import { DEFAULT_PROFILE, type ExerciseEntry, type Meal, type MealItem, type Profile, type ScanHistoryItem, type WeightEntry, type Workout } from "./types";
+import { parse as parseReminders } from "./reminders";
 
+const PROFILE_COLS =
+  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders";
+
+const num = (v: unknown): number | null => (v == null || v === "" ? null : Number(v));
+
+/** The signed-in user's `profiles` row with Android's defaults filled in for anything unset. */
 export async function getProfile(): Promise<Profile> {
   const supabase = await createClient();
-  const { data } = await supabase.from("profiles").select("weekly_workout_target, protein_target_g, calorie_target, weight_kg").maybeSingle();
-  if (!data) return { weekly_workout_target: 3, protein_target_g: 120, calorie_target: 2200, weight_kg: null };
-  return { ...data, weight_kg: data.weight_kg == null ? null : Number(data.weight_kg) } as Profile;
+  const { data } = await supabase.from("profiles").select(PROFILE_COLS).maybeSingle();
+  if (!data) return { ...DEFAULT_PROFILE };
+  const d = data as Record<string, unknown>;
+  return {
+    weekly_workout_target: num(d.weekly_workout_target) ?? DEFAULT_PROFILE.weekly_workout_target,
+    protein_target_g: num(d.protein_target_g) ?? DEFAULT_PROFILE.protein_target_g,
+    calorie_target: num(d.calorie_target) ?? DEFAULT_PROFILE.calorie_target,
+    name: typeof d.name === "string" ? d.name : "",
+    dob: typeof d.dob === "string" && d.dob ? d.dob.slice(0, 10) : null,
+    gender: d.gender === "male" || d.gender === "female" || d.gender === "other" ? d.gender : null,
+    height_cm: num(d.height_cm),
+    weight_kg: num(d.weight_kg),
+    goal_weight_kg: num(d.goal_weight_kg),
+    goal_type: d.goal_type === "lose" || d.goal_type === "gain" ? d.goal_type : "maintain",
+    goal_speed_kg_wk: num(d.goal_speed_kg_wk) ?? DEFAULT_PROFILE.goal_speed_kg_wk,
+    step_goal: num(d.step_goal) ?? DEFAULT_PROFILE.step_goal,
+    carb_target_g: num(d.carb_target_g),
+    fat_target_g: num(d.fat_target_g),
+    reminders: parseReminders(d.reminders),
+  };
+}
+
+/** Weigh-ins, newest first (Profile → Weight history and the Progress sparkline). */
+export async function getWeights(limit = 400): Promise<WeightEntry[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("weight_log")
+    .select("id, date, weight_kg, note")
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []).map((r) => ({ id: r.id as string, date: r.date as string, weight_kg: Number(r.weight_kg), note: (r.note as string | null) ?? "" }));
+}
+
+/**
+ * Lifetime numbers the badges need beyond the 120-day dashboard window: every workout date ever
+ * (for the longest day run) and the meals row count via PostgREST's exact count (no rows sent).
+ */
+export async function getBadgeTotals(): Promise<{ workoutDates: string[]; totalMeals: number }> {
+  const supabase = await createClient();
+  const [dates, count] = await Promise.all([
+    supabase.from("workouts").select("date").order("date", { ascending: true }),
+    supabase.from("meals").select("id", { count: "exact", head: true }),
+  ]);
+  return { workoutDates: (dates.data ?? []).map((r) => r.date as string), totalMeals: count.count ?? 0 };
 }
 
 /** Calories-burned rows (logged exercise + the auto-burn each band workout writes), newest first. */

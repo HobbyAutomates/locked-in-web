@@ -37,12 +37,57 @@ export type Meal = {
   items: MealItem[];
 };
 
+export type Gender = "male" | "female" | "other";
+export type GoalType = "lose" | "maintain" | "gain";
+
+/** One of the five meal reminders stored in `profiles.reminders`. */
+export type ReminderPref = { on: boolean; time: string };
+
+/** The full `bandlog.profiles` row, mirroring Android's `data.Profile`. */
 export type Profile = {
   weekly_workout_target: number;
   protein_target_g: number;
   calorie_target: number;
-  /** Body weight for the calories-burned formula; read-only here (Android owns the weight log). */
-  weight_kg?: number | null;
+  name: string;
+  /** ISO yyyy-MM-dd. */
+  dob: string | null;
+  gender: Gender | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  goal_weight_kg: number | null;
+  goal_type: GoalType;
+  goal_speed_kg_wk: number;
+  step_goal: number;
+  /** Explicit macro goals; null falls back to the derived formula. */
+  carb_target_g: number | null;
+  fat_target_g: number | null;
+  reminders: Record<string, ReminderPref>;
+};
+
+export const DEFAULT_PROFILE: Profile = {
+  weekly_workout_target: 3,
+  protein_target_g: 120,
+  calorie_target: 2200,
+  name: "",
+  dob: null,
+  gender: null,
+  height_cm: null,
+  weight_kg: null,
+  goal_weight_kg: null,
+  goal_type: "maintain",
+  goal_speed_kg_wk: 0.5,
+  step_goal: 8000,
+  carb_target_g: null,
+  fat_target_g: null,
+  reminders: {},
+};
+
+/** One row of `bandlog.weight_log`, newest first. */
+export type WeightEntry = {
+  id: string;
+  date: string;
+  weight_kg: number;
+  note: string;
 };
 
 /** One row of `bandlog.activities` — a MET-table entry the user can log against. */
@@ -171,10 +216,21 @@ export type ScanHistoryItem = {
   image_path: string | null;
 };
 
-/** Derived macro targets, exactly as Android's Profile: fat 25% of kcal, carbs the remainder. */
+/** Macro targets, exactly as Android's Profile: explicit if set, else fat 25% of kcal and carbs the remainder. */
 export function fatTargetG(p: Profile) {
-  return Math.trunc((p.calorie_target * 0.25) / 9);
+  return p.fat_target_g ?? Math.trunc((p.calorie_target * 0.25) / 9);
 }
 export function carbTargetG(p: Profile) {
-  return Math.max(0, Math.trunc((p.calorie_target - p.protein_target_g * 4 - fatTargetG(p) * 9) / 4));
+  return p.carb_target_g ?? Math.max(0, Math.trunc((p.calorie_target - p.protein_target_g * 4 - fatTargetG(p) * 9) / 4));
+}
+
+/** Whole years from `dob`, or null when no birthday is set (Android's `Profile.age`). */
+export function ageFrom(dob: string | null | undefined): number | null {
+  if (!dob) return null;
+  const [y, m, d] = dob.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const now = new Date();
+  let age = now.getFullYear() - y;
+  if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) age--;
+  return age >= 1 && age <= 120 ? age : null;
 }

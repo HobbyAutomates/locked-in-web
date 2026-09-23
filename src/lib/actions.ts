@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
+import { ONBOARD_SKIP_COOKIE } from "./onboarding";
 import { bandCode, bandIntensity, bandKcal } from "./burn";
 import type { Activity, DescribedExercise, MealItem, Profile, SavedMeal } from "./types";
 
@@ -183,9 +185,73 @@ export async function deleteMeal(id: string) {
   revalidatePath("/", "layout");
 }
 
-export async function saveTargets(p: Profile) {
+// ---- profile ----
+
+/** Columns a client may write; anything else in the patch is dropped. */
+const PROFILE_KEYS: (keyof Profile)[] = [
+  "weekly_workout_target",
+  "protein_target_g",
+  "calorie_target",
+  "name",
+  "dob",
+  "gender",
+  "height_cm",
+  "weight_kg",
+  "goal_weight_kg",
+  "goal_type",
+  "goal_speed_kg_wk",
+  "step_goal",
+  "carb_target_g",
+  "fat_target_g",
+  "reminders",
+];
+
+/** Upserts the given profile columns for the signed-in user (a partial patch is fine). */
+export async function saveProfile(patch: Partial<Profile>) {
   const { supabase, user } = await userOrThrow();
-  const { error } = await supabase.from("profiles").upsert({ id: user.id, ...p });
+  const row: Record<string, unknown> = { id: user.id };
+  for (const k of PROFILE_KEYS) if (k in patch) row[k] = patch[k];
+  if (typeof row.name === "string") row.name = row.name.trim().slice(0, 40);
+  const { error } = await supabase.from("profiles").upsert(row);
+  if (error) throw new Error(error.message);
+  revalidatePath("/", "layout");
+}
+
+/** Kept for older callers: the three classic targets. */
+export async function saveTargets(p: Pick<Profile, "weekly_workout_target" | "protein_target_g" | "calorie_target">) {
+  await saveProfile(p);
+}
+
+/** Onboarding's last screen: the whole profile plus the generated targets, in one go. */
+export async function completeOnboarding(patch: Partial<Profile>) {
+  await saveProfile(patch);
+  const jar = await cookies();
+  jar.delete(ONBOARD_SKIP_COOKIE);
+}
+
+/** "Skip for now": stay out of onboarding for 30 days on this device. */
+export async function skipOnboarding() {
+  const jar = await cookies();
+  jar.set(ONBOARD_SKIP_COOKIE, "1", { maxAge: 60 * 60 * 24 * 30, path: "/", sameSite: "lax", httpOnly: true });
+}
+
+// ---- weight log ----
+
+/** Logs a weigh-in and mirrors it onto `profiles.weight_kg` so every screen agrees. */
+export async function logWeight(input: { date: string; weight_kg: number; note: string }) {
+  const { supabase, user } = await userOrThrow();
+  const kg = Math.round(Number(input.weight_kg) * 10) / 10;
+  if (!Number.isFinite(kg) || kg < 20 || kg > 300) throw new Error("Enter a weight between 20 and 300 kg");
+  const { error } = await supabase.from("weight_log").insert({ user_id: user.id, date: input.date, weight_kg: kg, note: input.note.trim().slice(0, 80) || null });
+  if (error) throw new Error(error.message);
+  const { error: e2 } = await supabase.from("profiles").upsert({ id: user.id, weight_kg: kg });
+  if (e2) throw new Error(e2.message);
+  revalidatePath("/", "layout");
+}
+
+export async function deleteWeight(id: string) {
+  const { supabase, user } = await userOrThrow();
+  const { error } = await supabase.from("weight_log").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
 }
