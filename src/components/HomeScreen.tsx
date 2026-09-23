@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { addDays, longDate, shortDate } from "@/lib/dates";
 import { totalsFor } from "@/lib/totals";
-import { carbTargetG, fatTargetG, type Meal, type Profile, type Workout } from "@/lib/types";
-import { Flame, Lock } from "./icons";
-import { MealRow, PendingMealRow, WorkoutRow } from "./Rows";
+import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Profile, type Workout } from "@/lib/types";
+import { ChevronRight, Flame, Lock } from "./icons";
+import { ExerciseRow, MealRow, PendingMealRow, WorkoutRow } from "./Rows";
 import { usePendingMeals } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
 
@@ -16,12 +16,13 @@ type Props = {
   profile: Profile;
   workouts: Workout[];
   meals: Meal[];
+  exercises: ExerciseEntry[];
   weekStreak: number;
   thisWeek: number;
   celebrate: boolean;
 };
 
-export default function HomeScreen({ today, profile, workouts, meals, weekStreak, thisWeek, celebrate }: Props) {
+export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, thisWeek, celebrate }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(today);
   const { pending, savedCount, error } = usePendingMeals();
@@ -33,6 +34,11 @@ export default function HomeScreen({ today, profile, workouts, meals, weekStreak
   const totals = totalsFor(meals, selected);
   const dayWorkouts = workouts.filter((w) => w.date === selected);
   const dayMeals = meals.filter((m) => m.date === selected);
+  // Band-workout burns ride on the workout row itself; everything else gets a row of its own.
+  const dayExercises = exercises.filter((e) => e.date === selected && e.source !== "workout");
+  const workoutBurn = new Map(exercises.filter((e) => e.date === selected && e.source === "workout").map((e) => [e.note, e.kcal]));
+  // No Health Connect on the web, so the burned card is the exercise log alone.
+  const burned = exercises.filter((e) => e.date === selected).reduce((a, e) => a + e.kcal, 0);
   const trained = new Set(workouts.map((w) => w.date));
   const carbTarget = Math.max(1, carbTargetG(profile));
   const fatTarget = Math.max(1, fatTargetG(profile));
@@ -84,6 +90,31 @@ export default function HomeScreen({ today, profile, workouts, meals, weekStreak
         </div>
       </Rise>
 
+      {isToday ? (
+        <Rise index={4}>
+          <button
+            type="button"
+            className="card press flex w-full items-center gap-2.5 text-left"
+            style={{ padding: 14 }}
+            onClick={() => router.push(`/log?date=${today}&mode=exercise`)}
+            aria-label="Log exercise"
+          >
+            <Ring fraction={burned / 400} color="var(--orange)" size={44} stroke={5}>
+              <span style={{ color: "var(--orange)" }}>
+                <Flame size={16} />
+              </span>
+            </Ring>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="num text-xl font-extrabold leading-tight">{Math.round(burned)}</span>
+              <span className="text-xs muted">kcal burned · log exercise</span>
+            </span>
+            <span style={{ color: "var(--muted)" }}>
+              <ChevronRight size={18} />
+            </span>
+          </button>
+        </Rise>
+      ) : null}
+
       <Rise index={4}>
         <h2 className="text-xl font-extrabold" style={{ letterSpacing: "-0.025em" }}>
           {isToday ? "Recently logged" : longDate(selected)}
@@ -92,17 +123,22 @@ export default function HomeScreen({ today, profile, workouts, meals, weekStreak
 
       {isToday ? pending.map((p) => <Rise key={p.id} index={5}><PendingMealRow text={p.text} /></Rise>) : null}
 
-      {dayWorkouts.length === 0 && dayMeals.length === 0 && (!isToday || pending.length === 0) ? (
+      {dayWorkouts.length === 0 && dayMeals.length === 0 && dayExercises.length === 0 && (!isToday || pending.length === 0) ? (
         <Rise index={5}>
           <p className="text-[13px] muted">
-            {isToday ? "Nothing yet today. Tap + to log a workout or a meal." : `Nothing logged on ${longDate(selected)}.`}
+            {isToday ? "Nothing yet today. Tap + to log a workout, a meal or some exercise." : `Nothing logged on ${longDate(selected)}.`}
           </p>
         </Rise>
       ) : null}
 
       {dayWorkouts.map((w) => (
         <Rise key={w.id} index={5}>
-          <WorkoutRowLink workout={w} />
+          <WorkoutRowLink workout={w} burnKcal={workoutBurn.get(w.id) ?? null} />
+        </Rise>
+      ))}
+      {dayExercises.map((e) => (
+        <Rise key={e.id} index={5}>
+          <ExerciseRow entry={e} />
         </Rise>
       ))}
       {dayMeals.map((m) => (
@@ -118,9 +154,9 @@ export default function HomeScreen({ today, profile, workouts, meals, weekStreak
   );
 }
 
-function WorkoutRowLink({ workout }: { workout: Workout }) {
+function WorkoutRowLink({ workout, burnKcal }: { workout: Workout; burnKcal: number | null }) {
   const router = useRouter();
-  return <WorkoutRow workout={workout} onOpen={() => router.push(`/log?workout=${workout.id}`)} />;
+  return <WorkoutRow workout={workout} burnKcal={burnKcal} onOpen={() => router.push(`/log?workout=${workout.id}`)} />;
 }
 
 function WeekStrip({

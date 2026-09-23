@@ -1,11 +1,25 @@
 import { addDays, today } from "./dates";
 import { createClient } from "./supabase/server";
-import type { Meal, MealItem, Profile, ScanHistoryItem, Workout } from "./types";
+import type { ExerciseEntry, Meal, MealItem, Profile, ScanHistoryItem, Workout } from "./types";
 
 export async function getProfile(): Promise<Profile> {
   const supabase = await createClient();
-  const { data } = await supabase.from("profiles").select("weekly_workout_target, protein_target_g, calorie_target").maybeSingle();
-  return data ?? { weekly_workout_target: 3, protein_target_g: 120, calorie_target: 2200 };
+  const { data } = await supabase.from("profiles").select("weekly_workout_target, protein_target_g, calorie_target, weight_kg").maybeSingle();
+  if (!data) return { weekly_workout_target: 3, protein_target_g: 120, calorie_target: 2200, weight_kg: null };
+  return { ...data, weight_kg: data.weight_kg == null ? null : Number(data.weight_kg) } as Profile;
+}
+
+/** Calories-burned rows (logged exercise + the auto-burn each band workout writes), newest first. */
+export async function getExercises(from: string, to: string): Promise<ExerciseEntry[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("exercise_log")
+    .select("id, date, activity_code, name, minutes, intensity, kcal, source, note, created_at")
+    .gte("date", from)
+    .lte("date", to)
+    .order("date", { ascending: false })
+    .order("created_at", { ascending: false });
+  return (data ?? []).map((r) => ({ ...r, kcal: Number(r.kcal), minutes: Number(r.minutes), note: r.note ?? "" })) as ExerciseEntry[];
 }
 
 export async function getWorkouts(from: string, to: string): Promise<Workout[]> {
@@ -60,8 +74,8 @@ export async function getMeals(from: string, to: string): Promise<(Meal & { phot
 export async function getDashboard() {
   const t = today();
   const from = addDays(t, -120);
-  const [profile, workouts, meals] = await Promise.all([getProfile(), getWorkouts(from, t), getMeals(from, t)]);
-  return { today: t, profile, workouts, meals };
+  const [profile, workouts, meals, exercises] = await Promise.all([getProfile(), getWorkouts(from, t), getMeals(from, t), getExercises(from, t)]);
+  return { today: t, profile, workouts, meals, exercises };
 }
 
 /** Latest scans for the History list (label / barcode / photo), newest first. */

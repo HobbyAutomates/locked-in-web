@@ -6,7 +6,7 @@ import { addDays, today as todayIso, weekStart } from "@/lib/dates";
 import { totalsFor } from "@/lib/totals";
 import { restByMuscle } from "@/lib/streaks";
 import { MUSCLE_COLOR, type Muscle } from "@/lib/muscles";
-import type { Meal, Profile, Workout } from "@/lib/types";
+import type { ExerciseEntry, Meal, Profile, Workout } from "@/lib/types";
 import { BreathingFlame, Card, MacroDot, Rise, SPRING, Segmented } from "./ui";
 
 const WEEK_OPTIONS = ["This week", "Last week", "2 wks ago", "3 wks ago"];
@@ -15,12 +15,14 @@ export default function ProgressScreen({
   profile,
   workouts,
   meals,
+  exercises,
   weekStreak,
   thisWeek,
 }: {
   profile: Profile;
   workouts: Workout[];
   meals: Meal[];
+  exercises: ExerciseEntry[];
   weekStreak: number;
   thisWeek: number;
 }) {
@@ -89,6 +91,10 @@ export default function ProgressScreen({
       </Rise>
 
       <Rise index={3}>
+        <WeeklyEnergy days={days} meals={meals} exercises={exercises} today={t} />
+      </Rise>
+
+      <Rise index={3}>
         <Card>
           <p className="text-[17px] font-bold">Protein</p>
           <p className="flex items-baseline">
@@ -135,6 +141,97 @@ export default function ProgressScreen({
         </Card>
       </Rise>
     </div>
+  );
+}
+
+/**
+ * Weekly Energy: calories eaten vs burned for the selected week. Burned is the exercise log
+ * (logged activities + band-workout auto-burns) — the web has no Health Connect feed.
+ */
+function WeeklyEnergy({ days, meals, exercises, today }: { days: string[]; meals: Meal[]; exercises: ExerciseEntry[]; today: string }) {
+  const consumed = days.map((d) => totalsFor(meals, d).calories);
+  const burned = days.map((d) => exercises.filter((e) => e.date === d).reduce((a, e) => a + e.kcal, 0));
+  const totalIn = consumed.reduce((a, b) => a + b, 0);
+  const totalOut = burned.reduce((a, b) => a + b, 0);
+  const inWeek = new Set(days);
+  const week = exercises.filter((e) => inWeek.has(e.date));
+  const stat = (label: string, value: number, color: string) => (
+    <span className="flex flex-col">
+      <span className="text-xs muted">{label}</span>
+      <span className="num text-xl font-extrabold leading-tight" style={{ color, letterSpacing: "-0.03em" }}>{Math.round(value)}</span>
+      <span className="text-[11px] muted">kcal</span>
+    </span>
+  );
+  return (
+    <Card>
+      <p className="text-[17px] font-bold">Weekly Energy</p>
+      <div className="mt-3 flex justify-between">
+        {stat("Consumed", totalIn, "var(--orange)")}
+        {stat("Burned", totalOut, "var(--green)")}
+        {stat("Net", totalIn - totalOut, "var(--ink)")}
+      </div>
+      <LineChart a={consumed} b={burned} colorA="var(--orange)" colorB="var(--green)" />
+      <div className="mt-2 flex gap-1">
+        {["S", "M", "T", "W", "T", "F", "S"].map((l, i) => (
+          <span key={i} className="flex-1 text-center text-[10px]" style={{ color: days[i] === today ? "var(--ink)" : "var(--muted)", fontWeight: days[i] === today ? 700 : 400 }}>
+            {l}
+          </span>
+        ))}
+      </div>
+      <div className="mt-2.5 flex gap-3.5">
+        <MacroDot value="Consumed" color="var(--orange)" />
+        <MacroDot value="Burned" color="var(--green)" />
+      </div>
+      {week.length ? (
+        <div className="mt-3.5">
+          <p className="text-[13px] font-semibold muted">Exercise this week</p>
+          <div className="mt-1 flex flex-col gap-1.5">
+            {week.slice(0, 8).map((e) => (
+              <div key={e.id} className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="w-[34px] shrink-0 text-xs font-semibold muted">{new Date(e.date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" })}</span>
+                  <span className="truncate text-[13px] font-semibold">{e.name.charAt(0).toUpperCase() + e.name.slice(1)}</span>
+                </span>
+                <span className="shrink-0 text-xs muted">
+                  {e.minutes} min · {Math.round(e.kcal)} kcal
+                </span>
+              </div>
+            ))}
+            {week.length > 8 ? <span className="text-xs muted">+{week.length - 8} more</span> : null}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-2.5 text-xs muted">Log a run, bands or any activity from + → Exercise and it lands here.</p>
+      )}
+    </Card>
+  );
+}
+
+/** Two 7-point polylines on a shared scale, with a dot at each day. Mirrors Compose's LineChart. */
+function LineChart({ a, b, colorA, colorB }: { a: number[]; b: number[]; colorA: string; colorB: string }) {
+  const W = 300;
+  const H = 110;
+  const max = Math.max(...a, ...b, 1);
+  const pts = (v: number[]) => v.map((x, i) => [v.length <= 1 ? 0 : (W * i) / (v.length - 1), H - Math.min(H, Math.max(0, (H * x) / max))] as const);
+  const path = (p: readonly (readonly [number, number])[]) => p.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 block h-[110px] w-full" preserveAspectRatio="none" aria-hidden="true">
+      <line x1={0} y1={H} x2={W} y2={H} stroke="var(--hair)" strokeWidth={1.5} />
+      {[
+        [a, colorA],
+        [b, colorB],
+      ].map(([v, c], i) => {
+        const p = pts(v as number[]);
+        return (
+          <g key={i}>
+            <motion.path d={path(p)} fill="none" stroke={c as string} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ ...SPRING, delay: 0.2 }} />
+            {p.map(([x, y], j) => (
+              <circle key={j} cx={x} cy={y} r={3.5} fill={c as string} />
+            ))}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 

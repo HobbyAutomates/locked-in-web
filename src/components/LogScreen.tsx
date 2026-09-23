@@ -4,26 +4,29 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "./icons";
 import { Segmented } from "./ui";
+import ExerciseForm from "./ExerciseForm";
 import MealForm from "./MealForm";
 import WorkoutForm from "./WorkoutForm";
 import type { Profile, SavedMeal, Workout } from "@/lib/types";
 
-/** Full-screen Log page: Workout / Meal segments (opened from the + FAB or a workout row). */
+/** Full-screen Log page: Workout / Meal / Exercise segments (opened from the + FAB or a workout row). */
 export default function LogScreen({
   existing,
   date,
   startOnMeal,
+  startOnExercise = false,
   savedMeals,
   profile,
 }: {
   existing: Workout | null;
   date: string;
   startOnMeal: boolean;
+  startOnExercise?: boolean;
   savedMeals: SavedMeal[];
   profile: Profile;
 }) {
   const router = useRouter();
-  const [seg, setSeg] = useState(startOnMeal ? 1 : 0);
+  const [seg, setSeg] = useState(startOnExercise ? 2 : startOnMeal ? 1 : 0);
   const close = () => router.push("/");
 
   return (
@@ -43,13 +46,15 @@ export default function LogScreen({
       </div>
       {!existing ? (
         <div className="px-4 py-2">
-          <Segmented options={["Workout", "Meal"]} selected={seg} onSelect={setSeg} label="What are you logging" />
+          <Segmented options={["Workout", "Meal", "Exercise"]} selected={seg} onSelect={setSeg} label="What are you logging" />
         </div>
       ) : null}
       {existing || seg === 0 ? (
         <WorkoutForm existing={existing} initialDate={date} target={profile.weekly_workout_target} onClose={close} />
-      ) : (
+      ) : seg === 1 ? (
         <MealForm date={date} savedMeals={savedMeals} onClose={close} />
+      ) : (
+        <ExerciseForm date={date} weightKg={profile.weight_kg ?? null} onClose={close} />
       )}
     </div>
   );

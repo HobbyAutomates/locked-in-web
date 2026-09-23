@@ -41,6 +41,43 @@ export type Profile = {
   weekly_workout_target: number;
   protein_target_g: number;
   calorie_target: number;
+  /** Body weight for the calories-burned formula; read-only here (Android owns the weight log). */
+  weight_kg?: number | null;
+};
+
+/** One row of `bandlog.activities` — a MET-table entry the user can log against. */
+export type Activity = {
+  code: string;
+  name: string;
+  description: string;
+  met: number;
+  category: string;
+  tags: string[];
+};
+
+/** One row of `bandlog.exercise_log`: a burn the user logged (or a band workout wrote for them). */
+export type ExerciseEntry = {
+  id: string;
+  date: string;
+  activity_code: string | null;
+  name: string;
+  minutes: number;
+  intensity: "low" | "medium" | "high";
+  kcal: number;
+  source: "manual" | "workout" | "health" | "describe";
+  /** For source=workout this holds the workout id so a delete can find its row. */
+  note: string;
+  created_at: string;
+};
+
+/** One activity Haiku pulled out of a free-text description (see /api/describe-exercise). */
+export type DescribedExercise = {
+  activity_code: string | null;
+  name: string;
+  minutes: number;
+  intensity: "low" | "medium" | "high";
+  met: number;
+  kcal: number;
 };
 
 export type ParsedItem = MealItem & {

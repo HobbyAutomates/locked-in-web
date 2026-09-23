@@ -26,6 +26,36 @@ function Stroke({ size = 24, className, style, children }: P & { children: React
   );
 }
 
+/** Running figure for the Run option and exercise rows. */
+export function Run(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="15" cy="4" r="1.5" />
+      <path d="M6 21l3.5-6.5 3 2L14 21" />
+      <path d="M9.5 14.5l1-4.5 3.5-1.5 2.5 3.5 3.5.5" />
+      <path d="M10.5 10L7 11.5 5 9" />
+    </Stroke>
+  );
+}
+
+/** Three text lines for the Describe option. */
+export function TextLines(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M4 7h16M4 12h12M4 17h8" />
+    </Stroke>
+  );
+}
+
+/** Number keypad for the Manual option. */
+export function Keypad(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M6 5h.1M12 5h.1M18 5h.1M6 11h.1M12 11h.1M18 11h.1M6 17h.1M12 17h.1M18 17h.1" />
+    </Stroke>
+  );
+}
+
 /** Filled flame — streak and calories. */
 export function Flame({ size = 24, className, style }: P) {
   return (

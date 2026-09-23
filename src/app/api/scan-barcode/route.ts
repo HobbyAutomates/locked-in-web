@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/apiAuth";
-import { analyseTranscript, fetchOff, lensFor, loadScanProfile, offTranscript, saveScan, type OffProduct } from "@/lib/labelAnalysis";
+import { analyseTranscript, fetchOff, lensFor, loadScanProfile, offComplete, offTranscript, saveScan, type OffProduct } from "@/lib/labelAnalysis";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -43,7 +43,9 @@ export async function POST(req: Request) {
     // 2–3. Same analysis + structuring as a label.
     const transcript = offTranscript(product);
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const { report, analysis } = await analyseTranscript({ client, transcript, note: body.note, lens, profile, kind: "barcode" });
+    // A complete OFF record (ingredients + full nutrition) only needs one search at most — recall /
+    // counterfeit checks — which keeps a typical barcode scan well under 25 s.
+    const { report, analysis } = await analyseTranscript({ client, transcript, note: body.note, lens, profile, kind: "barcode", maxSearches: offComplete(product) ? 1 : 2 });
     const image_url = product.image_url ?? null;
     const full = { ...report, kind: "barcode", lens, barcode, image_url, transcript, analysis };
     const id = await saveScan(admin, {

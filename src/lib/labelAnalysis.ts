@@ -182,33 +182,84 @@ export type AnalysisInput = {
   fromPhoneOcr?: boolean;
   /** "label" (photo/OCR) or "barcode" (Open Food Facts product data). */
   kind: "label" | "barcode";
+  /** Web searches Haiku may run (default 2). A complete Open Food Facts record needs at most 1. */
+  maxSearches?: number;
 };
 
-/** Steps 2 (analyse + research) and 3 (forced tool call). Always yields a report object. */
+/** The rules the structuring step follows, shared by the two-call and the single-call paths. */
+function structureRules(targets: string, lens: Lens, compact: boolean) {
+  return (
+    `${targets}\nThe user's chosen lens is "${lens}".\n\n` +
+    `Rules:\n` +
+    `- what_it_is: two neutral sentences from section 1. No judgement words.\n` +
+    `- verdict / verdict_reason: from TRUST only (safety + honesty). Never let taste or nutrition move it.\n` +
+    `- fits: one entry per lens (protein, snack, cutting, bulking) with verdict great|ok|weak and a "why" that quotes the deciding number. Descriptive wording only — never "not good for you".\n` +
+    `- infographic.serving_share: take ONE serving (use serving_g; if there is no serving size, use 100 g and say so in one_liner) and express its calories/protein/carbs/fat as whole percentages of the daily targets above. Clamp each to 0-100.\n` +
+    `- infographic.sugar_teaspoons_per_serving: sugar grams in one serving divided by 4. 0 when unknown.\n` +
+    `- infographic.sodium_pct_of_2000mg: sodium mg in one serving as a whole percentage of 2000 mg (salt g x 400 = sodium mg). 0 when unknown.\n` +
+    `- infographic.score_out_of_10: how well this product serves the "${lens}" lens for THIS user. 0 is useless for that lens, 10 is ideal.\n` +
+    `- infographic.one_liner: at most 12 words, descriptive ("Mostly refined flour and palm oil; 7 g protein per pack").\n` +
+    `- infographic.eat_it: for the "${lens}" lens — "yes" great fit, "sometimes" ok, "skip" weak.\n` +
+    (compact
+      ? `- Keep it tight: at most 4 concerns, 3 suggestions, 3 alternatives, 2 research lines (only what you actually found; an empty array when you did not search), and only claims actually printed on the pack. One sentence per "why", "note" and "issue".\n\n`
+      : `\n`)
+  );
+}
+
+/**
+ * Steps 2 (analyse + research) and 3 (forced tool call). Always yields a report object.
+ *
+ * Two paths:
+ *  - Label scans (and thin Open Food Facts records): a free-text analysis with up to two web
+ *    searches, then a second forced `label_report` call that structures it.
+ *  - Complete Open Food Facts records (`maxSearches` 1): ONE call that offers both web search
+ *    (max 1 use, only for a plausible recall / counterfeit story) and `label_report`, asked to jot
+ *    brief notes and call the tool. Half the output tokens, one round trip — a typical barcode
+ *    scan lands well under 25 s. Falls back to the two-call path if the tool wasn't called.
+ */
 export async function analyseTranscript(input: AnalysisInput): Promise<{ report: Record<string, unknown>; analysis: string }> {
   const { client, transcript, note, lens, profile } = input;
   const text = (m: Anthropic.Message) => m.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("\n");
   const targets = targetsLine(profile);
+  const maxSearches = input.maxSearches ?? 2;
+  const compact = input.kind === "barcode" && maxSearches <= 1;
   const provenance =
     input.kind === "barcode"
       ? " (this is a product record from Open Food Facts, contributed by volunteers — nutrition numbers are usually right, ingredient lists may be partial; say so if a field is missing)"
       : input.fromPhoneOcr
         ? " (read on the user's phone, so odd line breaks and the occasional misread character are expected — use judgement)"
         : "";
+  // A complete OFF record answers the nutrition questions on its own; the one remaining reason to
+  // search is a recall / counterfeit story, and most products have none.
+  const searchHint = compact
+    ? "\n\nThe data comes from Open Food Facts and is complete (ingredients + full nutrition table). Search the web ONLY if the brand/product could plausibly have a recall or counterfeit issue; otherwise answer from the record and skip the search."
+    : "";
+  const userText = `LABEL TRANSCRIPT${provenance}:\n${transcript}\n\n${note ? `User note: ${note.slice(0, 300)}\n\n` : ""}${targets}${searchHint}`;
+  const webSearch = { type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool;
 
-  const a = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 3000,
-    system: analyseSystem(profile, lens),
-    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 2 } as unknown as Anthropic.Tool],
-    messages: [
-      {
-        role: "user",
-        content: `LABEL TRANSCRIPT${provenance}:\n${transcript}\n\n${note ? `User note: ${note.slice(0, 300)}\n\n` : ""}${targets}\n\nAnalyse it.`,
-      },
-    ],
-  });
-  const analysis = text(a).trim();
+  let analysis = "";
+  if (compact) {
+    const one = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2500,
+      system: analyseSystem(profile, lens) + "\n\nFor this record: write your notes as short bullets (under 150 words in total — the numbers, the trust call, one line per lens), then call the label_report tool exactly once with the full report. Every number in the report comes from the record.",
+      tools: [webSearch, REPORT_TOOL],
+      messages: [{ role: "user", content: `${userText}\n\nAnalyse it briefly, then call label_report.\n\n${structureRules(targets, lens, true)}` }],
+    });
+    analysis = text(one).trim();
+    const block = one.content.find((b) => b.type === "tool_use" && b.name === "label_report");
+    if (block && block.type === "tool_use") return { report: block.input as Record<string, unknown>, analysis };
+    // The model wrote prose but skipped the tool: structure what it wrote, below.
+  } else {
+    const a = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 3000,
+      system: analyseSystem(profile, lens),
+      tools: [webSearch],
+      messages: [{ role: "user", content: `${userText}\n\nAnalyse it.` }],
+    });
+    analysis = text(a).trim();
+  }
 
   const s = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
@@ -220,17 +271,7 @@ export async function analyseTranscript(input: AnalysisInput): Promise<{ report:
         role: "user",
         content:
           `Convert this analysis into the label_report tool call. Keep every number as written. Set readable=true.\n\n` +
-          `${targets}\nThe user's chosen lens is "${lens}".\n\n` +
-          `Rules:\n` +
-          `- what_it_is: two neutral sentences from section 1. No judgement words.\n` +
-          `- verdict / verdict_reason: from TRUST only (safety + honesty). Never let taste or nutrition move it.\n` +
-          `- fits: one entry per lens (protein, snack, cutting, bulking) with verdict great|ok|weak and a "why" that quotes the deciding number. Descriptive wording only — never "not good for you".\n` +
-          `- infographic.serving_share: take ONE serving (use serving_g; if there is no serving size, use 100 g and say so in one_liner) and express its calories/protein/carbs/fat as whole percentages of the daily targets above. Clamp each to 0-100.\n` +
-          `- infographic.sugar_teaspoons_per_serving: sugar grams in one serving divided by 4. 0 when unknown.\n` +
-          `- infographic.sodium_pct_of_2000mg: sodium mg in one serving as a whole percentage of 2000 mg (salt g x 400 = sodium mg). 0 when unknown.\n` +
-          `- infographic.score_out_of_10: how well this product serves the "${lens}" lens for THIS user. 0 is useless for that lens, 10 is ideal.\n` +
-          `- infographic.one_liner: at most 12 words, descriptive ("Mostly refined flour and palm oil; 7 g protein per pack").\n` +
-          `- infographic.eat_it: for the "${lens}" lens — "yes" great fit, "sometimes" ok, "skip" weak.\n\n` +
+          structureRules(targets, lens, compact) +
           `TRANSCRIPT:\n${transcript}\n\nANALYSIS:\n${analysis}`,
       },
     ],
@@ -274,6 +315,18 @@ export async function saveScan(
 }
 
 // ---- Open Food Facts ----
+
+/** True when OFF has an ingredients list and per-100 g energy, protein, carbs, fat, sugar and sodium. */
+export function offComplete(p: OffProduct): boolean {
+  if (!p.ingredients_text?.trim()) return false;
+  const n = p.nutriments ?? {};
+  const has = (k: string) => {
+    const v = n[`${k}_100g`] ?? n[k];
+    return v != null && v !== "" && Number.isFinite(Number(v));
+  };
+  const sodium = has("sodium") || has("salt");
+  return has("energy-kcal") && has("proteins") && has("carbohydrates") && has("fat") && has("sugars") && sodium;
+}
 
 export type OffProduct = {
   code?: string;

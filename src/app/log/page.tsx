@@ -25,6 +25,7 @@ export default async function LogPage({
         existing={existing}
         date={existing?.date ?? sp.date ?? todayIso()}
         startOnMeal={sp.mode === "meal"}
+        startOnExercise={sp.mode === "exercise"}
         savedMeals={savedMeals}
         profile={profile}
       />

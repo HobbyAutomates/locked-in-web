@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deleteMeal } from "@/lib/actions";
-import type { Meal, Workout } from "@/lib/types";
+import { deleteExercise, deleteMeal } from "@/lib/actions";
+import { RUN_CODE, intensityLabel } from "@/lib/burn";
+import type { ExerciseEntry, Meal, Workout } from "@/lib/types";
 import { formatTime, relativeDay } from "@/lib/display";
-import { Bowl, Dumbbell, Flame, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
+import { Bowl, Dumbbell, Flame, Run, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
 import { Card, CardButton, IconTile, MacroDot, fmt } from "./ui";
 
-export function WorkoutRow({ workout, onOpen }: { workout: Workout; onOpen: () => void }) {
+export function WorkoutRow({ workout, onOpen, burnKcal }: { workout: Workout; onOpen: () => void; burnKcal?: number | null }) {
   const w = workout;
   return (
     <CardButton onClick={onOpen} ariaLabel={`Edit workout on ${relativeDay(w.date)}`}>
@@ -25,7 +26,13 @@ export function WorkoutRow({ workout, onOpen }: { workout: Workout; onOpen: () =
             </span>
           </div>
           <span className="truncate text-[15px] font-bold">{w.muscles.join(" · ")}</span>
-          <span className="flex gap-2.5 truncate text-xs muted">
+          <span className="flex items-center gap-2.5 truncate text-xs muted">
+            {burnKcal != null && burnKcal > 0 ? (
+              <span className="flex items-center gap-1 font-bold" style={{ color: "var(--ink)" }}>
+                <Flame size={13} />
+                {Math.round(burnKcal)} kcal
+              </span>
+            ) : null}
             {w.minutes != null ? <span>{w.minutes} mins</span> : null}
             {w.exercises ? <span className="truncate">{w.exercises}</span> : null}
           </span>
@@ -121,6 +128,54 @@ export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: 
           </span>
         </div>
       ) : null}
+    </Card>
+  );
+}
+
+/** A logged burn (run / activity / described / manual): flame + calories, then intensity and minutes. */
+export function ExerciseRow({ entry }: { entry: ExerciseEntry }) {
+  const router = useRouter();
+  const [busy, startDelete] = useTransition();
+  const e = entry;
+  const lower = e.name.toLowerCase();
+  const isRun = e.activity_code === RUN_CODE || lower.includes("run") || lower.includes("jog");
+  const isBands = (e.activity_code ?? "").startsWith("LI-BAND") || lower.includes("lifting") || lower.includes("band");
+  const neutral = isRun || isBands;
+  return (
+    <Card padding={14}>
+      <div className="flex items-center gap-3">
+        <IconTile tint={neutral ? "var(--ink)" : "var(--green)"} bg={neutral ? "var(--card2)" : "var(--green-bg)"}>
+          {isBands ? <Dumbbell size={26} /> : <Run size={26} />}
+        </IconTile>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-[15px] font-semibold">{e.name.charAt(0).toUpperCase() + e.name.slice(1)}</span>
+            <span className="shrink-0 text-xs muted">{formatTime(e.created_at)}</span>
+          </div>
+          <span className="flex items-center gap-1.5 text-[15px] font-bold">
+            <Flame size={15} />
+            {Math.round(e.kcal)} calories
+          </span>
+          <span className="text-xs muted">
+            {e.source === "manual" && !e.activity_code ? "Manual" : `Intensity: ${intensityLabel(e.intensity)}`} · {e.minutes} mins
+          </span>
+        </div>
+        <button
+          type="button"
+          className="press grid h-8 w-8 shrink-0 place-items-center rounded-full"
+          style={{ color: "var(--muted)" }}
+          aria-label="Delete exercise"
+          disabled={busy}
+          onClick={() =>
+            startDelete(async () => {
+              await deleteExercise(e.id);
+              router.refresh();
+            })
+          }
+        >
+          {busy ? <Spinner size={16} /> : <Trash size={18} />}
+        </button>
+      </div>
     </Card>
   );
 }
