@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "motion/react";
-import { Flame as FlameIcon } from "./icons";
+import { ChevronRight as ChevronRightIcon, Flame as FlameIcon } from "./icons";
 
 /** Spring used for anything spatial (rings, bars, rising cards) — mirrors Motion.spatialSlow(). */
 export const SPRING = { type: "spring" as const, stiffness: 190, damping: 22 };
@@ -240,29 +241,43 @@ export function NumberField({
   );
 }
 
-/** A settings-style row inside a zero-padding card. */
+/** A settings-style row inside a zero-padding card. `href` renders a link, `onClick` a button. */
 export function SettingRow({
   icon,
   tint,
   label,
+  subtitle,
   onClick,
+  href,
   children,
 }: {
   icon?: React.ReactNode;
   tint?: string;
   label: string;
+  subtitle?: string;
   onClick?: () => void;
+  href?: string;
   children: React.ReactNode;
 }) {
   const inner = (
     <>
-      <span className="flex items-center gap-2.5">
-        {icon ? <span style={{ color: tint ?? "var(--ink)", display: "inline-flex" }}>{icon}</span> : null}
-        {label}
+      <span className="flex min-w-0 items-center gap-2.5">
+        {icon ? <span style={{ color: tint ?? "var(--ink)", display: "inline-flex", flex: "none" }}>{icon}</span> : null}
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate">{label}</span>
+          {subtitle ? <span className="text-[11px] font-normal muted">{subtitle}</span> : null}
+        </span>
       </span>
       {children}
     </>
   );
+  if (href) {
+    return (
+      <Link href={href} className="setting-row press">
+        {inner}
+      </Link>
+    );
+  }
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className="setting-row press">
@@ -271,6 +286,43 @@ export function SettingRow({
     );
   }
   return <div className="setting-row">{inner}</div>;
+}
+
+/** The small "›" that ends a row which pushes a page. */
+export function Chevron() {
+  return (
+    <span style={{ color: "var(--muted)", display: "inline-flex", flex: "none" }}>
+      <ChevronRightIcon size={18} />
+    </span>
+  );
+}
+
+/** Grey caption above a grouped card ("Account", "Goals & tracking"). */
+export function GroupLabel({ children }: { children: React.ReactNode }) {
+  return <p className="px-1 text-[13px] font-bold muted">{children}</p>;
+}
+
+/** iOS-style switch: black track when on. */
+export function Toggle({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} className="toggle press">
+      <span className="toggle-knob" />
+    </button>
+  );
+}
+
+/** Answer tile for onboarding: solid black with white text when chosen, soft grey when not. */
+export function OptionCard({ title, sub, selected, onClick }: { title: string; sub?: string; selected: boolean; onClick: () => void }) {
+  return (
+    <button type="button" aria-pressed={selected} onClick={onClick} className="option-card press">
+      <span className="block text-[17px] font-bold">{title}</span>
+      {sub ? (
+        <span className="mt-0.5 block text-[13px]" style={{ opacity: selected ? 0.72 : 1, color: selected ? "inherit" : "var(--muted)" }}>
+          {sub}
+        </span>
+      ) : null}
+    </button>
+  );
 }
 
 /** Number formatting shared with the Android app's `fmt`. */

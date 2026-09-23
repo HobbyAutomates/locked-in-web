@@ -1,5 +1,8 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
+import { getProfile } from "@/lib/data";
+import { ONBOARD_SKIP_COOKIE, needsOnboarding } from "@/lib/onboarding";
 import BottomNav from "@/components/BottomNav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -18,6 +21,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   const { user } = await requireUser();
   if (!user) redirect("/login");
+  // First run: until the body details are in (or "Skip for now" was tapped), every tab lands on onboarding.
+  const [profile, jar] = await Promise.all([getProfile(), cookies()]);
+  if (needsOnboarding(profile) && jar.get(ONBOARD_SKIP_COOKIE)?.value !== "1") redirect("/onboarding");
   return (
     <>
       <main

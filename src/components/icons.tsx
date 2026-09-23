@@ -231,3 +231,146 @@ export function Spinner({ size = 18, className, style }: P) {
     </svg>
   );
 }
+
+// ---- v1.5–v1.8 additions (Profile, onboarding, badges), ported from Icons.kt ----
+
+/** Two footprints for the step-goal row. */
+export function Steps(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M6 3c2 0 3 2 3 5s-1 5-2.5 5S4 11 4 8s.5-5 2-5zM5 15h3v2H5zM18 7c2 0 2 2 2 5s-1 5-2.5 5S15 15 15 12s1-5 3-5zM16 19h3v2h-3z" />
+    </Stroke>
+  );
+}
+
+/** Goal-speed animals: a hunched sloth, an upright rabbit, a stretched-out cheetah. */
+export function Sloth(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M4 6h16M9 6v3M16 6v3" />
+      <path d="M12.5 9c3.5 0 5.5 2.5 5.5 5.5S16 20 12.5 20 7 17.5 7 14.5 9 9 12.5 9z" />
+      <path d="M10.5 14h.1M14.5 14h.1" />
+    </Stroke>
+  );
+}
+export function Rabbit(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M9 10c-1-3-1-6 .5-7 1.5 1 1.5 4 1 7M14.5 10c1-3 1-6-.5-7-1.5 1-1.5 4-1 7" />
+      <path d="M12 10c3.5 0 6 2.5 6 6s-2.5 5-6 5-6-2-6-5 2.5-6 6-6z" />
+      <path d="M10 15h.1M14 15h.1" />
+    </Stroke>
+  );
+}
+export function Cheetah(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M3 15c2-4 6-5 10-5 3 0 5-1 6-3l2.5.5M3 15c-1 1-1.5 2-1 3" />
+      <path d="M6 13.5L5 19M9.5 12.5L9 19M13.5 11.5l1 6.5M16.5 9.5L18 15" />
+    </Stroke>
+  );
+}
+
+/** Bathroom scale for the weight rows. */
+export function Scale(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path d="M8 9c0-2 2-2.5 4-2.5s4 .5 4 2.5M12 9v4" />
+    </Stroke>
+  );
+}
+
+/** Ruler for the height row. */
+export function Ruler(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M4 8h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+      <path d="M7 8v4M11 8v4M15 8v4M19 8v4" />
+    </Stroke>
+  );
+}
+
+/** Pencil used on the "tap to edit" rows. */
+export function Pencil(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M4 20l.8-3.8L16.5 4.5a2.1 2.1 0 0 1 3 3L7.8 19.2zM14.5 6.5l3 3" />
+    </Stroke>
+  );
+}
+
+/** Target rings for the goal / nutrition rows. */
+export function Target(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 12h.1" />
+    </Stroke>
+  );
+}
+
+export function Check(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M5 12.5l5 5 9-11" />
+    </Stroke>
+  );
+}
+
+export function Person(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.5-6.5 8-6.5s8 2.5 8 6.5" />
+    </Stroke>
+  );
+}
+
+/** Sliders for the Preferences row. */
+export function Tune(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+      <circle cx="16" cy="7" r="2" />
+      <circle cx="10" cy="17" r="2" />
+    </Stroke>
+  );
+}
+
+export function Bell(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 21h4" />
+    </Stroke>
+  );
+}
+
+/** Painter's palette for "Ring colours explained". */
+export function Palette(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M12 3a9 9 0 0 0 0 18c1.5 0 2-1 1.5-2s0-2 1.5-2h2a4 4 0 0 0 4-4c0-5.5-4-10-9-10z" />
+      <path d="M7.5 10.5h.1M11 7h.1M15.5 8.5h.1M7.5 15h.1" />
+    </Stroke>
+  );
+}
+
+export function Mail(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M3 6h18v12H3zM3 7l9 6 9-6" />
+    </Stroke>
+  );
+}
+
+/** Hexagonal medal outline for the Badges tab card. */
+export function Medal(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5z" />
+      <path d="M9.5 12l2 2 3.5-4" />
+    </Stroke>
+  );
+}

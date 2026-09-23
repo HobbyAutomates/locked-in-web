@@ -432,3 +432,170 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ───────── Profile / onboarding controls ───────── */
+
+.toggle {
+  position: relative;
+  flex: none;
+  width: 50px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--track);
+  padding: 0;
+  transition: background-color 0.18s ease, transform 0.16s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+.toggle[aria-checked="true"] {
+  background: var(--btn);
+}
+.toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+.toggle[aria-checked="true"] .toggle-knob {
+  background: var(--btn-ink);
+  transform: translateX(20px);
+}
+
+.option-card {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 18px;
+  background: var(--card2);
+  color: var(--ink);
+  padding: 16px 18px;
+  text-align: left;
+}
+.option-card[aria-pressed="true"] {
+  background: var(--btn);
+  color: var(--btn-ink);
+}
+@media (hover: hover) {
+  .option-card:hover {
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+/* Notched slider on a grey track with a black thumb (Compose's Slider colours). */
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+}
+.range::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+}
+.range::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ink);
+}
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  margin-top: -9px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.range:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+/* Native date / time pickers styled like the grey value boxes. */
+.pickfield {
+  border: 0;
+  border-radius: 10px;
+  background: var(--card2);
+  color: var(--ink);
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+  min-height: 36px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.pickfield::-webkit-calendar-picker-indicator {
+  opacity: 0.6;
+}
+.pickfield::-webkit-date-and-time-value {
+  text-align: right;
+}
+
+/* Big height / weight boxes on onboarding. */
+.bignum {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  outline: none;
+  padding: 0;
+}
+
+/* Thin progress bar across the top of each onboarding step. */
+.obar {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+.obar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ink);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The draggable target-weight ruler. */
+.ruler {
+  position: relative;
+  width: 100%;
+  height: 104px;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ruler:active {
+  cursor: grabbing;
+}
