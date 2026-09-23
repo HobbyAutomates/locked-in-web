@@ -4,9 +4,11 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteScan, saveMeal } from "@/lib/actions";
 import { today } from "@/lib/dates";
-import type { Fit, LabelReport, Lens, PlateEstimate, PlateItem, ScanHistoryItem } from "@/lib/types";
-import { Bowl, Scan, Spinner, Trash } from "./icons";
-import { Card, ErrorNote, Hair, PillButton, Rise, Segmented, fmt } from "./ui";
+import { type QuantityFood } from "@/lib/quantity";
+import { initialLens, type Fit, type LabelReport, type Lens, type MealItem, type PlateEstimate, type PlateItem, type Profile, type ScanHistoryItem } from "@/lib/types";
+import { Bowl, Check, Scan, Spinner, Trash } from "./icons";
+import QuantitySheet from "./QuantitySheet";
+import { Card, ErrorNote, Hair, MacroDot, PillButton, Ring, Rise, Segmented, fmt } from "./ui";
 
 const MAX_EDGE = 2200;
 const LENSES: { key: Lens; label: string }[] = [
@@ -57,15 +59,16 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
-export default function ScanScreen({ history }: { history: ScanHistoryItem[] }) {
-  const [mode, setMode] = useState<Mode>("label");
+export default function ScanScreen({ history, profile, initialMode = "label" }: { history: ScanHistoryItem[]; profile: Profile; initialMode?: Mode }) {
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [preview, setPreview] = useState<string | null>(null);
   const [payload, setPayload] = useState<{ base64: string; media_type: string } | null>(null);
   const [note, setNote] = useState("");
   const [barcode, setBarcode] = useState("");
   const [decoding, setDecoding] = useState(false);
   const [decodeNote, setDecodeNote] = useState<string | null>(null);
-  const [lens, setLens] = useState<Lens>("protein");
+  // Profile → Preferences → "Judge scans for" decides where the lens starts.
+  const [lens, setLens] = useState<Lens>(initialLens(profile));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<LabelReport | null>(null);
@@ -343,9 +346,72 @@ const PER_100 = [
   ["sodium_mg", "mg Na"],
 ] as const;
 
+/** The scan report as a food the Quantity sheet can price: per-100 g from the label, one serving = serving_g. */
+function reportFood(r: LabelReport): QuantityFood | null {
+  const p = r.per_100g ?? {};
+  if (p.calories == null && p.protein_g == null) return null;
+  const serving = r.serving_g && r.serving_g > 0 ? [{ label: "1 serving", grams: r.serving_g }] : [];
+  return {
+    name: r.product || "Scanned product",
+    food_id: null,
+    per100: { calories: Number(p.calories ?? 0), protein_g: Number(p.protein_g ?? 0), carbs_g: Number(p.carbs_g ?? 0), fat_g: Number(p.fat_g ?? 0) },
+    micros: { ...(p.sugar_g != null ? { sugar_g: Number(p.sugar_g) } : {}), ...(p.fiber_g != null ? { fiber_g: Number(p.fiber_g) } : {}), ...(p.sodium_mg != null ? { sodium_mg: Number(p.sodium_mg) } : {}) },
+    servings: serving,
+    defaultServing: serving[0]?.label ?? null,
+    source: "scan",
+  };
+}
+
+/** P / C / F share of one serving's calories (4 / 4 / 9 kcal per g), as a donut. */
+function MacroDonut({ per100, servingG }: { per100: NonNullable<LabelReport["per_100g"]>; servingG: number | null | undefined }) {
+  const g = servingG && servingG > 0 ? servingG : 100;
+  const k = g / 100;
+  const p = Number(per100.protein_g ?? 0) * k;
+  const c = Number(per100.carbs_g ?? 0) * k;
+  const f = Number(per100.fat_g ?? 0) * k;
+  const kcal = p * 4 + c * 4 + f * 9;
+  if (!(kcal > 0)) return null;
+  const parts = [
+    { v: (p * 4) / kcal, color: "var(--red)", label: "Protein", grams: p },
+    { v: (c * 4) / kcal, color: "var(--orange)", label: "Carbs", grams: c },
+    { v: (f * 9) / kcal, color: "var(--blue)", label: "Fat", grams: f },
+  ];
+  const size = 84;
+  const stroke = 11;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  let offset = 0;
+  return (
+    <div className="flex items-center gap-4">
+      <svg width={size} height={size} className="-rotate-90 shrink-0" aria-label="Macro share of one serving">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--track)" strokeWidth={stroke} />
+        {parts.map((part) => {
+          const dash = circ * part.v;
+          const el = <circle key={part.label} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={part.color} strokeWidth={stroke} strokeDasharray={`${dash} ${circ - dash}`} strokeDashoffset={-offset} />;
+          offset += dash;
+          return el;
+        })}
+      </svg>
+      <div className="flex flex-col gap-1.5">
+        <p className="num text-[15px] font-extrabold leading-tight">
+          {Math.round(Number(per100.calories ?? kcal) * k)} kcal <span className="text-xs font-medium muted">/ {servingG && servingG > 0 ? "serving" : "100 g"}</span>
+        </p>
+        {parts.map((part) => (
+          <MacroDot key={part.label} value={`${part.label} ${Math.round(part.v * 100)}% · ${fmt(Math.round(part.grams * 10) / 10)} g`} color={part.color} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ReportView({ report: r, initialLens, readOnly }: { report: LabelReport; initialLens?: Lens; readOnly?: boolean }) {
+  const router = useRouter();
   const [lens, setLens] = useState<Lens>(initialLens ?? r.lens ?? "protein");
+  const [logFood, setLogFood] = useState<QuantityFood | null>(null);
+  const [logged, setLogged] = useState<string | null>(null);
+  const [logErr, setLogErr] = useState<string | null>(null);
   const t = TRUST[r.verdict] ?? { color: "var(--muted)", bg: "var(--card2)", label: r.verdict };
+  const food = reportFood(r);
 
   if (!r.readable) {
     return (
@@ -364,6 +430,20 @@ export function ReportView({ report: r, initialLens, readOnly }: { report: Label
   const fit: Fit | undefined = r.fits?.[lens];
   const fs = fit ? FIT_STYLE[fit.verdict] : null;
   const info = r.infographic;
+  const score = info?.score_out_of_10 ?? null;
+  const scoreColor = score == null ? "var(--muted)" : score >= 7 ? "var(--green)" : score >= 4 ? "var(--orange)" : "var(--muted)";
+
+  async function logServing(item: MealItem) {
+    setLogFood(null);
+    setLogErr(null);
+    try {
+      await saveMeal({ date: today(), raw_text: `${r.product || "Scanned product"} (scan)`, items: [item] });
+      setLogged(`Logged ${item.servings != null && item.unit === "serving" ? `${fmt(item.servings)} serving${item.servings === 1 ? "" : "s"}` : `${Math.round(item.grams)} g`} · ${Math.round(item.calories)} kcal`);
+      router.refresh();
+    } catch (e) {
+      setLogErr(e instanceof Error ? e.message : "Could not log that");
+    }
+  }
 
   return (
     <>
@@ -375,13 +455,40 @@ export function ReportView({ report: r, initialLens, readOnly }: { report: Label
               <img src={r.image_url} alt="" className="h-16 w-16 shrink-0 rounded-[12px] object-cover" style={{ background: "var(--card2)" }} />
             ) : null}
             <div className="min-w-0 flex-1">
-              <p className="text-[17px] font-bold">{r.product || "Unknown product"}</p>
-              {r.what_it_is ? <p className="mt-1 text-sm leading-relaxed">{r.what_it_is}</p> : null}
+              <p className="text-[17px] font-bold leading-snug" style={{ overflowWrap: "anywhere" }}>{r.product || "Unknown product"}</p>
               {info?.one_liner ? <p className="mt-1 text-[13px] muted">{info.one_liner}</p> : null}
             </div>
+            {score != null ? (
+              <Ring fraction={score / 10} color={scoreColor} size={64} stroke={7}>
+                <span className="flex flex-col items-center leading-none">
+                  <span className="num text-[20px] font-extrabold">{score}</span>
+                  <span className="text-[9px] font-semibold muted">/ 10</span>
+                </span>
+              </Ring>
+            ) : null}
           </div>
+          {r.what_it_is ? <p className="mt-2.5 text-sm leading-relaxed">{r.what_it_is}</p> : null}
+          {food ? (
+            <div className="mt-3 flex flex-col gap-2">
+              <PillButton height={44} onClick={() => setLogFood(food)}>
+                Log 1 serving{r.serving_g ? ` · ${Math.round(r.serving_g)} g` : ""}
+              </PillButton>
+              {logged ? (
+                <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--green)" }}>
+                  <Check size={14} />
+                  {logged} — on Home
+                </p>
+              ) : null}
+              {logErr ? <p className="text-xs" style={{ color: "var(--red)" }}>{logErr}</p> : null}
+            </div>
+          ) : null}
           {Object.keys(per100).length > 0 ? (
             <>
+              <div className="my-2.5">
+                <Hair />
+              </div>
+              <p className="mb-2 text-xs font-semibold muted">One serving</p>
+              <MacroDonut per100={per100} servingG={r.serving_g} />
               <div className="my-2.5">
                 <Hair />
               </div>
@@ -412,6 +519,33 @@ export function ReportView({ report: r, initialLens, readOnly }: { report: Label
                 <p className="mt-1.5 text-sm leading-relaxed">{fit.why}</p>
               </div>
             ) : null}
+          </Card>
+        </Rise>
+      ) : null}
+
+      {info && info.serving_share && info.serving_share.calories_pct + info.serving_share.protein_pct + info.serving_share.carbs_pct + info.serving_share.fat_pct > 0 ? (
+        <Rise index={4}>
+          <Card>
+            <p className="text-[15px] font-bold">One serving = …</p>
+            <p className="text-xs muted">…this much of your whole day.</p>
+            <div className="mt-3 flex flex-col gap-2.5">
+              {(
+                [
+                  ["Calories", info.serving_share.calories_pct, "var(--ink)"],
+                  ["Protein", info.serving_share.protein_pct, "var(--red)"],
+                  ["Carbs", info.serving_share.carbs_pct, "var(--orange)"],
+                  ["Fat", info.serving_share.fat_pct, "var(--blue)"],
+                ] as const
+              ).map(([label, pct, color]) => (
+                <div key={label} className="flex items-center gap-2.5">
+                  <span className="w-[62px] shrink-0 text-xs font-semibold muted">{label}</span>
+                  <span className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
+                    <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} />
+                  </span>
+                  <span className="num w-10 shrink-0 text-right text-[13px] font-bold">{pct}%</span>
+                </div>
+              ))}
+            </div>
           </Card>
         </Rise>
       ) : null}
@@ -483,6 +617,7 @@ export function ReportView({ report: r, initialLens, readOnly }: { report: Label
       {r.research?.length ? <Rise index={8}><Bullets title="What the web says" lines={r.research} /></Rise> : null}
       {r.suggestions?.length ? <Rise index={9}><Bullets title="For you" lines={r.suggestions} strong /></Rise> : null}
       {r.alternatives?.length ? <Rise index={9}><Bullets title="Better options" lines={r.alternatives} /></Rise> : null}
+      <QuantitySheet food={logFood} title="Log from this scan" cta="Log" onClose={() => setLogFood(null)} onDone={(item) => void logServing(item)} />
     </>
   );
 }

@@ -23,9 +23,14 @@ export type MealItem = {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
-  source: "table" | "estimated";
+  source: "table" | "estimated" | "scan";
   confidence: number | null;
   micros?: ItemMicros;
+  /** v1.9: how the quantity was entered — "g" | "ml" | "kg" | "serving" — and how many servings that was. */
+  unit?: string | null;
+  servings?: number | null;
+  /** v1.9: the fat preset id this dish was cooked in (the fat itself is a separate item). */
+  cooked_in?: string | null;
 };
 
 export type Meal = {
@@ -39,6 +44,52 @@ export type Meal = {
 
 export type Gender = "male" | "female" | "other";
 export type GoalType = "lose" | "maintain" | "gain";
+/** Profile → Preferences → "Judge scans for". `goal` follows the weight goal (lose → cutting, gain → bulking, else protein). */
+export type LensDefault = "protein" | "goal" | "snack" | "cutting" | "bulking";
+export const LENS_DEFAULTS: { key: LensDefault; label: string }[] = [
+  { key: "protein", label: "Protein" },
+  { key: "goal", label: "My goal" },
+  { key: "snack", label: "Snack" },
+  { key: "cutting", label: "Cutting" },
+  { key: "bulking", label: "Bulking" },
+];
+
+/** A one-tap Indian food preset (bandlog.food_presets) joined to its foods row. Per-100 g numbers come from the food. */
+export type PresetServing = { label: string; grams: number };
+export type PresetCategory = "breakfast" | "staple" | "dal" | "sabzi" | "protein" | "snack" | "drink" | "sweet" | "fruit" | "fat";
+export type FoodPreset = {
+  id: string;
+  food_id: string;
+  label: string;
+  label_hi: string | null;
+  category: PresetCategory;
+  servings: PresetServing[];
+  default_serving: string | null;
+  sort: number;
+  icon: string | null;
+  /** From the joined foods row. */
+  food_name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  micros: Record<string, number>;
+};
+
+/** A row of bandlog.foods as the food picker sees it (search_foods RPC, per 100 g). */
+export type FoodSearchHit = {
+  id: string;
+  name: string;
+  name_hi: string | null;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  source: string;
+  units: PresetServing[];
+  micros: Record<string, number>;
+  score: number;
+};
 
 /** One of the five meal reminders stored in `profiles.reminders`. */
 export type ReminderPref = { on: boolean; time: string };
@@ -62,6 +113,10 @@ export type Profile = {
   carb_target_g: number | null;
   fat_target_g: number | null;
   reminders: Record<string, ReminderPref>;
+  /** v1.9: the lens a scan report opens on. */
+  lens_default: LensDefault;
+  /** v1.9: Groups (coming next) — share protein & calories, or streaks only. */
+  share_stats: boolean;
 };
 
 export const DEFAULT_PROFILE: Profile = {
@@ -80,6 +135,8 @@ export const DEFAULT_PROFILE: Profile = {
   carb_target_g: null,
   fat_target_g: null,
   reminders: {},
+  lens_default: "protein",
+  share_stats: true,
 };
 
 /** One row of `bandlog.weight_log`, newest first. */
@@ -143,6 +200,13 @@ export type SavedMeal = {
 
 export type LabelVerdict = "safe" | "caution" | "unsafe" | "misleading" | "fake";
 export type Lens = "protein" | "snack" | "cutting" | "bulking";
+
+/** The lens a report should open on for this profile: `goal` follows the weight goal. */
+export function initialLens(p: Pick<Profile, "lens_default" | "goal_type">): Lens {
+  const d = p.lens_default ?? "protein";
+  if (d !== "goal") return d;
+  return p.goal_type === "lose" ? "cutting" : p.goal_type === "gain" ? "bulking" : "protein";
+}
 export type FitVerdict = "great" | "ok" | "weak";
 export type Fit = { verdict: FitVerdict; why: string };
 

@@ -1,11 +1,11 @@
 import { addDays, today } from "./dates";
 import { createClient } from "./supabase/server";
-import { DEFAULT_PROFILE, type ExerciseEntry, type Meal, type MealItem, type Profile, type ScanHistoryItem, type WeightEntry, type Workout } from "./types";
+import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Profile, type ScanHistoryItem, type WeightEntry, type Workout } from "./types";
 import { parse as parseReminders } from "./reminders";
 import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 
 const PROFILE_COLS =
-  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders";
+  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats";
 
 const num = (v: unknown): number | null => (v == null || v === "" ? null : Number(v));
 
@@ -31,6 +31,8 @@ export async function getProfile(): Promise<Profile> {
     carb_target_g: num(d.carb_target_g),
     fat_target_g: num(d.fat_target_g),
     reminders: parseReminders(d.reminders),
+    lens_default: (["protein", "goal", "snack", "cutting", "bulking"] as const).includes(d.lens_default as never) ? (d.lens_default as Profile["lens_default"]) : "protein",
+    share_stats: d.share_stats !== false,
   };
 }
 
@@ -108,7 +110,7 @@ export async function getMeals(from: string, to: string): Promise<(Meal & { phot
   const supabase = await createClient();
   const { data } = await supabase
     .from("meals")
-    .select("id, date, raw_text, created_at, photo_path, meal_items(id, food_id, name, grams, calories, protein_g, carbs_g, fat_g, source, confidence, micros)")
+    .select("id, date, raw_text, created_at, photo_path, meal_items(id, food_id, name, grams, calories, protein_g, carbs_g, fat_g, source, confidence, micros, unit, servings, cooked_in)")
     .gte("date", from)
     .lte("date", to)
     .order("created_at", { ascending: false });
@@ -136,6 +138,35 @@ export async function getDashboard() {
   const from = addDays(t, -120);
   const [profile, workouts, meals, exercises] = await Promise.all([getProfile(), getWorkouts(from, t), getMeals(from, t), getExercises(from, t)]);
   return { today: t, profile, workouts, meals, exercises };
+}
+
+/** Every Indian food preset joined to its foods row (per-100 g numbers), in category + sort order. */
+export async function getPresets(): Promise<FoodPreset[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("food_presets")
+    .select("id, food_id, label, label_hi, category, servings, default_serving, sort, icon, foods(name, calories, protein_g, carbs_g, fat_g, micros)")
+    .order("sort", { ascending: true });
+  type Row = { id: string; food_id: string; label: string; label_hi: string | null; category: string; servings: unknown; default_serving: string | null; sort: number | null; icon: string | null; foods: { name: string; calories: unknown; protein_g: unknown; carbs_g: unknown; fat_g: unknown; micros: unknown } | null };
+  return ((data ?? []) as unknown as Row[])
+    .filter((r) => r.foods)
+    .map((r) => ({
+      id: r.id,
+      food_id: r.food_id,
+      label: r.label,
+      label_hi: r.label_hi,
+      category: r.category as FoodPreset["category"],
+      servings: (Array.isArray(r.servings) ? r.servings : []) as FoodPreset["servings"],
+      default_serving: r.default_serving,
+      sort: Number(r.sort ?? 100),
+      icon: r.icon,
+      food_name: r.foods?.name ?? r.label,
+      calories: Number(r.foods?.calories ?? 0),
+      protein_g: Number(r.foods?.protein_g ?? 0),
+      carbs_g: Number(r.foods?.carbs_g ?? 0),
+      fat_g: Number(r.foods?.fat_g ?? 0),
+      micros: (r.foods?.micros ?? {}) as Record<string, number>,
+    }));
 }
 
 /** Latest scans for the History list (label / barcode / photo), newest first. */

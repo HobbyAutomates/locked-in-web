@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/apiAuth";
-import { chunksOf, describeHit, microsFor, searchFoods, type FoodHit } from "@/lib/foodSearch";
+import { chunksOf, describeHit, hasDevanagari, hindiToLatin, microsFor, searchFoods, type FoodHit } from "@/lib/foodSearch";
 import { matchFood } from "@/lib/foods";
 import type { ParseResult, ParsedItem } from "@/lib/types";
 
@@ -65,6 +65,8 @@ const SYSTEM = `You convert a person's description of what they ate — English,
 DATABASE FIRST. The user message lists DATABASE CANDIDATES for each chunk of the text: "id | name (हिंदी) | per100g: kcal P C F | unit=grams …". If a candidate is the same food the person means, set food_id to that id and food to that name, even when the wording differs ("dal tadka" → the dal row, "chapati" → the roti row). Only when NO candidate is that food, omit food_id and fill est_per_100g from your own nutrition knowledge.
 
 HINGLISH GLOSSARY — numbers: ek = 1, do = 2, teen = 3, char = 4, paanch = 5, chhe = 6, saat = 7, aath = 8, das = 10, aadha / adha = half, dedh = 1.5, dhai = 2.5, thoda / thoda sa = a little (about 1 tsp for fats and sauces, a quarter portion for foods), zyada = extra (about 1.5x), bahut = a lot (about 2x). Measures: katori = small bowl (150 g for dal, sabzi, curd, rice), bowl / bada katori = 200 g, chammach = spoon (tbsp 15 g; chhota chammach = tsp 5 g), glass = 250 ml, cup = 150 ml, plate = 250 g, ladle / karchi = 60 g, piece / tukda = one item, roti / chapati / phulka = 40 g each, paratha = 80 g, idli = 40 g, dosa = 100 g, egg / anda = 50 g, egg white = 33 g, scoop (whey) = 30 g, slice of bread = 30 g, banana = 120 g, apple = 180 g. Use the candidate's own units (e.g. "katori=150g", "piece=93g") when it lists them — they beat the defaults.
+
+DEVANAGARI — the text may be in Hindi script (from voice dictation in hi-IN). Numbers: एक = 1, दो = 2, तीन = 3, चार = 4, पाँच / पांच = 5, छह = 6, सात = 7, आठ = 8, नौ = 9, दस = 10, आधा / आधी = half, डेढ़ = 1.5, ढाई = 2.5, थोड़ा / थोड़ा सा / थोड़ी = a little, ज़्यादा = extra, बहुत = a lot; Devanagari digits ०-९ are 0-9. Measures: कटोरी = katori (150 g), कटोरा / बड़ी कटोरी = bowl (200 g), गिलास / ग्लास = glass (250 ml), कप = cup (150 ml), प्लेट = plate (250 g), चम्मच = tbsp (15 g; छोटा चम्मच = tsp 5 g), पीस / टुकड़ा = one piece, स्कूप = scoop (30 g), ग्राम = grams. Foods: रोटी / चपाती / फुल्का = roti, पराठा = paratha, चावल = rice, दाल = dal, दाल तड़का = dal tadka, सब्ज़ी / सब्जी = sabzi, अंडा / अंडे = egg(s), दूध = milk, दही = curd, पनीर = paneer, घी = ghee, तेल = oil, चाय = chai, चीनी = sugar, केला = banana, सेब = apple, मक्खन = butter, चिकन = chicken, मछली = fish, राजमा = rajma, छोले / चना = chole. Each DATABASE CANDIDATE line shows the Hindi name in brackets — match Devanagari input against those names too (the same food, whichever script it is written in). Write "food" and "input" for Devanagari items in the candidate's English name; keep "input" as the original Devanagari words.
 
 Rules:
 - Interpret messy dictation generously ("hundred fifty grams rice comma dal hundred").
@@ -150,10 +152,18 @@ export async function POST(req: Request) {
   const lines: string[] = [];
   await Promise.all(
     chunks.map(async (c) => {
-      const hits = await searchFoods(c, 3).catch(() => [] as FoodHit[]);
+      // A Devanagari chunk is searched as written AND as its English name ("दाल तड़का" → "dal tadka"),
+      // so it lands on the same rows a Hinglish speaker gets; the English hits rank first.
+      const latin = hasDevanagari(c) ? hindiToLatin(c) : null;
+      const [own, en] = await Promise.all([
+        searchFoods(c, 3).catch(() => [] as FoodHit[]),
+        latin && latin !== c && !hasDevanagari(latin) ? searchFoods(latin, 3).catch(() => [] as FoodHit[]) : Promise.resolve([] as FoodHit[]),
+      ]);
+      const seen = new Set<string>();
+      const hits = [...en, ...own].filter((h) => (seen.has(h.id) ? false : (seen.add(h.id), true))).slice(0, 4);
       if (!hits.length) return;
       for (const h of hits) candidates.set(h.id, h);
-      lines.push(`"${c}":\n${hits.map((h) => "  - " + describeHit(h)).join("\n")}`);
+      lines.push(`"${c}"${latin && latin !== c ? ` (= ${latin})` : ""}:\n${hits.map((h) => "  - " + describeHit(h)).join("\n")}`);
     }),
   );
   const candidateBlock = lines.length ? `DATABASE CANDIDATES (per chunk of the text):\n${lines.join("\n")}` : "DATABASE CANDIDATES: none found — estimate everything.";

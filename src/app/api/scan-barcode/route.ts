@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   }
 
   const profile = await loadScanProfile(admin, user.id);
-  const lens = lensFor(profile.goal_type, body.lens);
+  const lens = lensFor(profile.goal_type, body.lens, profile.lens_default);
 
   try {
     // 1. Cache, then Open Food Facts.

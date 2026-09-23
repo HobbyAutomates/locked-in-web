@@ -116,11 +116,48 @@ export function describeHit(f: FoodHit): string {
 
 /** Split "do roti, ek katori dal and 2 eggs" into candidate food chunks for the DB lookup. */
 export function chunksOf(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[\n;+]/g, ",")
-    .split(/,|\band\b|\baur\b|\bwith\b|\bke saath\b|\bplus\b/)
-    .map((s) => s.replace(/\b(\d+([.,]\d+)?|ek|do|teen|char|paanch|aadha|adha|thoda sa|thoda|zyada|bahut|one|two|three|four|five|half|a|an|some|few|little|of|the|g|gm|gms|grams|kg|ml|l|cup|cups|glass|bowl|katori|katoris|ladle|tbsp|tsp|spoon|spoons|chammach|piece|pieces|pcs|slice|slices|scoop|scoops|plate|small|medium|large|big)\b/g, " "))
-    .map((s) => s.replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim())
-    .filter((s) => s.length >= 2);
+  return (
+    text
+      .toLowerCase()
+      .replace(/[\n;+]/g, ",")
+      // Devanagari separators: "और" (and), "के साथ" (with), the danda "।".
+      .split(/,|।|\band\b|\baur\b|\bwith\b|\bke saath\b|\bplus\b|और|के साथ/)
+      .map((s) => s.replace(/\b(\d+([.,]\d+)?|ek|do|teen|char|paanch|aadha|adha|thoda sa|thoda|zyada|bahut|one|two|three|four|five|half|a|an|some|few|little|of|the|g|gm|gms|grams|kg|ml|l|cup|cups|glass|bowl|katori|katoris|ladle|tbsp|tsp|spoon|spoons|chammach|piece|pieces|pcs|slice|slices|scoop|scoops|plate|small|medium|large|big)\b/g, " "))
+      // Devanagari numbers / measures (no \b for Devanagari — word boundaries only work on ASCII).
+      .map((s) => s.replace(/[०-९]+|एक|दो|तीन|चार|पाँच|पांच|छह|छः|सात|आठ|नौ|दस|आधा|आधी|डेढ़|ढाई|थोड़ा सा|थोड़ा|थोड़ी|ज़्यादा|ज्यादा|बहुत|कटोरी|कटोरा|गिलास|ग्लास|कप|प्लेट|चम्मच|चमच|पीस|टुकड़ा|स्कूप|ग्राम|छोटा|छोटी|बड़ा|बड़ी/g, " "))
+      .map((s) => s.replace(/[^a-z\u0900-\u097F\s]/g, " ").replace(/\s+/g, " ").trim())
+      .filter((s) => s.length >= 2)
+  );
+}
+
+/**
+ * Devanagari → Latin food words, so a Hindi chunk ("दाल तड़का") also searches its English name
+ * ("dal tadka") and lands on the same rows a Hinglish speaker gets. Unknown words pass through.
+ */
+const HI_WORDS: Record<string, string> = {
+  रोटी: "roti", चपाती: "chapati", फुल्का: "phulka", पराठा: "paratha", नान: "naan", चावल: "rice", भात: "rice", खिचड़ी: "khichdi", पुलाव: "pulao", बिरयानी: "biryani",
+  दाल: "dal", तड़का: "tadka", फ्राई: "fry", मूंग: "moong", तूर: "toor", अरहर: "arhar", मसूर: "masoor", चना: "chana", राजमा: "rajma", छोले: "chole", सांभर: "sambar", रसम: "rasam", कढ़ी: "kadhi", मखनी: "makhani",
+  सब्ज़ी: "sabzi", सब्जी: "sabzi", आलू: "aloo", गोभी: "gobi", भिंडी: "bhindi", पालक: "palak", पनीर: "paneer", बैंगन: "baingan", भर्ता: "bharta", मटर: "matar", लौकी: "lauki", करेला: "karela", मशरूम: "mushroom", मिक्स: "mixed", भुर्जी: "bhurji", टिक्का: "tikka", बटर: "butter", मसाला: "masala",
+  अंडा: "egg", अंडे: "eggs", ऑमलेट: "omelette", आमलेट: "omelette", चिकन: "chicken", मछली: "fish", मटन: "mutton", झींगा: "prawns", व्हे: "whey", प्रोटीन: "protein", दही: "curd", दूध: "milk", छाछ: "chaas", लस्सी: "lassi", अंकुरित: "sprouts", सोया: "soya", चंक्स: "chunks", टोफू: "tofu", मूंगफली: "peanuts", बादाम: "almonds", काजू: "cashews", अखरोट: "walnuts",
+  घी: "ghee", तेल: "oil", सरसों: "mustard", नारियल: "coconut", मक्खन: "butter", चीनी: "sugar", शहद: "honey", नमक: "salt",
+  चाय: "chai", कॉफ़ी: "coffee", कॉफी: "coffee", कोल्ड: "cold", जूस: "juice", पानी: "water", नींबू: "nimbu", शेक: "shake", कोक: "coke",
+  पोहा: "poha", उपमा: "upma", इडली: "idli", डोसा: "dosa", वड़ा: "vada", उत्तपम: "uttapam", ओट्स: "oats", ब्रेड: "bread", टोस्ट: "toast", कॉर्नफ्लेक्स: "cornflakes", ढोकला: "dhokla", थेपला: "thepla", सूजी: "suji", हलवा: "halwa",
+  समोसा: "samosa", पकौड़ा: "pakora", पकोड़ा: "pakora", चाट: "chaat", मुरमुरा: "murmura", भेल: "bhel", बिस्कुट: "biscuit", मैगी: "maggi", नमकीन: "namkeen", चिप्स: "chips", पिज़्ज़ा: "pizza", पिज्जा: "pizza", बर्गर: "burger", सैंडविच: "sandwich", मोमो: "momos", मोमोज: "momos",
+  गुलाब: "gulab", जामुन: "jamun", लड्डू: "ladoo", खीर: "kheer", रसगुल्ला: "rasgulla", जलेबी: "jalebi", बर्फी: "barfi", कतली: "katli", आइसक्रीम: "ice cream", चॉकलेट: "chocolate", मिठाई: "sweet",
+  केला: "banana", सेब: "apple", पपीता: "papaya", आम: "mango", संतरा: "orange", मौसमी: "mosambi", अंगूर: "grapes", तरबूज़: "watermelon", तरबूज: "watermelon", अनार: "pomegranate", अमरूद: "guava", खजूर: "dates", चीकू: "chikoo", अनानास: "pineapple",
+  भुना: "roasted", उबला: "boiled", उबले: "boiled", तला: "fried", कच्चा: "raw", सादा: "plain", गरम: "hot", ठंडा: "cold", वेज: "veg", मिक्स्ड: "mixed", सलाद: "salad", रायता: "raita", अचार: "pickle", पापड़: "papad",
+};
+
+/** True when the text carries any Devanagari. */
+export function hasDevanagari(s: string): boolean {
+  return /[ऀ-ॿ]/.test(s);
+}
+
+/** "दाल तड़का" → "dal tadka"; words outside the glossary stay as they are. */
+export function hindiToLatin(chunk: string): string {
+  return chunk
+    .split(/\s+/)
+    .map((w) => HI_WORDS[w] ?? HI_WORDS[w.replace(/[ः़]/g, "")] ?? w)
+    .join(" ")
+    .trim();
 }

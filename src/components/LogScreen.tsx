@@ -7,7 +7,7 @@ import { Segmented } from "./ui";
 import ExerciseForm from "./ExerciseForm";
 import MealForm from "./MealForm";
 import WorkoutForm from "./WorkoutForm";
-import type { Profile, SavedMeal, Workout } from "@/lib/types";
+import type { FoodPreset, Profile, SavedMeal, Workout } from "@/lib/types";
 
 /** Full-screen Log page: Workout / Meal / Exercise segments (opened from the + FAB or a workout row). */
 export default function LogScreen({
@@ -16,6 +16,7 @@ export default function LogScreen({
   startOnMeal,
   startOnExercise = false,
   savedMeals,
+  presets,
   profile,
 }: {
   existing: Workout | null;
@@ -23,6 +24,7 @@ export default function LogScreen({
   startOnMeal: boolean;
   startOnExercise?: boolean;
   savedMeals: SavedMeal[];
+  presets: FoodPreset[];
   profile: Profile;
 }) {
   const router = useRouter();
@@ -52,7 +54,7 @@ export default function LogScreen({
       {existing || seg === 0 ? (
         <WorkoutForm existing={existing} initialDate={date} target={profile.weekly_workout_target} onClose={close} />
       ) : seg === 1 ? (
-        <MealForm date={date} savedMeals={savedMeals} onClose={close} />
+        <MealForm date={date} savedMeals={savedMeals} presets={presets} onClose={close} />
       ) : (
         <ExerciseForm date={date} weightKg={profile.weight_kg ?? null} onClose={close} />
       )}

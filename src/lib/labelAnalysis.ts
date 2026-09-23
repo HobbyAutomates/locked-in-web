@@ -13,9 +13,13 @@ import type { AdminClient } from "@/lib/apiAuth";
 export type Lens = "protein" | "snack" | "cutting" | "bulking";
 export const LENSES: Lens[] = ["protein", "snack", "cutting", "bulking"];
 
-/** The user's default lens comes from their goal: lose → cutting, gain → bulking, else protein. */
-export function lensFor(goalType: string | null | undefined, requested?: string | null): Lens {
+/**
+ * The lens a scan is written for: the request wins, then Profile → "Judge scans for"
+ * (`lens_default`; `goal` follows the weight goal: lose → cutting, gain → bulking, else protein).
+ */
+export function lensFor(goalType: string | null | undefined, requested?: string | null, lensDefault?: string | null): Lens {
   if (requested && (LENSES as string[]).includes(requested)) return requested as Lens;
+  if (lensDefault && lensDefault !== "goal" && (LENSES as string[]).includes(lensDefault)) return lensDefault as Lens;
   if (goalType === "lose") return "cutting";
   if (goalType === "gain") return "bulking";
   return "protein";
@@ -28,16 +32,17 @@ export type ScanProfile = {
   carb_target_g: number | null;
   fat_target_g: number | null;
   goal_type: string | null;
+  lens_default?: string | null;
 };
 
 export async function loadScanProfile(admin: AdminClient, userId: string): Promise<ScanProfile> {
   const { data } = await admin
     .from("profiles")
-    .select("protein_target_g, calorie_target, weekly_workout_target, carb_target_g, fat_target_g, goal_type")
+    .select("protein_target_g, calorie_target, weekly_workout_target, carb_target_g, fat_target_g, goal_type, lens_default")
     .eq("id", userId)
     .maybeSingle();
   return (
-    (data as ScanProfile | null) ?? { protein_target_g: 120, calorie_target: 2200, weekly_workout_target: 3, carb_target_g: null, fat_target_g: null, goal_type: "maintain" }
+    (data as ScanProfile | null) ?? { protein_target_g: 120, calorie_target: 2200, weekly_workout_target: 3, carb_target_g: null, fat_target_g: null, goal_type: "maintain", lens_default: "protein" }
   );
 }
 

@@ -374,3 +374,61 @@ export function Medal(p: P) {
     </Stroke>
   );
 }
+
+/** Magnifier for the food Search tab. */
+export function Search(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l5 5" />
+    </Stroke>
+  );
+}
+
+/** Four tiles for the Presets tab. */
+export function Grid(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
+    </Stroke>
+  );
+}
+
+/** Camera for the Photo tab. */
+export function Camera(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </Stroke>
+  );
+}
+
+/** Oil drop for the "Cooked in…" fat chips. */
+export function Drop(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z" />
+    </Stroke>
+  );
+}
+
+/** Two arrows for "Check for updates". */
+export function Refresh(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3" />
+      <path d="M20 4v4h-4M4 20v-4h4" />
+    </Stroke>
+  );
+}
+
+/** Sparkle for "What's new". */
+export function Sparkle(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />
+      <path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z" />
+    </Stroke>
+  );
+}

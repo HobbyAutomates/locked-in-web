@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   const mt = (media_type ?? "image/jpeg") as "image/jpeg" | "image/png" | "image/webp";
 
   const profile = await loadScanProfile(admin, user.id);
-  const lens = lensFor(profile.goal_type, body.lens);
+  const lens = lensFor(profile.goal_type, body.lens, profile.lens_default);
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   try {

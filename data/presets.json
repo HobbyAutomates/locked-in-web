@@ -1,0 +1,3630 @@
+[
+  {
+    "id": "poha",
+    "food_id": "dish-vegetable-poha",
+    "label": "Poha",
+    "label_hi": "पोहा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 plate",
+        "grams": 200
+      },
+      {
+        "label": "1 small bowl",
+        "grams": 98
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 10,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=97.8 g; katori 150 g household measure"
+  },
+  {
+    "id": "upma",
+    "food_id": "dish-semolina-upma",
+    "label": "Upma / khara bath",
+    "label_hi": "उपमा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 plate",
+        "grams": 200
+      },
+      {
+        "label": "1 small bowl",
+        "grams": 106
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 20,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=106.3 g; katori 150 g household measure"
+  },
+  {
+    "id": "idli",
+    "food_id": "dish-idli",
+    "label": "Idli",
+    "label_hi": "इडली",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "2 idli",
+        "grams": 80
+      },
+      {
+        "label": "3 idli",
+        "grams": 120
+      },
+      {
+        "label": "4 idli",
+        "grams": 160
+      }
+    ],
+    "default_serving": "2 idli",
+    "sort": 30,
+    "icon": "bowl",
+    "source_note": "standard household measure: idli 40 g (INDB lists a small 25 g idli)"
+  },
+  {
+    "id": "plain-dosa",
+    "food_id": "dosa",
+    "label": "Plain dosa",
+    "label_hi": "सादा डोसा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 dosa",
+        "grams": 100
+      },
+      {
+        "label": "2 dosa",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 dosa",
+    "sort": 40,
+    "icon": "roti",
+    "source_note": "standard Indian household measure: dosa 100 g (INDB plain dosa row rejected: 381 kcal/100 g)"
+  },
+  {
+    "id": "masala-dosa",
+    "food_id": "dish-masala-dosa",
+    "label": "Masala dosa",
+    "label_hi": "मसाला डोसा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 masala dosa",
+        "grams": 210
+      },
+      {
+        "label": "½ masala dosa",
+        "grams": 105
+      }
+    ],
+    "default_serving": "1 masala dosa",
+    "sort": 50,
+    "icon": "roti",
+    "source_note": "INDB units: dosa=209.7 g"
+  },
+  {
+    "id": "rava-dosa",
+    "food_id": "dish-semolina-dosa",
+    "label": "Rava dosa",
+    "label_hi": "रवा डोसा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 dosa",
+        "grams": 73
+      },
+      {
+        "label": "2 dosa",
+        "grams": 147
+      }
+    ],
+    "default_serving": "1 dosa",
+    "sort": 60,
+    "icon": "roti",
+    "source_note": "INDB units: dosa=73.4 g"
+  },
+  {
+    "id": "aloo-paratha",
+    "food_id": "dish-potato-parantha",
+    "label": "Aloo paratha",
+    "label_hi": "आलू पराठा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 paratha",
+        "grams": 93
+      },
+      {
+        "label": "2 paratha",
+        "grams": 187
+      }
+    ],
+    "default_serving": "1 paratha",
+    "sort": 70,
+    "icon": "roti",
+    "source_note": "INDB units: paratha=93.4 g"
+  },
+  {
+    "id": "plain-paratha",
+    "food_id": "dish-plain-parantha",
+    "label": "Plain paratha",
+    "label_hi": "सादा पराठा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 paratha",
+        "grams": 56
+      },
+      {
+        "label": "2 paratha",
+        "grams": 112
+      },
+      {
+        "label": "3 paratha",
+        "grams": 167
+      }
+    ],
+    "default_serving": "1 paratha",
+    "sort": 80,
+    "icon": "roti",
+    "source_note": "INDB units: paratha=55.8 g"
+  },
+  {
+    "id": "bread-white",
+    "food_id": "bread-white",
+    "label": "Bread / toast (white)",
+    "label_hi": "ब्रेड / टोस्ट",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 slice",
+        "grams": 30
+      },
+      {
+        "label": "2 slices",
+        "grams": 60
+      },
+      {
+        "label": "4 slices",
+        "grams": 120
+      }
+    ],
+    "default_serving": "2 slices",
+    "sort": 90,
+    "icon": "roti",
+    "source_note": "standard Indian household measure: slice 30 g"
+  },
+  {
+    "id": "omelette",
+    "food_id": "ifct-egg-poultry-omlet",
+    "label": "Omelette",
+    "label_hi": "ऑमलेट",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1-egg omelette",
+        "grams": 60
+      },
+      {
+        "label": "2-egg omelette",
+        "grams": 120
+      },
+      {
+        "label": "3-egg omelette",
+        "grams": 180
+      }
+    ],
+    "default_serving": "2-egg omelette",
+    "sort": 100,
+    "icon": "egg",
+    "source_note": "standard Indian household measure: egg 50 g + ~10 g onion/oil per egg"
+  },
+  {
+    "id": "boiled-egg",
+    "food_id": "ifct-egg-poultry-whole-boiled",
+    "label": "Boiled egg",
+    "label_hi": "उबला अंडा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 egg",
+        "grams": 50
+      },
+      {
+        "label": "2 eggs",
+        "grams": 100
+      },
+      {
+        "label": "3 eggs",
+        "grams": 150
+      }
+    ],
+    "default_serving": "2 eggs",
+    "sort": 110,
+    "icon": "egg",
+    "source_note": "IFCT household measure: egg 50 g"
+  },
+  {
+    "id": "oats",
+    "food_id": "dish-oatmeal-porridge",
+    "label": "Oats porridge",
+    "label_hi": "ओट्स दलिया",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 250
+      },
+      {
+        "label": "1 large bowl",
+        "grams": 398
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 120,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=398 g; katori 150 g household measure"
+  },
+  {
+    "id": "cornflakes",
+    "food_id": "dish-cornflakes-with-milk",
+    "label": "Cornflakes with milk",
+    "label_hi": "कॉर्नफ्लेक्स दूध के साथ",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 bowl",
+        "grams": 278
+      },
+      {
+        "label": "½ bowl",
+        "grams": 139
+      }
+    ],
+    "default_serving": "1 bowl",
+    "sort": 130,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=278 g"
+  },
+  {
+    "id": "kesari-bath",
+    "food_id": "dish-kesari-bath",
+    "label": "Kesari bath / sheera",
+    "label_hi": "केसरी भात / शीरा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 100
+      },
+      {
+        "label": "1 bowl",
+        "grams": 177
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 140,
+    "icon": "sweet",
+    "source_note": "INDB units: bowl=176.7 g; katori 100 g for halwa-type dishes"
+  },
+  {
+    "id": "medu-vada",
+    "food_id": "vada",
+    "label": "Medu vada",
+    "label_hi": "मेदू वड़ा",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 vada",
+        "grams": 60
+      },
+      {
+        "label": "2 vada",
+        "grams": 120
+      },
+      {
+        "label": "3 vada",
+        "grams": 180
+      }
+    ],
+    "default_serving": "2 vada",
+    "sort": 150,
+    "icon": "flame",
+    "source_note": "standard Indian household measure: vada 60 g (INDB fried vada rows rejected: 700+ kcal/100 g)"
+  },
+  {
+    "id": "uttapam",
+    "food_id": "dish-uttapam",
+    "label": "Uttapam",
+    "label_hi": "उत्तपम",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 uttapam",
+        "grams": 68
+      },
+      {
+        "label": "2 uttapam",
+        "grams": 136
+      }
+    ],
+    "default_serving": "1 uttapam",
+    "sort": 160,
+    "icon": "roti",
+    "source_note": "INDB units: uttapam=68 g"
+  },
+  {
+    "id": "sabudana-khichdi",
+    "food_id": "dish-sago-khitchdi",
+    "label": "Sabudana khichdi",
+    "label_hi": "साबूदाना खिचड़ी",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 271
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 170,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=271.4 g; katori 150 g"
+  },
+  {
+    "id": "thepla",
+    "food_id": "dish-methi-thepla",
+    "label": "Methi thepla",
+    "label_hi": "मेथी थेपला",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 thepla",
+        "grams": 36
+      },
+      {
+        "label": "2 thepla",
+        "grams": 73
+      },
+      {
+        "label": "3 thepla",
+        "grams": 109
+      }
+    ],
+    "default_serving": "2 thepla",
+    "sort": 180,
+    "icon": "roti",
+    "source_note": "INDB units: thepla=36.4 g"
+  },
+  {
+    "id": "dhokla",
+    "food_id": "dish-dhokla",
+    "label": "Dhokla",
+    "label_hi": "ढोकला",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "2 pieces",
+        "grams": 80
+      },
+      {
+        "label": "4 pieces",
+        "grams": 160
+      },
+      {
+        "label": "1 piece",
+        "grams": 40
+      }
+    ],
+    "default_serving": "2 pieces",
+    "sort": 190,
+    "icon": "bowl",
+    "source_note": "INDB units: piece=40 g"
+  },
+  {
+    "id": "pesarattu",
+    "food_id": "dish-moong-bean-dosa",
+    "label": "Pesarattu (moong dosa)",
+    "label_hi": "पेसरट्टू",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 pesarattu",
+        "grams": 100
+      },
+      {
+        "label": "2 pesarattu",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 pesarattu",
+    "sort": 200,
+    "icon": "roti",
+    "source_note": "standard Indian household measure: dosa 100 g (INDB lists a 26.6 g piece)"
+  },
+  {
+    "id": "besan-chilla",
+    "food_id": "dish-gram-flour-chilla",
+    "label": "Besan chilla",
+    "label_hi": "बेसन चीला",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 chilla",
+        "grams": 52
+      },
+      {
+        "label": "2 chilla",
+        "grams": 104
+      },
+      {
+        "label": "3 chilla",
+        "grams": 156
+      }
+    ],
+    "default_serving": "2 chilla",
+    "sort": 210,
+    "icon": "roti",
+    "source_note": "INDB units: cheela=52.1 g"
+  },
+  {
+    "id": "coconut-chutney",
+    "food_id": "dish-coconut-chutney",
+    "label": "Coconut chutney",
+    "label_hi": "नारियल चटनी",
+    "category": "breakfast",
+    "servings": [
+      {
+        "label": "1 tbsp",
+        "grams": 25
+      },
+      {
+        "label": "2 tbsp",
+        "grams": 50
+      },
+      {
+        "label": "¼ katori",
+        "grams": 40
+      }
+    ],
+    "default_serving": "2 tbsp",
+    "sort": 220,
+    "icon": "spoon",
+    "source_note": "INDB units: tablespoon=25.3 g"
+  },
+  {
+    "id": "roti",
+    "food_id": "roti",
+    "label": "Roti / chapati",
+    "label_hi": "रोटी",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 roti",
+        "grams": 40
+      },
+      {
+        "label": "2 roti",
+        "grams": 80
+      },
+      {
+        "label": "3 roti",
+        "grams": 120
+      }
+    ],
+    "default_serving": "2 roti",
+    "sort": 10,
+    "icon": "roti",
+    "source_note": "standard Indian household measure: roti 40 g"
+  },
+  {
+    "id": "phulka",
+    "food_id": "dish-chapati",
+    "label": "Phulka (no ghee)",
+    "label_hi": "फुल्का",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 phulka",
+        "grams": 36
+      },
+      {
+        "label": "2 phulka",
+        "grams": 72
+      },
+      {
+        "label": "3 phulka",
+        "grams": 108
+      },
+      {
+        "label": "4 phulka",
+        "grams": 144
+      }
+    ],
+    "default_serving": "2 phulka",
+    "sort": 20,
+    "icon": "roti",
+    "source_note": "INDB units: chapati=36 g"
+  },
+  {
+    "id": "rice",
+    "food_id": "dish-boiled-rice",
+    "label": "Rice (cooked)",
+    "label_hi": "चावल",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 plate",
+        "grams": 300
+      },
+      {
+        "label": "1 ladle",
+        "grams": 60
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 30,
+    "icon": "bowl",
+    "source_note": "INDB units: plate=300 g, katori=150 g"
+  },
+  {
+    "id": "jeera-rice",
+    "food_id": "dish-cumin-pulao",
+    "label": "Jeera rice",
+    "label_hi": "जीरा चावल",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 plate",
+        "grams": 271
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 40,
+    "icon": "bowl",
+    "source_note": "INDB units: plate=270.5 g, katori=150 g"
+  },
+  {
+    "id": "brown-rice",
+    "food_id": "brown-rice-cooked",
+    "label": "Brown rice (cooked)",
+    "label_hi": "ब्राउन राइस",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 plate",
+        "grams": 250
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 50,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: katori 150 g, plate 250 g"
+  },
+  {
+    "id": "khichdi",
+    "food_id": "dish-vegetable-khichdi",
+    "label": "Khichdi",
+    "label_hi": "खिचड़ी",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 60,
+    "icon": "bowl",
+    "source_note": "INDB units: katori=150 g, bowl=200 g"
+  },
+  {
+    "id": "veg-pulao",
+    "food_id": "dish-mixed-vegetable-pulao",
+    "label": "Veg pulao",
+    "label_hi": "वेज पुलाव",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      },
+      {
+        "label": "1 full plate",
+        "grams": 438
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 70,
+    "icon": "bowl",
+    "source_note": "INDB units: plate=438.4 g, katori=150 g"
+  },
+  {
+    "id": "veg-biryani",
+    "food_id": "dish-vegetable-biryani",
+    "label": "Veg biryani",
+    "label_hi": "वेज बिरयानी",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 plate",
+        "grams": 302
+      },
+      {
+        "label": "1 katori",
+        "grams": 150
+      }
+    ],
+    "default_serving": "1 plate",
+    "sort": 80,
+    "icon": "bowl",
+    "source_note": "INDB units: plate=301.6 g, katori=150 g"
+  },
+  {
+    "id": "chicken-biryani",
+    "food_id": "biryani-chicken",
+    "label": "Chicken biryani",
+    "label_hi": "चिकन बिरयानी",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 plate",
+        "grams": 300
+      },
+      {
+        "label": "1 katori",
+        "grams": 150
+      }
+    ],
+    "default_serving": "1 plate",
+    "sort": 90,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: plate 300 g (no INDB chicken biryani recipe)"
+  },
+  {
+    "id": "mutton-biryani",
+    "food_id": "dish-mutton-biryani",
+    "label": "Mutton biryani",
+    "label_hi": "मटन बिरयानी",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 plate",
+        "grams": 208
+      },
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 large plate",
+        "grams": 300
+      }
+    ],
+    "default_serving": "1 plate",
+    "sort": 100,
+    "icon": "bowl",
+    "source_note": "INDB units: plate=207.8 g"
+  },
+  {
+    "id": "naan",
+    "food_id": "dish-naan",
+    "label": "Naan",
+    "label_hi": "नान",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 naan",
+        "grams": 53
+      },
+      {
+        "label": "2 naan",
+        "grams": 106
+      },
+      {
+        "label": "1 large naan",
+        "grams": 90
+      }
+    ],
+    "default_serving": "1 naan",
+    "sort": 110,
+    "icon": "roti",
+    "source_note": "INDB units: naan=53.2 g; large restaurant naan 90 g"
+  },
+  {
+    "id": "makki-roti",
+    "food_id": "dish-makki-ki-roti",
+    "label": "Makki ki roti",
+    "label_hi": "मक्की की रोटी",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 roti",
+        "grams": 85
+      },
+      {
+        "label": "2 roti",
+        "grams": 170
+      }
+    ],
+    "default_serving": "1 roti",
+    "sort": 120,
+    "icon": "roti",
+    "source_note": "INDB units: roti=85 g"
+  },
+  {
+    "id": "curd-rice",
+    "food_id": "dish-curd-rice",
+    "label": "Curd rice",
+    "label_hi": "दही चावल",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 plate",
+        "grams": 216
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 130,
+    "icon": "bowl",
+    "source_note": "INDB units: plate=216.2 g, katori=150 g"
+  },
+  {
+    "id": "lemon-rice",
+    "food_id": "dish-lemon-rice",
+    "label": "Lemon rice",
+    "label_hi": "नींबू चावल",
+    "category": "staple",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 plate",
+        "grams": 319
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 140,
+    "icon": "bowl",
+    "source_note": "INDB units: plate=319.2 g, katori=150 g"
+  },
+  {
+    "id": "dal-tadka",
+    "food_id": "dal-cooked",
+    "label": "Dal tadka / dal fry",
+    "label_hi": "दाल तड़का",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 10,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: katori 150 g (INDB thin dals ~50 kcal/100 g rejected)"
+  },
+  {
+    "id": "toor-dal",
+    "food_id": "dal-cooked",
+    "label": "Toor / arhar dal",
+    "label_hi": "अरहर / तूर दाल",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 20,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: katori 150 g"
+  },
+  {
+    "id": "moong-dal",
+    "food_id": "dal-cooked",
+    "label": "Moong dal",
+    "label_hi": "मूंग दाल",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 30,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: katori 150 g (INDB washed moong dal 50 kcal/100 g rejected)"
+  },
+  {
+    "id": "masoor-dal",
+    "food_id": "dal-cooked",
+    "label": "Masoor dal",
+    "label_hi": "मसूर दाल",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 40,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: katori 150 g (INDB whole masoor 54 kcal/100 g rejected)"
+  },
+  {
+    "id": "chana-dal",
+    "food_id": "dish-split-bengal-gram-dal",
+    "label": "Chana dal",
+    "label_hi": "चना दाल",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      },
+      {
+        "label": "1 bowl",
+        "grams": 292
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 50,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=292.2 g, katori=150 g"
+  },
+  {
+    "id": "rajma",
+    "food_id": "dish-kidney-bean-curry",
+    "label": "Rajma",
+    "label_hi": "राजमा",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 60,
+    "icon": "bowl",
+    "source_note": "INDB units: katori=150 g"
+  },
+  {
+    "id": "chole",
+    "food_id": "dish-chickpeas-curry",
+    "label": "Chole / chana masala",
+    "label_hi": "छोले",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 70,
+    "icon": "bowl",
+    "source_note": "INDB units: katori=150 g"
+  },
+  {
+    "id": "kala-chana",
+    "food_id": "dish-black-channa-curry",
+    "label": "Kala chana curry",
+    "label_hi": "काला चना",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 80,
+    "icon": "bowl",
+    "source_note": "INDB units: katori=150 g"
+  },
+  {
+    "id": "sambar",
+    "food_id": "dish-sambar",
+    "label": "Sambar",
+    "label_hi": "सांभर",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 257
+      },
+      {
+        "label": "1 ladle",
+        "grams": 60
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 90,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=257.2 g, katori=150 g, ladle=60 g"
+  },
+  {
+    "id": "rasam",
+    "food_id": "dish-rasam-with-tamarind",
+    "label": "Rasam",
+    "label_hi": "रसम",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 390
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 100,
+    "icon": "bowl",
+    "source_note": "INDB units: curry bowl=389.9 g, katori=150 g"
+  },
+  {
+    "id": "dal-makhani",
+    "food_id": "dish-moti-mahal-dal",
+    "label": "Dal makhani",
+    "label_hi": "दाल मखनी",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 287
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 110,
+    "icon": "bowl",
+    "source_note": "INDB 'Moti Mahal dal' (original dal makhani), bowl=286.7 g; INDB 'Dal makhani' row (74 kcal) too thin"
+  },
+  {
+    "id": "dal-palak",
+    "food_id": "dish-arhar-with-spinach",
+    "label": "Dal palak",
+    "label_hi": "दाल पालक",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 120,
+    "icon": "leaf",
+    "source_note": "INDB units: katori=150 g, bowl=200 g"
+  },
+  {
+    "id": "panchmel-dal",
+    "food_id": "dish-panchmel-dal",
+    "label": "Panchmel dal",
+    "label_hi": "पंचमेल दाल",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 301
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 130,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=300.8 g, katori=150 g"
+  },
+  {
+    "id": "lobia",
+    "food_id": "dish-lobia-curry",
+    "label": "Lobia curry",
+    "label_hi": "लोबिया",
+    "category": "dal",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 140,
+    "icon": "bowl",
+    "source_note": "INDB units: katori=150 g"
+  },
+  {
+    "id": "aloo-gobi",
+    "food_id": "dish-potato-cauliflower",
+    "label": "Aloo gobi",
+    "label_hi": "आलू गोभी",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 176
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 10,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=175.7 g; katori 150 g"
+  },
+  {
+    "id": "bhindi",
+    "food_id": "dish-okra",
+    "label": "Bhindi sabzi",
+    "label_hi": "भिंडी",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 166
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 20,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=166.3 g, katori=150 g"
+  },
+  {
+    "id": "palak-paneer",
+    "food_id": "dish-spinach-paneer",
+    "label": "Palak paneer",
+    "label_hi": "पालक पनीर",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 296
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 30,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=295.5 g; katori 150 g"
+  },
+  {
+    "id": "mixed-veg",
+    "food_id": "sabzi-mixed",
+    "label": "Mixed veg sabzi",
+    "label_hi": "मिक्स वेज",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 40,
+    "icon": "leaf",
+    "source_note": "standard Indian household measure: katori 150 g"
+  },
+  {
+    "id": "baingan-bharta",
+    "food_id": "dish-brinjal-bhartha",
+    "label": "Baingan bharta",
+    "label_hi": "बैंगन भर्ता",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 326
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 50,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=325.8 g; katori 150 g"
+  },
+  {
+    "id": "aloo-matar",
+    "food_id": "dish-pea-potato-curry",
+    "label": "Aloo matar",
+    "label_hi": "आलू मटर",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 277
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 60,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=277.3 g, katori=150 g"
+  },
+  {
+    "id": "aloo-jeera",
+    "food_id": "dish-dry-potato",
+    "label": "Jeera aloo",
+    "label_hi": "जीरा आलू",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 106
+      },
+      {
+        "label": "2 katori",
+        "grams": 212
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 70,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=105.7 g"
+  },
+  {
+    "id": "cabbage-sabzi",
+    "food_id": "dish-cabbage-and-peas",
+    "label": "Cabbage matar sabzi",
+    "label_hi": "पत्ता गोभी मटर",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 166
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 80,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=166.2 g; katori 150 g"
+  },
+  {
+    "id": "matar-paneer",
+    "food_id": "dish-pea-paneer-curry",
+    "label": "Matar paneer",
+    "label_hi": "मटर पनीर",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 277
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 90,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=277.3 g, katori=150 g"
+  },
+  {
+    "id": "paneer-butter-masala",
+    "food_id": "dish-paneer-in-butter-sauce",
+    "label": "Paneer butter masala",
+    "label_hi": "पनीर बटर मसाला",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 157
+      },
+      {
+        "label": "2 katori",
+        "grams": 300
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 100,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=156.8 g; katori 150 g"
+  },
+  {
+    "id": "kadai-paneer",
+    "food_id": "dish-kadhai-paneer",
+    "label": "Kadai paneer",
+    "label_hi": "कड़ाही पनीर",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 318
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 110,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=318.1 g; katori 150 g"
+  },
+  {
+    "id": "methi-aloo",
+    "food_id": "dish-potato-fenugreek",
+    "label": "Aloo methi",
+    "label_hi": "आलू मेथी",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 204
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 120,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=204.3 g; katori 150 g"
+  },
+  {
+    "id": "gobi-matar",
+    "food_id": "dish-cauliflower-pea-and-potato-bhujia",
+    "label": "Gobi matar",
+    "label_hi": "गोभी मटर",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 191
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 130,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=191.2 g; katori 150 g"
+  },
+  {
+    "id": "karela",
+    "food_id": "dish-stuffed-bittergourd",
+    "label": "Karela (bharwa)",
+    "label_hi": "भरवां करेला",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 157
+      },
+      {
+        "label": "½ katori",
+        "grams": 75
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 140,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=156.5 g; katori 150 g"
+  },
+  {
+    "id": "tinda",
+    "food_id": "dish-stuffed-round-gourd",
+    "label": "Tinda sabzi",
+    "label_hi": "टिंडा",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 248
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 150,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=248.2 g; katori 150 g"
+  },
+  {
+    "id": "bhindi-masala",
+    "food_id": "dish-stuffed-okra",
+    "label": "Bhindi masala (bharwa)",
+    "label_hi": "भिंडी मसाला",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 111
+      },
+      {
+        "label": "2 katori",
+        "grams": 221
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 160,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=110.5 g"
+  },
+  {
+    "id": "aloo-curry",
+    "food_id": "dish-potato-curry",
+    "label": "Aloo curry (rasedar)",
+    "label_hi": "आलू की सब्ज़ी",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 202
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 170,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=201.6 g, katori=150 g"
+  },
+  {
+    "id": "sarson-saag",
+    "food_id": "dish-sarson-ka-saag",
+    "label": "Sarson ka saag",
+    "label_hi": "सरसों का साग",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 142
+      },
+      {
+        "label": "2 katori",
+        "grams": 283
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 180,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=141.5 g"
+  },
+  {
+    "id": "mushroom-matar",
+    "food_id": "dish-mushroom-matar",
+    "label": "Mushroom matar",
+    "label_hi": "मशरूम मटर",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 263
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 190,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=262.9 g; katori 150 g"
+  },
+  {
+    "id": "veg-kurma",
+    "food_id": "dish-vegetable-curry-with-coconut",
+    "label": "Veg kurma (coconut)",
+    "label_hi": "वेज कुरमा",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 372
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 200,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=371.6 g, katori=150 g"
+  },
+  {
+    "id": "avial",
+    "food_id": "dish-avial",
+    "label": "Avial",
+    "label_hi": "अवियल",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 335
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 210,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=335.1 g; katori 150 g"
+  },
+  {
+    "id": "beans-poriyal",
+    "food_id": "dish-beans-with-coconut",
+    "label": "Beans poriyal",
+    "label_hi": "बीन्स पोरियल",
+    "category": "sabzi",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "½ katori",
+        "grams": 75
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 220,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=149.5 g"
+  },
+  {
+    "id": "egg-whole",
+    "food_id": "ifct-egg-poultry-whole-raw",
+    "label": "Egg (whole)",
+    "label_hi": "अंडा",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 egg",
+        "grams": 50
+      },
+      {
+        "label": "2 eggs",
+        "grams": 100
+      },
+      {
+        "label": "3 eggs",
+        "grams": 150
+      }
+    ],
+    "default_serving": "2 eggs",
+    "sort": 10,
+    "icon": "egg",
+    "source_note": "IFCT household measure: egg 50 g"
+  },
+  {
+    "id": "egg-white",
+    "food_id": "ifct-egg-poultry-white-boiled",
+    "label": "Egg white",
+    "label_hi": "अंडे की सफ़ेदी",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 egg white",
+        "grams": 33
+      },
+      {
+        "label": "2 egg whites",
+        "grams": 66
+      },
+      {
+        "label": "4 egg whites",
+        "grams": 132
+      }
+    ],
+    "default_serving": "2 egg whites",
+    "sort": 20,
+    "icon": "egg",
+    "source_note": "IFCT household measure: egg white 33 g"
+  },
+  {
+    "id": "paneer",
+    "food_id": "ifct-paneer",
+    "label": "Paneer (raw)",
+    "label_hi": "पनीर",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "50 g",
+        "grams": 50
+      },
+      {
+        "label": "100 g",
+        "grams": 100
+      },
+      {
+        "label": "200 g pack",
+        "grams": 200
+      }
+    ],
+    "default_serving": "100 g",
+    "sort": 30,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: paneer 50/100 g, 200 g retail pack"
+  },
+  {
+    "id": "whey",
+    "food_id": "whey",
+    "label": "Whey protein",
+    "label_hi": "व्हे प्रोटीन",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 scoop",
+        "grams": 30
+      },
+      {
+        "label": "½ scoop",
+        "grams": 15
+      },
+      {
+        "label": "2 scoops",
+        "grams": 60
+      }
+    ],
+    "default_serving": "1 scoop",
+    "sort": 40,
+    "icon": "spoon",
+    "source_note": "manufacturer scoop 30 g"
+  },
+  {
+    "id": "chicken-curry",
+    "food_id": "dish-chicken-curry",
+    "label": "Chicken curry",
+    "label_hi": "चिकन करी",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 katori (2 pcs)",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 248
+      }
+    ],
+    "default_serving": "1 katori (2 pcs)",
+    "sort": 50,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=247.9 g, katori=150 g"
+  },
+  {
+    "id": "chicken-breast",
+    "food_id": "chicken-breast",
+    "label": "Chicken breast (grilled)",
+    "label_hi": "चिकन ब्रेस्ट",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "100 g",
+        "grams": 100
+      },
+      {
+        "label": "150 g",
+        "grams": 150
+      },
+      {
+        "label": "200 g",
+        "grams": 200
+      }
+    ],
+    "default_serving": "150 g",
+    "sort": 60,
+    "icon": "flame",
+    "source_note": "standard Indian household measure: 100 g piece"
+  },
+  {
+    "id": "tandoori-chicken",
+    "food_id": "dish-tandoori-chicken",
+    "label": "Tandoori chicken / tikka",
+    "label_hi": "तंदूरी चिकन",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "5-6 pieces",
+        "grams": 150
+      },
+      {
+        "label": "¼ chicken",
+        "grams": 360
+      },
+      {
+        "label": "½ chicken",
+        "grams": 720
+      }
+    ],
+    "default_serving": "5-6 pieces",
+    "sort": 70,
+    "icon": "flame",
+    "source_note": "INDB units: whole chicken=1440.8 g (¼, ½); 150 g tikka portion household measure"
+  },
+  {
+    "id": "butter-chicken",
+    "food_id": "dish-butter-chicken",
+    "label": "Butter chicken",
+    "label_hi": "बटर चिकन",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 serving",
+        "grams": 275
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 80,
+    "icon": "bowl",
+    "source_note": "INDB units: large piece serving=275.2 g; katori 150 g"
+  },
+  {
+    "id": "egg-curry",
+    "food_id": "dish-egg-curry",
+    "label": "Egg curry",
+    "label_hi": "अंडा करी",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 152
+      },
+      {
+        "label": "2 katori",
+        "grams": 303
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 90,
+    "icon": "egg",
+    "source_note": "INDB units: bowl=151.6 g"
+  },
+  {
+    "id": "egg-bhurji",
+    "food_id": "dish-scrambled-egg",
+    "label": "Egg bhurji / scrambled",
+    "label_hi": "अंडा भुर्जी",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 egg",
+        "grams": 70
+      },
+      {
+        "label": "2 eggs",
+        "grams": 140
+      },
+      {
+        "label": "3 eggs",
+        "grams": 210
+      }
+    ],
+    "default_serving": "2 eggs",
+    "sort": 100,
+    "icon": "egg",
+    "source_note": "INDB units: egg=70 g"
+  },
+  {
+    "id": "fish-curry",
+    "food_id": "dish-fish-curry",
+    "label": "Fish curry",
+    "label_hi": "मछली करी",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 254
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 110,
+    "icon": "fish",
+    "source_note": "INDB units: bowl=254 g, katori=150 g"
+  },
+  {
+    "id": "prawn-curry",
+    "food_id": "dish-prawn-curry",
+    "label": "Prawn curry",
+    "label_hi": "झींगा करी",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 286
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 120,
+    "icon": "fish",
+    "source_note": "INDB units: bowl=286.1 g, katori=150 g"
+  },
+  {
+    "id": "mutton-curry",
+    "food_id": "dish-roghan-josh",
+    "label": "Mutton curry / rogan josh",
+    "label_hi": "मटन करी",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 236
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 130,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=236 g; katori 150 g"
+  },
+  {
+    "id": "curd",
+    "food_id": "curd",
+    "label": "Curd / dahi",
+    "label_hi": "दही",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 cup",
+        "grams": 200
+      },
+      {
+        "label": "2 tbsp",
+        "grams": 30
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 140,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: katori 150 g"
+  },
+  {
+    "id": "greek-yogurt",
+    "food_id": "greek-yogurt",
+    "label": "Greek yogurt",
+    "label_hi": "ग्रीक योगर्ट",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 small tub",
+        "grams": 100
+      },
+      {
+        "label": "1 cup",
+        "grams": 170
+      }
+    ],
+    "default_serving": "1 small tub",
+    "sort": 150,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: 100 g tub, cup 170 g"
+  },
+  {
+    "id": "sprouts",
+    "food_id": "sprouts",
+    "label": "Moong sprouts",
+    "label_hi": "अंकुरित मूंग",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 100
+      },
+      {
+        "label": "1 bowl",
+        "grams": 150
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 160,
+    "icon": "leaf",
+    "source_note": "standard Indian household measure: sprouts katori 100 g"
+  },
+  {
+    "id": "soya-chunks",
+    "food_id": "soya-chunks",
+    "label": "Soya chunks (cooked)",
+    "label_hi": "सोया चंक्स",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 100
+      },
+      {
+        "label": "1 bowl",
+        "grams": 150
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 170,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: cooked soya chunks katori 100 g"
+  },
+  {
+    "id": "tofu",
+    "food_id": "tofu",
+    "label": "Tofu",
+    "label_hi": "टोफू",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "100 g",
+        "grams": 100
+      },
+      {
+        "label": "150 g",
+        "grams": 150
+      },
+      {
+        "label": "200 g pack",
+        "grams": 200
+      }
+    ],
+    "default_serving": "100 g",
+    "sort": 180,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: 100 g portion, 200 g retail pack"
+  },
+  {
+    "id": "chana-boiled",
+    "food_id": "chana-black",
+    "label": "Kala chana (boiled)",
+    "label_hi": "उबला काला चना",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "½ katori",
+        "grams": 75
+      },
+      {
+        "label": "1 katori",
+        "grams": 150
+      }
+    ],
+    "default_serving": "½ katori",
+    "sort": 190,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: katori 150 g"
+  },
+  {
+    "id": "peanuts",
+    "food_id": "ifct-ground-nut",
+    "label": "Peanuts",
+    "label_hi": "मूंगफली",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 handful",
+        "grams": 30
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 10
+      },
+      {
+        "label": "2 handfuls",
+        "grams": 60
+      }
+    ],
+    "default_serving": "1 handful",
+    "sort": 200,
+    "icon": "leaf",
+    "source_note": "IFCT household measure: handful 30 g"
+  },
+  {
+    "id": "milk-toned",
+    "food_id": "milk-toned",
+    "label": "Milk (toned)",
+    "label_hi": "टोंड दूध",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 cup",
+        "grams": 150
+      },
+      {
+        "label": "½ glass",
+        "grams": 125
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 210,
+    "icon": "glass",
+    "source_note": "standard Indian household measure: glass 250 ml, cup 150 ml"
+  },
+  {
+    "id": "paneer-tikka",
+    "food_id": "dish-paneer-shaslik",
+    "label": "Paneer tikka / shashlik",
+    "label_hi": "पनीर टिक्का",
+    "category": "protein",
+    "servings": [
+      {
+        "label": "1 plate",
+        "grams": 439
+      },
+      {
+        "label": "½ plate",
+        "grams": 220
+      }
+    ],
+    "default_serving": "1 plate",
+    "sort": 220,
+    "icon": "flame",
+    "source_note": "INDB units: plate=438.7 g"
+  },
+  {
+    "id": "samosa",
+    "food_id": "samosa",
+    "label": "Samosa",
+    "label_hi": "समोसा",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 samosa",
+        "grams": 100
+      },
+      {
+        "label": "2 samosa",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 samosa",
+    "sort": 10,
+    "icon": "flame",
+    "source_note": "standard Indian household measure: samosa 100 g (INDB samosa rows rejected: 440-620 kcal/100 g)"
+  },
+  {
+    "id": "pakora",
+    "food_id": "pakora",
+    "label": "Pakora / bhajji",
+    "label_hi": "पकौड़ा",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "4 pieces",
+        "grams": 120
+      },
+      {
+        "label": "6 pieces",
+        "grams": 180
+      },
+      {
+        "label": "1 piece",
+        "grams": 30
+      }
+    ],
+    "default_serving": "4 pieces",
+    "sort": 20,
+    "icon": "flame",
+    "source_note": "standard Indian household measure: pakora 30 g/piece (INDB pakora rows rejected: 550-720 kcal/100 g)"
+  },
+  {
+    "id": "chana-chaat",
+    "food_id": "dish-khatta-channa",
+    "label": "Chana chaat",
+    "label_hi": "चना चाट",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 120
+      },
+      {
+        "label": "1 bowl",
+        "grams": 157
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 30,
+    "icon": "bowl",
+    "source_note": "INDB units: bowl=157.1 g; chaat katori 120 g"
+  },
+  {
+    "id": "murmura",
+    "food_id": "ifct-rice-puffed",
+    "label": "Murmura / puffed rice",
+    "label_hi": "मुरमुरा",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 bowl",
+        "grams": 30
+      },
+      {
+        "label": "2 bowls",
+        "grams": 60
+      }
+    ],
+    "default_serving": "1 bowl",
+    "sort": 40,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: murmura bowl 30 g"
+  },
+  {
+    "id": "marie-biscuit",
+    "food_id": "biscuit",
+    "label": "Marie / Good Day biscuit",
+    "label_hi": "मैरी बिस्कुट",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "2 biscuits",
+        "grams": 20
+      },
+      {
+        "label": "4 biscuits",
+        "grams": 40
+      },
+      {
+        "label": "1 biscuit",
+        "grams": 10
+      }
+    ],
+    "default_serving": "2 biscuits",
+    "sort": 50,
+    "icon": "sweet",
+    "source_note": "standard Indian household measure: biscuit 10 g"
+  },
+  {
+    "id": "parle-g",
+    "food_id": "biscuit",
+    "label": "Parle-G",
+    "label_hi": "पारले-जी बिस्कुट",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "½ pack",
+        "grams": 25
+      },
+      {
+        "label": "1 pack (50 g)",
+        "grams": 50
+      }
+    ],
+    "default_serving": "1 pack (50 g)",
+    "sort": 60,
+    "icon": "sweet",
+    "source_note": "retail pack 50 g"
+  },
+  {
+    "id": "maggi",
+    "food_id": "noodles-cooked",
+    "label": "Maggi (cooked)",
+    "label_hi": "मैगी",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 pack",
+        "grams": 250
+      },
+      {
+        "label": "2 packs",
+        "grams": 500
+      },
+      {
+        "label": "½ pack",
+        "grams": 125
+      }
+    ],
+    "default_serving": "1 pack",
+    "sort": 70,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: 1 pack = 70 g dry ≈ 250 g cooked"
+  },
+  {
+    "id": "poha-chivda",
+    "food_id": "dish-rice-flakes-and-roasted-channa",
+    "label": "Poha chivda (roasted)",
+    "label_hi": "पोहा चिवड़ा",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 handful",
+        "grams": 30
+      },
+      {
+        "label": "1 small bowl",
+        "grams": 50
+      }
+    ],
+    "default_serving": "1 handful",
+    "sort": 80,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: dry snack handful 30 g"
+  },
+  {
+    "id": "sev-namkeen",
+    "food_id": "dish-sev",
+    "label": "Sev / bhujia namkeen",
+    "label_hi": "सेव नमकीन",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 handful",
+        "grams": 25
+      },
+      {
+        "label": "1 small bowl",
+        "grams": 50
+      }
+    ],
+    "default_serving": "1 handful",
+    "sort": 90,
+    "icon": "flame",
+    "source_note": "standard Indian household measure: dry snack handful 25 g (INDB plate=136.9 g)"
+  },
+  {
+    "id": "pav-bhaji",
+    "food_id": "dish-pav-bhaji",
+    "label": "Pav bhaji (bhaji only)",
+    "label_hi": "पाव भाजी",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 100,
+    "icon": "bowl",
+    "source_note": "INDB units: katori=150 g, bowl=200 g"
+  },
+  {
+    "id": "pav",
+    "food_id": "bread-white",
+    "label": "Pav / bun",
+    "label_hi": "पाव",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 pav",
+        "grams": 40
+      },
+      {
+        "label": "2 pav",
+        "grams": 80
+      }
+    ],
+    "default_serving": "2 pav",
+    "sort": 110,
+    "icon": "roti",
+    "source_note": "standard Indian household measure: pav 40 g"
+  },
+  {
+    "id": "veg-sandwich",
+    "food_id": "dish-tomato-and-cucumber-sandwich",
+    "label": "Veg sandwich",
+    "label_hi": "वेज सैंडविच",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 sandwich",
+        "grams": 79
+      },
+      {
+        "label": "2 sandwiches",
+        "grams": 158
+      }
+    ],
+    "default_serving": "1 sandwich",
+    "sort": 120,
+    "icon": "roti",
+    "source_note": "INDB units: sandwich=78.8 g"
+  },
+  {
+    "id": "chips",
+    "food_id": "chips",
+    "label": "Potato chips",
+    "label_hi": "चिप्स",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 small pack",
+        "grams": 30
+      },
+      {
+        "label": "1 large pack",
+        "grams": 52
+      }
+    ],
+    "default_serving": "1 small pack",
+    "sort": 130,
+    "icon": "flame",
+    "source_note": "retail pack sizes 30 g / 52 g"
+  },
+  {
+    "id": "almonds",
+    "food_id": "almonds",
+    "label": "Almonds",
+    "label_hi": "बादाम",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "5 almonds",
+        "grams": 6
+      },
+      {
+        "label": "10 almonds",
+        "grams": 12
+      },
+      {
+        "label": "1 handful",
+        "grams": 30
+      }
+    ],
+    "default_serving": "10 almonds",
+    "sort": 140,
+    "icon": "leaf",
+    "source_note": "standard Indian household measure: almond 1.2 g each"
+  },
+  {
+    "id": "momos",
+    "food_id": "momos",
+    "label": "Momos (steamed)",
+    "label_hi": "मोमोज़",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "6 momos",
+        "grams": 210
+      },
+      {
+        "label": "4 momos",
+        "grams": 140
+      },
+      {
+        "label": "10 momos",
+        "grams": 350
+      }
+    ],
+    "default_serving": "6 momos",
+    "sort": 150,
+    "icon": "bowl",
+    "source_note": "standard Indian household measure: momo 35 g"
+  },
+  {
+    "id": "sprout-salad",
+    "food_id": "dish-sprouted-moong-salad",
+    "label": "Sprout salad",
+    "label_hi": "अंकुरित मूंग सलाद",
+    "category": "snack",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 100
+      },
+      {
+        "label": "1 bowl",
+        "grams": 204
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 160,
+    "icon": "leaf",
+    "source_note": "INDB units: bowl=203.7 g; sprouts katori 100 g"
+  },
+  {
+    "id": "chai",
+    "food_id": "tea",
+    "label": "Chai (milk + sugar)",
+    "label_hi": "चाय",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 cup",
+        "grams": 150
+      },
+      {
+        "label": "1 large cup",
+        "grams": 210
+      },
+      {
+        "label": "1 glass",
+        "grams": 250
+      }
+    ],
+    "default_serving": "1 cup",
+    "sort": 10,
+    "icon": "cup",
+    "source_note": "standard 150 ml cup; INDB tea cup=210.5 g"
+  },
+  {
+    "id": "filter-coffee",
+    "food_id": "coffee-milk",
+    "label": "Filter coffee / coffee with milk",
+    "label_hi": "फ़िल्टर कॉफ़ी",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 tumbler",
+        "grams": 150
+      },
+      {
+        "label": "1 cup",
+        "grams": 200
+      },
+      {
+        "label": "1 glass",
+        "grams": 250
+      }
+    ],
+    "default_serving": "1 tumbler",
+    "sort": 20,
+    "icon": "cup",
+    "source_note": "standard Indian household measure: tumbler 150 ml"
+  },
+  {
+    "id": "black-coffee",
+    "food_id": "black-coffee",
+    "label": "Black coffee",
+    "label_hi": "ब्लैक कॉफ़ी",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 cup",
+        "grams": 200
+      },
+      {
+        "label": "1 glass",
+        "grams": 250
+      }
+    ],
+    "default_serving": "1 cup",
+    "sort": 30,
+    "icon": "cup",
+    "source_note": "standard Indian household measure: cup 200 ml"
+  },
+  {
+    "id": "milk-full",
+    "food_id": "ifct-milk-whole-cow",
+    "label": "Milk (full cream)",
+    "label_hi": "दूध",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 cup",
+        "grams": 150
+      },
+      {
+        "label": "½ glass",
+        "grams": 125
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 40,
+    "icon": "glass",
+    "source_note": "IFCT household measure: glass 250 ml, cup 150 ml"
+  },
+  {
+    "id": "lassi",
+    "food_id": "dish-sweet-lassi",
+    "label": "Lassi (sweet)",
+    "label_hi": "लस्सी",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 tall glass",
+        "grams": 443
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 50,
+    "icon": "glass",
+    "source_note": "INDB units: tall glass=442.5 g, glass=250 g"
+  },
+  {
+    "id": "chaas",
+    "food_id": "buttermilk",
+    "label": "Chaas / buttermilk",
+    "label_hi": "छाछ",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 cup",
+        "grams": 150
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 60,
+    "icon": "glass",
+    "source_note": "standard Indian household measure: glass 250 ml"
+  },
+  {
+    "id": "cold-coffee",
+    "food_id": "dish-cold-coffee",
+    "label": "Cold coffee",
+    "label_hi": "कोल्ड कॉफ़ी",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 large glass",
+        "grams": 300
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 70,
+    "icon": "glass",
+    "source_note": "INDB units: tall glass=250.5 g; large café glass 300 ml"
+  },
+  {
+    "id": "nimbu-pani",
+    "food_id": "dish-lemonade",
+    "label": "Nimbu pani (sweet)",
+    "label_hi": "नींबू पानी",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 large glass",
+        "grams": 349
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 80,
+    "icon": "glass",
+    "source_note": "INDB units: glass=349.3 g"
+  },
+  {
+    "id": "coconut-water",
+    "food_id": "ifct-coconut-water",
+    "label": "Coconut water",
+    "label_hi": "नारियल पानी",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 tender coconut",
+        "grams": 250
+      },
+      {
+        "label": "1 cup",
+        "grams": 150
+      }
+    ],
+    "default_serving": "1 tender coconut",
+    "sort": 90,
+    "icon": "glass",
+    "source_note": "standard Indian household measure: one tender coconut ≈ 250 ml"
+  },
+  {
+    "id": "mango-shake",
+    "food_id": "dish-mango-milkshake",
+    "label": "Mango shake",
+    "label_hi": "मैंगो शेक",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 tall glass",
+        "grams": 356
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 100,
+    "icon": "glass",
+    "source_note": "INDB units: tall glass=355.5 g, glass=250 g"
+  },
+  {
+    "id": "banana-shake",
+    "food_id": "dish-banana-milkshake",
+    "label": "Banana shake",
+    "label_hi": "बनाना शेक",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 tall glass",
+        "grams": 346
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 110,
+    "icon": "glass",
+    "source_note": "INDB units: tall glass=345.5 g, glass=250 g"
+  },
+  {
+    "id": "sugarcane-juice",
+    "food_id": "ifct-sugarcane-juice",
+    "label": "Sugarcane juice",
+    "label_hi": "गन्ने का रस",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 small glass",
+        "grams": 150
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 120,
+    "icon": "glass",
+    "source_note": "standard Indian household measure: glass 250 ml"
+  },
+  {
+    "id": "fruit-juice",
+    "food_id": "juice",
+    "label": "Fruit juice",
+    "label_hi": "फलों का रस",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 cup",
+        "grams": 150
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 130,
+    "icon": "glass",
+    "source_note": "standard Indian household measure: glass 250 ml"
+  },
+  {
+    "id": "cola",
+    "food_id": "coke",
+    "label": "Cola / soft drink",
+    "label_hi": "कोल्ड ड्रिंक",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 can (300 ml)",
+        "grams": 300
+      },
+      {
+        "label": "1 bottle (600 ml)",
+        "grams": 600
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 140,
+    "icon": "glass",
+    "source_note": "retail sizes: 300 ml can, 600 ml bottle; glass 250 ml"
+  },
+  {
+    "id": "gulab-jamun",
+    "food_id": "gulab-jamun",
+    "label": "Gulab jamun",
+    "label_hi": "गुलाब जामुन",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 piece",
+        "grams": 40
+      },
+      {
+        "label": "2 pieces",
+        "grams": 80
+      }
+    ],
+    "default_serving": "1 piece",
+    "sort": 10,
+    "icon": "sweet",
+    "source_note": "standard Indian household measure: gulab jamun 40 g (INDB rows rejected: 470-590 kcal/100 g)"
+  },
+  {
+    "id": "besan-ladoo",
+    "food_id": "dish-gram-flour-ladoo",
+    "label": "Besan ladoo",
+    "label_hi": "बेसन लड्डू",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 ladoo",
+        "grams": 35
+      },
+      {
+        "label": "2 ladoo",
+        "grams": 71
+      }
+    ],
+    "default_serving": "1 ladoo",
+    "sort": 20,
+    "icon": "sweet",
+    "source_note": "INDB units: ladoo=35.3 g"
+  },
+  {
+    "id": "kheer",
+    "food_id": "dish-phirni",
+    "label": "Kheer / phirni",
+    "label_hi": "खीर",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 290
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 30,
+    "icon": "sweet",
+    "source_note": "INDB units: bowl=290.2 g; katori 150 g"
+  },
+  {
+    "id": "suji-halwa",
+    "food_id": "dish-semolina-halwa",
+    "label": "Suji halwa",
+    "label_hi": "सूजी का हलवा",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 100
+      },
+      {
+        "label": "1 bowl",
+        "grams": 160
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 40,
+    "icon": "sweet",
+    "source_note": "INDB units: bowl=159.6 g; halwa katori 100 g"
+  },
+  {
+    "id": "gajar-halwa",
+    "food_id": "dish-carrot-halwa",
+    "label": "Gajar halwa",
+    "label_hi": "गाजर का हलवा",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 100
+      },
+      {
+        "label": "1 bowl",
+        "grams": 168
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 50,
+    "icon": "sweet",
+    "source_note": "INDB units: bowl=167.8 g; halwa katori 100 g"
+  },
+  {
+    "id": "rasgulla",
+    "food_id": "dish-rasgulla",
+    "label": "Rasgulla",
+    "label_hi": "रसगुल्ला",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 piece",
+        "grams": 50
+      },
+      {
+        "label": "2 pieces",
+        "grams": 100
+      }
+    ],
+    "default_serving": "1 piece",
+    "sort": 60,
+    "icon": "sweet",
+    "source_note": "standard Indian household measure: rasgulla with syrup 50 g"
+  },
+  {
+    "id": "rasmalai",
+    "food_id": "dish-rasmalai",
+    "label": "Rasmalai",
+    "label_hi": "रसमलाई",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 piece",
+        "grams": 70
+      },
+      {
+        "label": "2 pieces",
+        "grams": 140
+      }
+    ],
+    "default_serving": "1 piece",
+    "sort": 70,
+    "icon": "sweet",
+    "source_note": "standard Indian household measure: rasmalai with milk 70 g"
+  },
+  {
+    "id": "barfi",
+    "food_id": "dish-plain-burfi",
+    "label": "Barfi (khoya)",
+    "label_hi": "बर्फ़ी",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 piece",
+        "grams": 44
+      },
+      {
+        "label": "2 pieces",
+        "grams": 87
+      }
+    ],
+    "default_serving": "1 piece",
+    "sort": 80,
+    "icon": "sweet",
+    "source_note": "INDB units: burfi=43.6 g"
+  },
+  {
+    "id": "kaju-katli",
+    "food_id": "dish-cashewnut-burfi",
+    "label": "Kaju katli",
+    "label_hi": "काजू कतली",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 piece",
+        "grams": 15
+      },
+      {
+        "label": "2 pieces",
+        "grams": 30
+      },
+      {
+        "label": "4 pieces",
+        "grams": 60
+      }
+    ],
+    "default_serving": "2 pieces",
+    "sort": 90,
+    "icon": "sweet",
+    "source_note": "standard Indian household measure: kaju katli diamond 15 g (INDB cashew burfi=28.7 g)"
+  },
+  {
+    "id": "ice-cream",
+    "food_id": "dish-vanilla-ice-cream-without-egg",
+    "label": "Ice cream (vanilla)",
+    "label_hi": "आइसक्रीम",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 scoop",
+        "grams": 70
+      },
+      {
+        "label": "2 scoops",
+        "grams": 140
+      },
+      {
+        "label": "1 cup",
+        "grams": 157
+      }
+    ],
+    "default_serving": "1 scoop",
+    "sort": 100,
+    "icon": "sweet",
+    "source_note": "INDB units: ice cream cup=157.4 g; scoop 70 g"
+  },
+  {
+    "id": "chocolate",
+    "food_id": "chocolate",
+    "label": "Chocolate (milk)",
+    "label_hi": "चॉकलेट",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 small bar",
+        "grams": 13
+      },
+      {
+        "label": "½ bar",
+        "grams": 20
+      },
+      {
+        "label": "1 bar",
+        "grams": 40
+      }
+    ],
+    "default_serving": "1 small bar",
+    "sort": 110,
+    "icon": "sweet",
+    "source_note": "retail bar sizes 13 g / 40 g"
+  },
+  {
+    "id": "payasam",
+    "food_id": "dish-vermicelli-kheer",
+    "label": "Semiya payasam",
+    "label_hi": "सेवइयां खीर / पायसम",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 katori",
+        "grams": 150
+      },
+      {
+        "label": "1 bowl",
+        "grams": 232
+      }
+    ],
+    "default_serving": "1 katori",
+    "sort": 120,
+    "icon": "sweet",
+    "source_note": "INDB units: bowl=232.4 g, katori=150 g"
+  },
+  {
+    "id": "sugar",
+    "food_id": "sugar",
+    "label": "Sugar",
+    "label_hi": "चीनी",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 tsp",
+        "grams": 4
+      },
+      {
+        "label": "2 tsp",
+        "grams": 8
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 15
+      }
+    ],
+    "default_serving": "1 tsp",
+    "sort": 130,
+    "icon": "spoon",
+    "source_note": "standard Indian household measure: tsp 4 g, tbsp 15 g"
+  },
+  {
+    "id": "jaggery",
+    "food_id": "ifct-jaggery-cane",
+    "label": "Jaggery (gud)",
+    "label_hi": "गुड़",
+    "category": "sweet",
+    "servings": [
+      {
+        "label": "1 tsp",
+        "grams": 5
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 15
+      },
+      {
+        "label": "1 piece",
+        "grams": 10
+      }
+    ],
+    "default_serving": "1 tsp",
+    "sort": 140,
+    "icon": "spoon",
+    "source_note": "IFCT household measure: tsp 5 g, tbsp 15 g"
+  },
+  {
+    "id": "banana",
+    "food_id": "ifct-banana-ripe-robusta",
+    "label": "Banana",
+    "label_hi": "केला",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 banana",
+        "grams": 120
+      },
+      {
+        "label": "2 bananas",
+        "grams": 240
+      }
+    ],
+    "default_serving": "1 banana",
+    "sort": 10,
+    "icon": "fruit",
+    "source_note": "standard Indian household measure: banana 120 g"
+  },
+  {
+    "id": "apple",
+    "food_id": "ifct-apple-big",
+    "label": "Apple",
+    "label_hi": "सेब",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 apple",
+        "grams": 180
+      },
+      {
+        "label": "½ apple",
+        "grams": 90
+      }
+    ],
+    "default_serving": "1 apple",
+    "sort": 20,
+    "icon": "fruit",
+    "source_note": "standard Indian household measure: apple 180 g"
+  },
+  {
+    "id": "papaya",
+    "food_id": "papaya",
+    "label": "Papaya",
+    "label_hi": "पपीता",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 bowl",
+        "grams": 150
+      },
+      {
+        "label": "2 bowls",
+        "grams": 300
+      }
+    ],
+    "default_serving": "1 bowl",
+    "sort": 30,
+    "icon": "fruit",
+    "source_note": "standard Indian household measure: bowl 150 g (IFCT ripe papaya 24 kcal/100 g looked low)"
+  },
+  {
+    "id": "mango",
+    "food_id": "mango",
+    "label": "Mango",
+    "label_hi": "आम",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 mango",
+        "grams": 200
+      },
+      {
+        "label": "½ mango",
+        "grams": 100
+      },
+      {
+        "label": "1 bowl",
+        "grams": 150
+      }
+    ],
+    "default_serving": "1 mango",
+    "sort": 40,
+    "icon": "fruit",
+    "source_note": "standard Indian household measure: mango 200 g (IFCT Banganapalli carbs looked low)"
+  },
+  {
+    "id": "orange",
+    "food_id": "ifct-orange-pulp",
+    "label": "Orange",
+    "label_hi": "संतरा",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 orange",
+        "grams": 130
+      },
+      {
+        "label": "2 oranges",
+        "grams": 260
+      }
+    ],
+    "default_serving": "1 orange",
+    "sort": 50,
+    "icon": "fruit",
+    "source_note": "standard Indian household measure: orange 130 g"
+  },
+  {
+    "id": "mosambi",
+    "food_id": "ifct-lime-sweet-pulp",
+    "label": "Mosambi / sweet lime",
+    "label_hi": "मौसंबी",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 mosambi",
+        "grams": 150
+      },
+      {
+        "label": "2 mosambi",
+        "grams": 300
+      }
+    ],
+    "default_serving": "1 mosambi",
+    "sort": 60,
+    "icon": "fruit",
+    "source_note": "standard Indian household measure: mosambi 150 g edible"
+  },
+  {
+    "id": "guava",
+    "food_id": "ifct-guava-white-flesh",
+    "label": "Guava",
+    "label_hi": "अमरूद",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 guava",
+        "grams": 120
+      },
+      {
+        "label": "2 guavas",
+        "grams": 240
+      }
+    ],
+    "default_serving": "1 guava",
+    "sort": 70,
+    "icon": "fruit",
+    "source_note": "IFCT household measure: piece=120 g"
+  },
+  {
+    "id": "grapes",
+    "food_id": "ifct-grapes-seedless-round-green",
+    "label": "Grapes",
+    "label_hi": "अंगूर",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 cup",
+        "grams": 150
+      },
+      {
+        "label": "½ cup",
+        "grams": 75
+      }
+    ],
+    "default_serving": "1 cup",
+    "sort": 80,
+    "icon": "fruit",
+    "source_note": "IFCT household measure: cup=150 g"
+  },
+  {
+    "id": "watermelon",
+    "food_id": "ifct-water-melon-dark-green-sugar-baby",
+    "label": "Watermelon",
+    "label_hi": "तरबूज़",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 bowl",
+        "grams": 150
+      },
+      {
+        "label": "2 bowls",
+        "grams": 300
+      }
+    ],
+    "default_serving": "1 bowl",
+    "sort": 90,
+    "icon": "fruit",
+    "source_note": "IFCT household measure: cup=150 g"
+  },
+  {
+    "id": "pomegranate",
+    "food_id": "ifct-pomegranate-maroon-seeds",
+    "label": "Pomegranate",
+    "label_hi": "अनार",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 cup seeds",
+        "grams": 150
+      },
+      {
+        "label": "½ cup seeds",
+        "grams": 75
+      }
+    ],
+    "default_serving": "1 cup seeds",
+    "sort": 100,
+    "icon": "fruit",
+    "source_note": "IFCT household measure: cup=150 g"
+  },
+  {
+    "id": "chikoo",
+    "food_id": "ifct-sapota",
+    "label": "Chikoo / sapota",
+    "label_hi": "चीकू",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 chikoo",
+        "grams": 100
+      },
+      {
+        "label": "2 chikoo",
+        "grams": 200
+      }
+    ],
+    "default_serving": "1 chikoo",
+    "sort": 110,
+    "icon": "fruit",
+    "source_note": "standard Indian household measure: chikoo 100 g"
+  },
+  {
+    "id": "dates",
+    "food_id": "dates",
+    "label": "Dates (khajur)",
+    "label_hi": "खजूर",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 date",
+        "grams": 8
+      },
+      {
+        "label": "3 dates",
+        "grams": 24
+      },
+      {
+        "label": "5 dates",
+        "grams": 40
+      }
+    ],
+    "default_serving": "3 dates",
+    "sort": 120,
+    "icon": "fruit",
+    "source_note": "standard Indian household measure: date 8 g"
+  },
+  {
+    "id": "muskmelon",
+    "food_id": "ifct-musk-melon-orange-flesh",
+    "label": "Muskmelon",
+    "label_hi": "खरबूजा",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 bowl",
+        "grams": 150
+      },
+      {
+        "label": "2 bowls",
+        "grams": 300
+      }
+    ],
+    "default_serving": "1 bowl",
+    "sort": 130,
+    "icon": "fruit",
+    "source_note": "IFCT household measure: cup=150 g"
+  },
+  {
+    "id": "pineapple",
+    "food_id": "ifct-pineapple",
+    "label": "Pineapple",
+    "label_hi": "अनानास",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 bowl",
+        "grams": 150
+      },
+      {
+        "label": "1 slice",
+        "grams": 80
+      }
+    ],
+    "default_serving": "1 bowl",
+    "sort": 140,
+    "icon": "fruit",
+    "source_note": "IFCT household measure: cup=150 g"
+  },
+  {
+    "id": "kiwi",
+    "food_id": "usda-kiwifruit-green-raw",
+    "label": "Kiwi",
+    "label_hi": "कीवी",
+    "category": "fruit",
+    "servings": [
+      {
+        "label": "1 kiwi",
+        "grams": 69
+      },
+      {
+        "label": "2 kiwis",
+        "grams": 138
+      }
+    ],
+    "default_serving": "1 kiwi",
+    "sort": 150,
+    "icon": "fruit",
+    "source_note": "USDA household measure: fruit=69 g"
+  },
+  {
+    "id": "ghee",
+    "food_id": "ghee",
+    "label": "Ghee",
+    "label_hi": "घी",
+    "category": "fat",
+    "servings": [
+      {
+        "label": "½ tsp",
+        "grams": 2.5
+      },
+      {
+        "label": "1 tsp",
+        "grams": 5
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 15
+      }
+    ],
+    "default_serving": "1 tsp",
+    "sort": 10,
+    "icon": "drop",
+    "source_note": "household measure: tsp 5 g, tbsp 15 g"
+  },
+  {
+    "id": "refined-oil",
+    "food_id": "oil",
+    "label": "Refined oil",
+    "label_hi": "रिफ़ाइंड तेल",
+    "category": "fat",
+    "servings": [
+      {
+        "label": "½ tsp",
+        "grams": 2.5
+      },
+      {
+        "label": "1 tsp",
+        "grams": 5
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 15
+      }
+    ],
+    "default_serving": "1 tsp",
+    "sort": 20,
+    "icon": "drop",
+    "source_note": "household measure: tsp 5 g, tbsp 15 g"
+  },
+  {
+    "id": "mustard-oil",
+    "food_id": "usda-oil-mustard",
+    "label": "Mustard oil",
+    "label_hi": "सरसों का तेल",
+    "category": "fat",
+    "servings": [
+      {
+        "label": "½ tsp",
+        "grams": 2.5
+      },
+      {
+        "label": "1 tsp",
+        "grams": 5
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 15
+      }
+    ],
+    "default_serving": "1 tsp",
+    "sort": 30,
+    "icon": "drop",
+    "source_note": "household measure: tsp 5 g, tbsp 15 g (IFCT oil rows carry 0 kcal; USDA row used)"
+  },
+  {
+    "id": "coconut-oil",
+    "food_id": "usda-oil-coconut",
+    "label": "Coconut oil",
+    "label_hi": "नारियल तेल",
+    "category": "fat",
+    "servings": [
+      {
+        "label": "½ tsp",
+        "grams": 2.5
+      },
+      {
+        "label": "1 tsp",
+        "grams": 5
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 15
+      }
+    ],
+    "default_serving": "1 tsp",
+    "sort": 40,
+    "icon": "drop",
+    "source_note": "household measure: tsp 5 g, tbsp 15 g (IFCT oil rows carry 0 kcal; USDA row used)"
+  },
+  {
+    "id": "butter",
+    "food_id": "butter",
+    "label": "Butter",
+    "label_hi": "मक्खन",
+    "category": "fat",
+    "servings": [
+      {
+        "label": "½ tsp",
+        "grams": 2.5
+      },
+      {
+        "label": "1 tsp",
+        "grams": 5
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 14
+      }
+    ],
+    "default_serving": "1 tsp",
+    "sort": 50,
+    "icon": "drop",
+    "source_note": "household measure: tsp 5 g, tbsp 14 g"
+  },
+  {
+    "id": "olive-oil",
+    "food_id": "oil",
+    "label": "Olive oil",
+    "label_hi": "जैतून का तेल",
+    "category": "fat",
+    "servings": [
+      {
+        "label": "½ tsp",
+        "grams": 2.5
+      },
+      {
+        "label": "1 tsp",
+        "grams": 5
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 15
+      }
+    ],
+    "default_serving": "1 tsp",
+    "sort": 60,
+    "icon": "drop",
+    "source_note": "household measure: tsp 5 g, tbsp 15 g (no olive-oil row; generic cooking-oil row, same 884 kcal/100 g)"
+  },
+  {
+    "id": "peanut-butter",
+    "food_id": "peanut-butter",
+    "label": "Peanut butter",
+    "label_hi": "पीनट बटर",
+    "category": "fat",
+    "servings": [
+      {
+        "label": "½ tsp",
+        "grams": 2.5
+      },
+      {
+        "label": "1 tsp",
+        "grams": 5
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 15
+      },
+      {
+        "label": "2 tbsp",
+        "grams": 30
+      }
+    ],
+    "default_serving": "1 tbsp",
+    "sort": 70,
+    "icon": "spoon",
+    "source_note": "household measure: tsp 5 g, tbsp 15 g"
+  }
+]

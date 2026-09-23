@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 import { ONBOARD_SKIP_COOKIE } from "./onboarding";
 import { bandCode, bandIntensity, bandKcal } from "./burn";
-import type { Activity, DescribedExercise, MealItem, Profile, SavedMeal } from "./types";
+import type { Activity, DescribedExercise, FoodSearchHit, MealItem, Profile, SavedMeal } from "./types";
 
 async function userOrThrow() {
   const supabase = await createClient();
@@ -170,6 +170,9 @@ export async function saveMeal(input: { date: string; raw_text: string; items: M
       source: i.source,
       confidence: i.confidence,
       micros: i.micros ?? {},
+      unit: i.unit ?? null,
+      servings: i.servings ?? null,
+      cooked_in: i.cooked_in ?? null,
     }));
   if (items.length) {
     const { error: e2 } = await supabase.from("meal_items").insert(items);
@@ -204,6 +207,8 @@ const PROFILE_KEYS: (keyof Profile)[] = [
   "carb_target_g",
   "fat_target_g",
   "reminders",
+  "lens_default",
+  "share_stats",
 ];
 
 /** Upserts the given profile columns for the signed-in user (a partial patch is fine). */
@@ -294,6 +299,37 @@ export async function deleteSavedMeal(id: string) {
   const { error } = await supabase.from("saved_meals").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
+}
+
+/**
+ * Food picker search over bandlog.foods (the same trigram RPC the parser uses), as the signed-in
+ * user. Returns per-100 g numbers plus the row's household units so the Quantity sheet can offer
+ * real serving sizes. Hinglish and Devanagari both match because search_text carries names_local.
+ */
+export async function searchFoodsForPicker(q: string, limit = 12): Promise<FoodSearchHit[]> {
+  const { supabase } = await userOrThrow();
+  const key = q.trim().toLowerCase().replace(/\s+/g, " ");
+  if (key.length < 2) return [];
+  const { data, error } = await supabase.rpc("search_foods", { q: key, n: limit });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    name: String(r.name ?? ""),
+    name_hi: ((r.names_local as Record<string, string> | null)?.hi as string | undefined) ?? null,
+    calories: Number(r.calories ?? 0),
+    protein_g: Number(r.protein_g ?? 0),
+    carbs_g: Number(r.carbs_g ?? 0),
+    fat_g: Number(r.fat_g ?? 0),
+    source: String(r.source ?? "custom"),
+    units: Array.isArray(r.units) ? (r.units as { name: string; grams: number }[]).map((u) => ({ label: u.name, grams: Number(u.grams) })) : [],
+    micros: {
+      ...((r.micros ?? {}) as Record<string, number>),
+      ...(r.fiber_g != null ? { fiber_g: Number(r.fiber_g) } : {}),
+      ...(r.sugar_g != null ? { sugar_g: Number(r.sugar_g) } : {}),
+      ...(r.sodium_mg != null ? { sodium_mg: Number(r.sodium_mg) } : {}),
+    },
+    score: Number(r.score ?? 0),
+  }));
 }
 
 /** Remove one scan from History. */

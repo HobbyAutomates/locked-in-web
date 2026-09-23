@@ -1,17 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { saveProfile, signOut } from "@/lib/actions";
 import { setBurnedBack, useBurnedBack } from "@/lib/prefs";
 import { onCount } from "@/lib/reminders";
 import { THEME_MODES, setThemeMode, useThemeMode, type ThemeMode } from "@/lib/theme";
-import { ageFrom, type Profile } from "@/lib/types";
-import { Bell, Exit, Flame, Mail, Moon, Palette, Pencil, Person, Scale, Share, Target, Tune } from "./icons";
+import { LENS_DEFAULTS, ageFrom, type LensDefault, type Profile } from "@/lib/types";
+import { APP_VERSION, CHANGELOG, compareVersions } from "@/lib/version";
+import { Bell, Exit, Flame, Mail, Moon, Palette, Pencil, Person, Refresh, Scale, Scan, Share, Sparkle, Target, Tune } from "./icons";
 import { Card, Chevron, ErrorNote, GroupLabel, Hair, PillButton, PillSwitch, Rise, SettingRow, Toggle, fmt } from "./ui";
 
-const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-10.apk";
+const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-11.apk";
 const WEB_URL = "https://web-production-ff1cf.up.railway.app";
 const INVITE_TEXT = `Locked In — workouts, meals by voice, label scanner. Android: ${APK_URL} · iPhone: ${WEB_URL} (Safari → Add to Home Screen)`;
 
@@ -28,6 +29,18 @@ export default function ProfileScreen({ profile, email }: { profile: Profile; em
   const burnedBack = useBurnedBack();
   const age = ageFrom(profile.dob);
   const remindersOn = onCount(profile.reminders);
+  const [lensDefault, setLensDefault] = useState<LensDefault>(profile.lens_default);
+  const [shareStats, setShareStats] = useState(profile.share_stats);
+
+  async function savePref(patch: Partial<Profile>) {
+    setError(null);
+    try {
+      await saveProfile(patch);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save that");
+    }
+  }
 
   async function invite() {
     try {
@@ -108,7 +121,7 @@ export default function ProfileScreen({ profile, email }: { profile: Profile; em
               <Chevron />
             </SettingRow>
             <Hair />
-            <SettingRow icon={<Tune size={20} />} label="Preferences" subtitle="Appearance, burned calories">
+            <SettingRow icon={<Tune size={20} />} label="Preferences" subtitle="Appearance, scans, burned calories, groups">
               <span />
             </SettingRow>
             <Hair />
@@ -118,6 +131,42 @@ export default function ProfileScreen({ profile, email }: { profile: Profile; em
             <Hair />
             <SettingRow icon={<Flame size={20} />} label="Add burned calories back" subtitle="Exercise you log raises today's calorie budget">
               <Toggle on={burnedBack} onChange={setBurnedBack} label="Add burned calories back" />
+            </SettingRow>
+            <Hair />
+            <div className="py-3">
+              <p className="flex items-center gap-2.5 text-[15px] font-medium">
+                <Scan size={20} />
+                Judge scans for
+              </p>
+              <p className="mt-0.5 pl-[30px] text-[11px] muted">The lens every scan report opens on. &ldquo;My goal&rdquo; follows Lose → Cutting, Gain → Bulking.</p>
+              <div className="mt-2 flex flex-wrap gap-1.5 pl-[30px]">
+                {LENS_DEFAULTS.map((l) => (
+                  <button
+                    key={l.key}
+                    type="button"
+                    aria-pressed={lensDefault === l.key}
+                    className="chip press"
+                    style={{ height: 32, fontSize: 12 }}
+                    onClick={() => {
+                      setLensDefault(l.key);
+                      void savePref({ lens_default: l.key });
+                    }}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Hair />
+            <SettingRow icon={<Share size={20} />} label="Share with groups" subtitle={`${shareStats ? "Streaks + protein & calories" : "Streaks only"} · Groups are coming next`}>
+              <Toggle
+                on={shareStats}
+                onChange={(v) => {
+                  setShareStats(v);
+                  void savePref({ share_stats: v });
+                }}
+                label="Share with groups"
+              />
             </SettingRow>
           </div>
         </Card>
@@ -174,6 +223,10 @@ export default function ProfileScreen({ profile, email }: { profile: Profile; em
       </Rise>
 
       <Rise index={6}>
+        <AppCard />
+      </Rise>
+
+      <Rise index={6}>
         <Card>
           <p className="flex items-center gap-2 text-[15px] font-semibold">
             <Share size={18} />
@@ -187,6 +240,68 @@ export default function ProfileScreen({ profile, email }: { profile: Profile; em
 
       <AnimatePresence>{showRings ? <RingColoursDialog onClose={() => setShowRings(false)} /> : null}</AnimatePresence>
     </div>
+  );
+}
+
+/**
+ * "Locked In web 1.9 · Check for updates" plus the What's new list. iPhone users have no APK, so
+ * this is how they learn what changed: /api/version says what the server is running; if it is
+ * newer than the build this page loaded with (<meta name="app-version">), we reload.
+ */
+function AppCard() {
+  const [state, setState] = useState<"idle" | "checking" | "current" | "newer" | "error">("idle");
+  const [server, setServer] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const loaded = typeof document !== "undefined" ? document.querySelector('meta[name="app-version"]')?.getAttribute("content") ?? APP_VERSION : APP_VERSION;
+  useEffect(() => {
+    if (state !== "newer") return;
+    const t = setTimeout(() => window.location.reload(), 900);
+    return () => clearTimeout(t);
+  }, [state]);
+  async function check() {
+    setState("checking");
+    try {
+      const res = await fetch("/api/version", { cache: "no-store" });
+      const j = (await res.json()) as { version: string };
+      setServer(j.version);
+      setState(compareVersions(j.version, loaded) > 0 ? "newer" : "current");
+    } catch {
+      setState("error");
+    }
+  }
+  return (
+    <Card padding={0}>
+      <div className="px-4">
+        <SettingRow icon={<Refresh size={20} />} label={`Locked In web ${loaded}`} subtitle={state === "newer" ? `Version ${server} is live — reloading…` : state === "current" ? "You're on the latest build" : state === "error" ? "Couldn't reach the server" : "Tap to check for a newer build"} onClick={check}>
+          <span className="text-[13px] font-semibold" style={{ color: state === "current" ? "var(--green)" : "var(--muted)" }}>
+            {state === "checking" ? "Checking…" : state === "current" ? "Up to date" : state === "newer" ? "Updating" : "Check for updates"}
+          </span>
+        </SettingRow>
+        <Hair />
+        <SettingRow icon={<Sparkle size={20} />} label="What's new" subtitle={`${CHANGELOG[0]?.version ?? APP_VERSION} · ${CHANGELOG.length} releases`} onClick={() => setOpen((o) => !o)}>
+          <span className="text-[13px] font-semibold muted">{open ? "Hide" : "Show"}</span>
+        </SettingRow>
+        {open ? (
+          <div className="flex flex-col gap-3 pb-4 pt-1">
+            {CHANGELOG.map((c) => (
+              <div key={c.version}>
+                <p className="text-[13px] font-bold">
+                  {c.version} <span className="font-medium muted">· {c.date}</span>
+                </p>
+                <ul className="mt-1 flex list-none flex-col gap-1 p-0 text-[13px] leading-[18px] muted">
+                  {c.lines.map((l, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span aria-hidden="true">•</span>
+                      {l}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </Card>
   );
 }
 

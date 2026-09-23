@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /data/
+
+# v1.9 presets are source data, not a raw dataset dump
+!/data/presets.json
