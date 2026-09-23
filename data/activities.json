@@ -1,0 +1,874 @@
+[
+ {
+  "code": "01015",
+  "name": "bicycling",
+  "description": "general",
+  "met": 7.5,
+  "tags": [],
+  "category": "bicycling"
+ },
+ {
+  "code": "01009",
+  "name": "bicycling, mountain",
+  "description": "general",
+  "met": 8.5,
+  "tags": [],
+  "category": "bicycling"
+ },
+ {
+  "code": "01070",
+  "name": "unicycling",
+  "description": "general",
+  "met": 5.0,
+  "tags": [],
+  "category": "bicycling"
+ },
+ {
+  "code": "02010",
+  "name": "bicycling, stationary",
+  "description": "general",
+  "met": 7.5,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02020",
+  "name": "calisthenics",
+  "description": "vigorous effort (e.g., pushups, sit-ups, pull-ups, jumping jacks, burpees)",
+  "met": 7.5,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02030",
+  "name": "calisthenics",
+  "description": "light or moderate effort, general (e.g., back exercises)",
+  "met": 3.5,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02040",
+  "name": "circuit training",
+  "description": "including kettlebells, some aerobic movement with minimal rest, vigorous intensity",
+  "met": 7.5,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02050",
+  "name": "resistance training",
+  "description": "weight lifting, free weight, nautilus or universal",
+  "met": 6.0,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02055",
+  "name": "resistance training",
+  "description": "vigorous effort, powerlifting or bodybuilding",
+  "met": 6.0,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02068",
+  "name": "rope skipping",
+  "description": "general",
+  "met": 12.3,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02080",
+  "name": "rowing machine",
+  "description": "moderate effort",
+  "met": 7.0,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02090",
+  "name": "elliptical trainer",
+  "description": "moderate effort",
+  "met": 5.0,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02095",
+  "name": "stair-treadmill ergometer",
+  "description": "general",
+  "met": 9.0,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02120",
+  "name": "water exercise",
+  "description": "water aerobics, water calisthenics",
+  "met": 5.3,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02160",
+  "name": "yoga",
+  "description": "general, hatha",
+  "met": 3.0,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02165",
+  "name": "pilates",
+  "description": "general",
+  "met": 3.0,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02170",
+  "name": "stretching",
+  "description": "mild, general",
+  "met": 2.3,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02210",
+  "name": "high intensity interval exercise",
+  "description": "moderate effort",
+  "met": 7.0,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "02214",
+  "name": "high intensity interval exercise",
+  "description": "burpees, mountain climbers, squat jumps, Tabata, vigorous effort",
+  "met": 11.0,
+  "tags": [],
+  "category": "conditioningExercise"
+ },
+ {
+  "code": "03015",
+  "name": "aerobic",
+  "description": "general",
+  "met": 7.3,
+  "tags": [],
+  "category": "dancing"
+ },
+ {
+  "code": "12020",
+  "name": "jogging",
+  "description": "general",
+  "met": 7.0,
+  "tags": [],
+  "category": "running"
+ },
+ {
+  "code": "12150",
+  "name": "running",
+  "description": "general",
+  "met": 8.3,
+  "tags": [],
+  "category": "running"
+ },
+ {
+  "code": "12180",
+  "name": "running",
+  "description": "on treadmill, general",
+  "met": 8.0,
+  "tags": [],
+  "category": "running"
+ },
+ {
+  "code": "15010",
+  "name": "archery",
+  "description": "non-hunting",
+  "met": 4.3,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15030",
+  "name": "badminton",
+  "description": "social singles and doubles, general",
+  "met": 5.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15055",
+  "name": "basketball",
+  "description": "general",
+  "met": 6.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15080",
+  "name": "billiards",
+  "description": "general",
+  "met": 2.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15090",
+  "name": "bowling",
+  "description": "general",
+  "met": 3.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15100",
+  "name": "boxing",
+  "description": "in ring, general",
+  "met": 12.8,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15110",
+  "name": "boxing",
+  "description": "punching bag",
+  "met": 5.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15130",
+  "name": "broomball",
+  "description": "general",
+  "met": 7.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15135",
+  "name": "children's games",
+  "description": "(e.g., hopscotch, 4-square, dodgeball, playground apparatus, t-ball, tetherball, marbles, arcade games), moderate effort",
+  "met": 5.8,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15138",
+  "name": "cheerleading",
+  "description": "gymnastic moves, competitive",
+  "met": 6.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15150",
+  "name": "cricket",
+  "description": "batting, bowling, fielding",
+  "met": 4.8,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15160",
+  "name": "croquet",
+  "description": "general",
+  "met": 3.3,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15170",
+  "name": "curling",
+  "description": "general",
+  "met": 4.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15180",
+  "name": "darts",
+  "description": "wall or lawn",
+  "met": 2.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15192",
+  "name": "auto racing",
+  "description": "open wheel",
+  "met": 8.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15200",
+  "name": "fencing",
+  "description": "general",
+  "met": 6.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15230",
+  "name": "football",
+  "description": "touch, flag, general",
+  "met": 8.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15235",
+  "name": "football or baseball",
+  "description": "playing catch",
+  "met": 2.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15240",
+  "name": "frisbee playing",
+  "description": "general",
+  "met": 3.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15255",
+  "name": "golf",
+  "description": "general",
+  "met": 4.8,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15300",
+  "name": "gymnastics",
+  "description": "general",
+  "met": 3.8,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15310",
+  "name": "hacky sack",
+  "description": "general",
+  "met": 4.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15320",
+  "name": "handball",
+  "description": "general",
+  "met": 12.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15340",
+  "name": "hang gliding",
+  "description": "general",
+  "met": 3.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15350",
+  "name": "hockey, field",
+  "description": "general",
+  "met": 7.8,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15360",
+  "name": "ice hockey",
+  "description": "general",
+  "met": 8.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15370",
+  "name": "horseback riding",
+  "description": "general",
+  "met": 5.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15420",
+  "name": "jai alai",
+  "description": "general",
+  "met": 12.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15425",
+  "name": "martial arts",
+  "description": "different types, slower pace, novice performers, practice",
+  "met": 5.3,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15430",
+  "name": "martial arts",
+  "description": "different types, moderate pace (e.g., judo, jujitsu, karate, kick boxing, tae kwan do, tai-bo, Muay Thai boxing)",
+  "met": 10.3,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15440",
+  "name": "juggling",
+  "description": "general",
+  "met": 4.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15460",
+  "name": "lacrosse",
+  "description": "general",
+  "met": 8.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15465",
+  "name": "lawn bowling",
+  "description": "bocce ball, outdoor",
+  "met": 3.3,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15470",
+  "name": "moto-cross",
+  "description": "off-road motor sports, all-terrain vehicle, general",
+  "met": 4.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15480",
+  "name": "orienteering",
+  "description": "general",
+  "met": 9.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15500",
+  "name": "paddleball",
+  "description": "casual, general",
+  "met": 6.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15510",
+  "name": "polo",
+  "description": "on horseback",
+  "met": 8.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15530",
+  "name": "racquetball",
+  "description": "general",
+  "met": 7.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15533",
+  "name": "climbing",
+  "description": "rock or mountain climbing",
+  "met": 8.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15544",
+  "name": "rodeo sports",
+  "description": "general, moderate effort",
+  "met": 5.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15551",
+  "name": "rope jumping",
+  "description": "moderate pace, 100-120 skips/min, general, 2 foot skip, plain bounce",
+  "met": 11.8,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15560",
+  "name": "rugby",
+  "description": "union, team, competitive",
+  "met": 8.3,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15562",
+  "name": "rugby",
+  "description": "touch, non-competitive",
+  "met": 6.3,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15570",
+  "name": "shuffleboard",
+  "description": "general",
+  "met": 3.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15580",
+  "name": "skateboarding",
+  "description": "general, moderate effort",
+  "met": 5.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15590",
+  "name": "skating",
+  "description": "roller",
+  "met": 7.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15592",
+  "name": "rollerblading",
+  "description": "in-line skating, 14.4 km/h (9.0 mph), recreational pace",
+  "met": 7.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15600",
+  "name": "skydiving",
+  "description": "skydiving, base jumping, bungee jumping",
+  "met": 3.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15610",
+  "name": "soccer",
+  "description": "casual, general",
+  "met": 7.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15620",
+  "name": "softball / baseball",
+  "description": "fast or slow pitch, general",
+  "met": 5.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15652",
+  "name": "squash",
+  "description": "general",
+  "met": 7.3,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15660",
+  "name": "table tennis",
+  "description": "table tennis, ping pong",
+  "met": 4.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15670",
+  "name": "tai chi, qi gong",
+  "description": "general",
+  "met": 3.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15675",
+  "name": "tennis",
+  "description": "general",
+  "met": 7.3,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15700",
+  "name": "trampoline",
+  "description": "recreational",
+  "met": 3.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15710",
+  "name": "volleyball",
+  "description": "non-competitive, 6 - 9 member team, general",
+  "met": 4.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15730",
+  "name": "wrestling",
+  "description": "general",
+  "met": 6.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15731",
+  "name": "wallyball",
+  "description": "general",
+  "met": 7.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15732",
+  "name": "track and field",
+  "description": "(e.g. shot, discus, hammer throw)",
+  "met": 4.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15733",
+  "name": "track and field",
+  "description": "(e.g. high jump, long jump, triple jump, javelin, pole vault)",
+  "met": 6.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15734",
+  "name": "track and field",
+  "description": "(e.g. steeplechase, hurdles)",
+  "met": 10.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15740",
+  "name": "pickleball",
+  "description": "general",
+  "met": 4.8,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "15750",
+  "name": "active video games",
+  "description": "Wii Sports, Dance Dance Revolution, general",
+  "met": 3.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "17010",
+  "name": "backpacking",
+  "description": "general",
+  "met": 7.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "17080",
+  "name": "hiking",
+  "description": "cross country",
+  "met": 6.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "17160",
+  "name": "walking",
+  "description": "for pleasure",
+  "met": 3.5,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "17165",
+  "name": "walking the dog",
+  "description": "general",
+  "met": 3.0,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "17170",
+  "name": "Nordic walking",
+  "description": "general",
+  "met": 4.8,
+  "tags": [],
+  "category": "sport"
+ },
+ {
+  "code": "18070",
+  "name": "canoeing",
+  "description": "rowing, for pleasure, general",
+  "met": 3.5,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18090",
+  "name": "diving",
+  "description": "springboard or platform",
+  "met": 3.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18100",
+  "name": "kayaking",
+  "description": "moderate effort",
+  "met": 5.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18110",
+  "name": "paddle boat",
+  "description": "general",
+  "met": 4.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18120",
+  "name": "sailing",
+  "description": "boat and board sailing, windsurfing, ice sailing, general",
+  "met": 3.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18150",
+  "name": "water skiing",
+  "description": "water or wakeboarding",
+  "met": 6.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18200",
+  "name": "diving",
+  "description": "skindiving, scuba diving, general",
+  "met": 7.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18210",
+  "name": "snorkeling",
+  "description": "general",
+  "met": 5.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18220",
+  "name": "surfing",
+  "description": "body or board, general",
+  "met": 3.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18225",
+  "name": "paddle boarding",
+  "description": "standing",
+  "met": 6.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18350",
+  "name": "swimming",
+  "description": "treading water, moderate effort, general",
+  "met": 3.5,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18355",
+  "name": "water aerobics",
+  "description": "water aerobics, water calisthenics",
+  "met": 5.5,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "18360",
+  "name": "water polo",
+  "description": "general",
+  "met": 10.0,
+  "tags": [],
+  "category": "waterActivities"
+ },
+ {
+  "code": "19030",
+  "name": "ice skating",
+  "description": "general",
+  "met": 7.0,
+  "tags": [],
+  "category": "winterActivities"
+ },
+ {
+  "code": "19075",
+  "name": "skiing",
+  "description": "general",
+  "met": 7.0,
+  "tags": [],
+  "category": "winterActivities"
+ },
+ {
+  "code": "19080",
+  "name": "skiing",
+  "description": "cross-country, general",
+  "met": 7.0,
+  "tags": [],
+  "category": "winterActivities"
+ },
+ {
+  "code": "19252",
+  "name": "snow shoveling",
+  "description": "by hand, moderate effort",
+  "met": 5.3,
+  "tags": [],
+  "category": "winterActivities"
+ },
+ {
+  "code": "19260",
+  "name": "snowshoeing",
+  "description": "general",
+  "met": 5.3,
+  "tags": [],
+  "category": "winterActivities"
+ }
+]
