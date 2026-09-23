@@ -35,7 +35,7 @@ export function WorkoutRow({ workout, onOpen }: { workout: Workout; onOpen: () =
   );
 }
 
-export function MealRow({ meal, feedback = true }: { meal: Meal; feedback?: boolean }) {
+export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: string | null }; feedback?: boolean }) {
   const router = useRouter();
   const [voted, setVoted] = useState<"up" | "down" | null>(null);
   const [busy, startDelete] = useTransition();
@@ -58,9 +58,14 @@ export function MealRow({ meal, feedback = true }: { meal: Meal; feedback?: bool
   return (
     <Card padding={14}>
       <div className="flex items-center gap-3">
-        <IconTile tint="var(--orange)" bg="var(--orange-bg)">
-          <Bowl size={26} />
-        </IconTile>
+        {meal.photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed Storage URL
+          <img src={meal.photo_url} alt="" className="h-14 w-14 shrink-0 rounded-[14px] object-cover" />
+        ) : (
+          <IconTile tint="var(--orange)" bg="var(--orange-bg)">
+            <Bowl size={26} />
+          </IconTile>
+        )}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-[15px] font-semibold">{meal.items.map((i) => i.name).join(", ") || "Meal"}</span>

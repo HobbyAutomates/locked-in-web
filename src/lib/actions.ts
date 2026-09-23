@@ -40,11 +40,11 @@ export async function deleteWorkout(id: string) {
   revalidatePath("/", "layout");
 }
 
-export async function saveMeal(input: { date: string; raw_text: string; items: MealItem[] }) {
+export async function saveMeal(input: { date: string; raw_text: string; items: MealItem[]; photo_path?: string | null }) {
   const { supabase, user } = await userOrThrow();
   const { data: meal, error } = await supabase
     .from("meals")
-    .insert({ user_id: user.id, date: input.date, raw_text: input.raw_text })
+    .insert({ user_id: user.id, date: input.date, raw_text: input.raw_text, photo_path: input.photo_path ?? null })
     .select("id")
     .single();
   if (error || !meal) throw new Error(error?.message ?? "Could not save meal");
@@ -62,6 +62,7 @@ export async function saveMeal(input: { date: string; raw_text: string; items: M
       fat_g: i.fat_g,
       source: i.source,
       confidence: i.confidence,
+      micros: i.micros ?? {},
     }));
   if (items.length) {
     const { error: e2 } = await supabase.from("meal_items").insert(items);
@@ -122,6 +123,14 @@ export async function deleteSavedMeal(id: string) {
   const { error } = await supabase.from("saved_meals").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
+}
+
+/** Remove one scan from History. */
+export async function deleteScan(id: string) {
+  const { supabase, user } = await userOrThrow();
+  const { error } = await supabase.from("label_scans").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/scan");
 }
 
 export async function signOut() {
