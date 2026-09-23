@@ -21,8 +21,12 @@ export function weekStart(s: string) {
   const dow = (d.getDay() + 6) % 7;
   return addDays(s, -dow);
 }
+/**
+ * Today's date for the user, not the server: Railway runs in UTC, so between midnight and 05:30
+ * IST `iso(new Date())` was still "yesterday" and Home hid meals the phone had just saved.
+ */
 export function today() {
-  return iso(new Date());
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 export function longDate(s: string) {
   return parseIso(s).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
