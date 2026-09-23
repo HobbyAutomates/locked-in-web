@@ -17,6 +17,23 @@ const LENSES: { key: Lens; label: string }[] = [
 ];
 type Mode = "label" | "barcode" | "photo";
 
+/** Try to read an EAN/UPC from a still image in the browser (iPhone Safari has no native reader). */
+async function decodeBarcode(dataUrl: string): Promise<string | null> {
+  try {
+    const { BrowserMultiFormatReader } = await import("@zxing/browser");
+    const { BarcodeFormat, DecodeHintType } = await import("@zxing/library");
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]);
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    const reader = new BrowserMultiFormatReader(hints);
+    const result = await reader.decodeFromImageUrl(dataUrl);
+    const digits = result.getText().replace(/\D/g, "");
+    return digits.length >= 8 ? digits : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Downscale and re-encode as JPEG, matching the Android scanner. */
 async function toJpegBase64(file: File, maxEdge = MAX_EDGE, quality = 0.88): Promise<{ base64: string; media_type: string; preview: string }> {
   const bitmap = await createImageBitmap(file);
@@ -46,6 +63,8 @@ export default function ScanScreen({ history }: { history: ScanHistoryItem[] }) 
   const [payload, setPayload] = useState<{ base64: string; media_type: string } | null>(null);
   const [note, setNote] = useState("");
   const [barcode, setBarcode] = useState("");
+  const [decoding, setDecoding] = useState(false);
+  const [decodeNote, setDecodeNote] = useState<string | null>(null);
   const [lens, setLens] = useState<Lens>("protein");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +90,14 @@ export default function ScanScreen({ history }: { history: ScanHistoryItem[] }) 
       const out = mode === "photo" ? await toJpegBase64(file, 1600, 0.85) : await toJpegBase64(file);
       setPayload({ base64: out.base64, media_type: out.media_type });
       setPreview(out.preview);
+      if (mode === "barcode") {
+        setDecodeNote(null);
+        setDecoding(true);
+        const digits = await decodeBarcode(out.preview);
+        setDecoding(false);
+        if (digits) setBarcode(digits);
+        else setDecodeNote("Couldn't read the bars from that photo. Tap Analyse and the printed digits will be read on the server, or type them below.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read that image");
     }
@@ -81,9 +108,19 @@ export default function ScanScreen({ history }: { history: ScanHistoryItem[] }) 
     setError(null);
     try {
       if (mode === "barcode") {
-        const r = await post<LabelReport & { found?: boolean; message?: string }>("/api/scan-barcode", { barcode: barcode.trim(), lens, note: note.trim() || undefined });
-        if (r.found === false) setNotFound(true);
-        else setReport(r);
+        const digits = barcode.replace(/\D/g, "");
+        const r = await post<LabelReport & { found?: boolean; message?: string; barcode?: string }>("/api/scan-barcode", {
+          barcode: digits.length >= 8 ? digits : undefined,
+          image: digits.length >= 8 ? undefined : payload?.base64,
+          media_type: digits.length >= 8 ? undefined : payload?.media_type,
+          lens,
+          note: note.trim() || undefined,
+        });
+        if (r.barcode && digits.length < 8) setBarcode(r.barcode);
+        if (r.found === false) {
+          setNotFound(true);
+          if (r.message) setError(r.message);
+        } else setReport(r);
       } else if (mode === "photo") {
         if (!payload) return;
         setPlate(await post<PlateEstimate>("/api/photo-meal", { image: payload.base64, media_type: payload.media_type, note: note.trim() || undefined }));
@@ -113,7 +150,7 @@ export default function ScanScreen({ history }: { history: ScanHistoryItem[] }) 
   }
 
   const modeIndex = mode === "label" ? 0 : mode === "barcode" ? 1 : 2;
-  const canAnalyse = mode === "barcode" ? barcode.replace(/\D/g, "").length >= 8 : !!payload;
+  const canAnalyse = mode === "barcode" ? barcode.replace(/\D/g, "").length >= 8 || !!payload : !!payload;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -144,13 +181,13 @@ export default function ScanScreen({ history }: { history: ScanHistoryItem[] }) 
             </span>
             <span>
               <span className="block text-[15px] font-semibold">
-                {mode === "label" ? "Scan an ingredients label" : mode === "barcode" ? "Type the barcode" : "Photograph your plate"}
+                {mode === "label" ? "Scan an ingredients label" : mode === "barcode" ? "Scan a barcode" : "Photograph your plate"}
               </span>
               <span className="block text-xs muted">
                 {mode === "label"
                   ? "What it is, how it fits your goal, and whether to trust the pack"
                   : mode === "barcode"
-                    ? "EAN-13 / UPC under the bars — looked up on Open Food Facts"
+                    ? "Photograph the bars — looked up on Open Food Facts"
                     : "Each item with grams, calories, macros and micros. An estimate — edit anything."}
               </span>
             </span>
@@ -164,14 +201,32 @@ export default function ScanScreen({ history }: { history: ScanHistoryItem[] }) 
           ) : null}
 
           {mode === "barcode" ? (
-            <input
-              className="field mt-3 num"
-              inputMode="numeric"
-              value={barcode}
-              aria-label="Barcode digits"
-              onChange={(e) => setBarcode(e.target.value.replace(/[^\d]/g, ""))}
-              placeholder="8901058851298"
-            />
+            <>
+              {preview ? (
+                // eslint-disable-next-line @next/next/no-img-element -- a local canvas data URL, not a remote asset
+                <img src={preview} alt="The barcode you photographed" className="mt-3 h-[180px] w-full rounded-[14px] object-cover" />
+              ) : null}
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => void pick(e.target.files?.[0])} />
+              <input ref={galleryRef} type="file" accept="image/*" className="sr-only" onChange={(e) => void pick(e.target.files?.[0])} />
+              <div className="mt-3 flex gap-2">
+                <PillButton height={46} onClick={() => cameraRef.current?.click()}>
+                  {preview ? "Retake" : "Photograph the barcode"}
+                </PillButton>
+                <PillButton height={46} soft onClick={() => galleryRef.current?.click()}>
+                  Gallery
+                </PillButton>
+              </div>
+              {decoding ? <p className="mt-2 text-xs muted">Reading the bars…</p> : null}
+              {decodeNote && !barcode ? <p className="mt-2 text-xs muted">{decodeNote}</p> : null}
+              <input
+                className="field mt-3 num"
+                inputMode="numeric"
+                value={barcode}
+                aria-label="Barcode digits"
+                onChange={(e) => setBarcode(e.target.value.replace(/[^\d]/g, ""))}
+                placeholder="…or type the digits under the bars"
+              />
+            </>
           ) : (
             <>
               {preview ? (
