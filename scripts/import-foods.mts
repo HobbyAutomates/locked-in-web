@@ -176,7 +176,7 @@ function customRows(): Row[] {
       micros: {},
       source: "custom",
       region: WESTERN.test(f.name + " " + f.aliases.join(" ")) ? "western" : regionOf(f.name + " " + f.aliases.join(" ")),
-      names_local: (() => {
+      names_local: ((): Record<string, string> => {
         const h = devanagari(f.name, f.aliases);
         return h ? { hi: h } : {};
       })(),
