@@ -1,10 +1,6 @@
-import { getProfile } from "@/lib/data";
-import { requireUser } from "@/lib/supabase/server";
-import SettingsScreen from "@/components/SettingsScreen";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function SettingsPage() {
-  const [profile, { user }] = await Promise.all([getProfile(), requireUser()]);
-  return <SettingsScreen profile={profile} email={user?.email ?? ""} />;
+/** Settings became Profile in v1.5; old bookmarks land in the right place. */
+export default function SettingsPage() {
+  redirect("/profile");
 }

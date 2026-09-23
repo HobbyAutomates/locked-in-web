@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, Chart, Gear, Home, Plus, Scan } from "./icons";
+import { CalendarIcon, Chart, Home, Person, Plus, Scan } from "./icons";
 import { today } from "@/lib/dates";
 
 const TABS = [
@@ -10,7 +10,7 @@ const TABS = [
   { href: "/calendar", label: "Calendar", Icon: CalendarIcon },
   { href: "/scan", label: "Scan", Icon: Scan },
   { href: "/progress", label: "Progress", Icon: Chart },
-  { href: "/settings", label: "Settings", Icon: Gear },
+  { href: "/profile", label: "Profile", Icon: Person },
 ];
 
 /** Fixed bottom bar + the black FAB that opens the full-screen Log route. */
