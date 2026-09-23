@@ -2,6 +2,7 @@ import { addDays, today } from "./dates";
 import { createClient } from "./supabase/server";
 import { DEFAULT_PROFILE, type ExerciseEntry, type Meal, type MealItem, type Profile, type ScanHistoryItem, type WeightEntry, type Workout } from "./types";
 import { parse as parseReminders } from "./reminders";
+import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 
 const PROFILE_COLS =
   "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders";
@@ -56,6 +57,16 @@ export async function getBadgeTotals(): Promise<{ workoutDates: string[]; totalM
     supabase.from("meals").select("id", { count: "exact", head: true }),
   ]);
   return { workoutDates: (dates.data ?? []).map((r) => r.date as string), totalMeals: count.count ?? 0 };
+}
+
+/** The three badge counters, exactly as Android's `AppViewModel.badgeProgress`. */
+export async function getBadgeProgress(profile: Profile, workouts: Workout[], meals: Meal[]): Promise<BadgeProgress> {
+  const { workoutDates, totalMeals } = await getBadgeTotals();
+  return {
+    streakDays: longestDayRun(workoutDates.length ? workoutDates : workouts.map((w) => w.date)),
+    meals: Math.max(totalMeals, meals.length),
+    goalDays: calorieGoalDays(meals, profile.calorie_target),
+  };
 }
 
 /** Calories-burned rows (logged exercise + the auto-burn each band workout writes), newest first. */

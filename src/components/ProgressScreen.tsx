@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
+import { ALL_BADGES, earnedCount, type BadgeProgress } from "@/lib/badges";
 import { addDays, today as todayIso, weekStart } from "@/lib/dates";
 import { totalsFor } from "@/lib/totals";
 import { restByMuscle } from "@/lib/streaks";
 import { MUSCLE_COLOR, type Muscle } from "@/lib/muscles";
-import type { ExerciseEntry, Meal, Profile, Workout } from "@/lib/types";
-import { BreathingFlame, Card, MacroDot, Rise, SPRING, Segmented } from "./ui";
+import type { ExerciseEntry, Meal, Profile, WeightEntry, Workout } from "@/lib/types";
+import HexMedal from "./HexMedal";
+import { BreathingFlame, Card, Chevron, MacroDot, Rise, SPRING, Segmented, fmt } from "./ui";
 
 const WEEK_OPTIONS = ["This week", "Last week", "2 wks ago", "3 wks ago"];
 
@@ -16,6 +19,8 @@ export default function ProgressScreen({
   workouts,
   meals,
   exercises,
+  weights,
+  badges,
   weekStreak,
   thisWeek,
 }: {
@@ -23,6 +28,8 @@ export default function ProgressScreen({
   workouts: Workout[];
   meals: Meal[];
   exercises: ExerciseEntry[];
+  weights: WeightEntry[];
+  badges: BadgeProgress;
   weekStreak: number;
   thisWeek: number;
 }) {
@@ -47,6 +54,10 @@ export default function ProgressScreen({
     <div className="flex flex-col gap-3.5">
       <Rise index={0}>
         <h1 className="screen-title">Progress</h1>
+      </Rise>
+
+      <Rise index={1}>
+        <WeightCard profile={profile} weights={weights} />
       </Rise>
 
       <Rise index={1}>
@@ -84,6 +95,10 @@ export default function ProgressScreen({
             </div>
           </Card>
         </div>
+      </Rise>
+
+      <Rise index={2}>
+        <BadgesCard progress={badges} />
       </Rise>
 
       <Rise index={2}>
@@ -141,6 +156,75 @@ export default function ProgressScreen({
         </Card>
       </Rise>
     </div>
+  );
+}
+
+/** Current vs goal weight, with a hairline sparkline of the last ten weigh-ins. */
+function WeightCard({ profile, weights }: { profile: Profile; weights: WeightEntry[] }) {
+  const current = weights[0]?.weight_kg ?? profile.weight_kg;
+  const goal = profile.goal_weight_kg;
+  // weights arrive newest-first; the sparkline reads left-to-right in time order.
+  const spark = weights.slice(0, 10).map((w) => w.weight_kg).reverse();
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[13px] font-medium muted">Weight</p>
+          <p className="mt-1 flex items-baseline">
+            <span className="num text-3xl font-extrabold leading-none">{current != null ? fmt(current) : "—"}</span>
+            <span className="ml-1 text-[13px] muted">{goal != null ? `kg · goal ${fmt(goal)} kg` : "kg"}</span>
+          </p>
+        </div>
+        {spark.length >= 2 ? <Sparkline values={spark} /> : null}
+      </div>
+      {weights.length === 0 ? (
+        <p className="mt-1.5 text-xs muted">
+          Log a weigh-in from{" "}
+          <Link href="/profile/weight" className="font-semibold" style={{ color: "var(--ink)" }}>
+            Profile → Weight history
+          </Link>
+          .
+        </p>
+      ) : null}
+    </Card>
+  );
+}
+
+/** Tiny line of the last few weigh-ins — no axes, just the shape of the trend. */
+function Sparkline({ values }: { values: number[] }) {
+  const W = 96;
+  const H = 40;
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const span = hi - lo > 0.01 ? hi - lo : 1;
+  const d = values
+    .map((v, i) => {
+      const x = values.length <= 1 ? 0 : (W * i) / (values.length - 1);
+      const y = H - Math.min(H, Math.max(0, (H * (v - lo)) / span));
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+  return (
+    <svg width={W} height={H} viewBox={`-2 -2 ${W + 4} ${H + 4}`} aria-hidden="true" style={{ flex: "none" }}>
+      <motion.path d={d} fill="none" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ ...SPRING, delay: 0.2 }} />
+    </svg>
+  );
+}
+
+/** How many medals are unlocked; taps through to the full grid. */
+function BadgesCard({ progress }: { progress: BadgeProgress }) {
+  const got = earnedCount(progress);
+  return (
+    <Link href="/badges" className="card press flex w-full items-center gap-3.5" style={{ padding: 14 }} aria-label={`Badges: ${got} of ${ALL_BADGES.length} earned`}>
+      <HexMedal number={got} earned={got > 0} size={48} />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-base font-bold">Badges</span>
+        <span className="text-xs muted">
+          {got} of {ALL_BADGES.length} earned
+        </span>
+      </span>
+      <Chevron />
+    </Link>
   );
 }
 

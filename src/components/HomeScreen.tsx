@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { addDays, longDate, shortDate } from "@/lib/dates";
+import { useBurnedBack } from "@/lib/prefs";
 import { totalsFor } from "@/lib/totals";
 import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Profile, type Workout } from "@/lib/types";
 import { ChevronRight, Flame, Lock } from "./icons";
@@ -42,7 +43,10 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   const trained = new Set(workouts.map((w) => w.date));
   const carbTarget = Math.max(1, carbTargetG(profile));
   const fatTarget = Math.max(1, fatTargetG(profile));
-  const left = (target: number, used: number) => Math.max(0, Math.round(target - used));
+  // "Add burned calories back": today's exercise burn widens the budget when the preference is on.
+  const burnedBack = useBurnedBack();
+  const burnedKcal = burnedBack && isToday ? burned : 0;
+  const caloriesLeft = Math.max(0, Math.round(profile.calorie_target + burnedKcal - totals.calories));
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -72,8 +76,15 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         <Card padding={20}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="num text-[40px] font-extrabold leading-none">{left(profile.calorie_target, totals.calories)}</p>
-              <p className="mt-1 text-sm font-medium muted">{isToday ? "Calories left" : `Calories left · ${shortDate(selected)}`}</p>
+              <p className="num text-[40px] font-extrabold leading-none">{caloriesLeft}</p>
+              <p className="mt-1 flex items-center gap-2 text-sm font-medium muted">
+                {isToday ? "Calories left" : `Calories left · ${shortDate(selected)}`}
+                {burnedKcal > 0 ? (
+                  <span className="num rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }} title="Burned calories added back">
+                    +{Math.round(burnedKcal)}
+                  </span>
+                ) : null}
+              </p>
             </div>
             <Ring fraction={totals.calories / Math.max(1, profile.calorie_target)} color="var(--ink)" size={96} stroke={9}>
               <Flame size={26} />
@@ -84,9 +95,9 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
 
       <Rise index={3}>
         <div className="grid grid-cols-3 gap-2.5">
-          <MacroCard value={`${left(profile.protein_target_g, totals.protein)}g`} label="Protein left" fraction={totals.protein / Math.max(1, profile.protein_target_g)} color="var(--red)" />
-          <MacroCard value={`${left(carbTarget, totals.carbs)}g`} label="Carbs left" fraction={totals.carbs / carbTarget} color="var(--orange)" />
-          <MacroCard value={`${left(fatTarget, totals.fat)}g`} label="Fat left" fraction={totals.fat / fatTarget} color="var(--blue)" />
+          <MacroCard macro="Protein" consumed={totals.protein} target={profile.protein_target_g} color="var(--red)" />
+          <MacroCard macro="Carbs" consumed={totals.carbs} target={carbTarget} color="var(--orange)" />
+          <MacroCard macro="Fat" consumed={totals.fat} target={fatTarget} color="var(--blue)" />
         </div>
       </Rise>
 
@@ -200,13 +211,25 @@ function WeekStrip({
   );
 }
 
-function MacroCard({ value, label, fraction, color }: { value: string; label: string; fraction: number; color: string }) {
+/**
+ * One macro card. Below target it counts down ("34g / Protein left"); once the target is passed
+ * it flips to the overshoot ("12g / Protein **over**") in the macro's own colour, like Cal AI.
+ */
+function MacroCard({ macro, consumed, target, color }: { macro: string; consumed: number; target: number; color: string }) {
+  const safeTarget = Math.max(1, target);
+  const over = consumed > target && target > 0;
+  const amount = Math.max(0, Math.round(over ? consumed - target : target - consumed));
   return (
     <Card padding={12}>
-      <p className="num text-xl font-extrabold leading-tight">{value}</p>
-      <p className="text-xs muted">{label}</p>
+      <p className="num text-xl font-extrabold leading-tight" style={{ color: over ? color : "var(--ink)" }}>
+        {amount}g
+      </p>
+      <p className="text-xs muted">
+        {macro}{" "}
+        <span style={{ color: over ? color : "var(--muted)", fontWeight: over ? 700 : 400 }}>{over ? "over" : "left"}</span>
+      </p>
       <div className="mt-2.5 flex justify-center">
-        <Ring fraction={fraction} color={color} size={56} stroke={6}>
+        <Ring fraction={consumed / safeTarget} color={color} size={56} stroke={6}>
           <span className="rounded-full" style={{ width: 8, height: 8, background: color }} />
         </Ring>
       </div>
