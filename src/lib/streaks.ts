@@ -60,3 +60,19 @@ export function restByMuscle(workouts: { date: string; muscles: string[] }[]): R
     return { muscle, last: hit?.date ?? null, days: hit ? daysBetween(hit.date, t) : Infinity };
   }).sort((a, b) => b.days - a.days);
 }
+
+/**
+ * v2.5: every kind of workout counts toward the week streak — gym / bodyweight / band sessions
+ * (workouts rows) plus cardio, sport and yoga logged on the exercise log (10+ minutes).
+ */
+export function trainingDates(workouts: { date: string }[], exercises: { date: string; source?: string | null; minutes?: number | null }[] = []): string[] {
+  // One entry per workout row (two sessions in a day still count twice), plus one per exercise-log day with none.
+  const out = workouts.map((w) => w.date);
+  const seen = new Set(out);
+  for (const e of exercises) {
+    if (e.source === "workout" || Number(e.minutes ?? 0) < 10 || seen.has(e.date)) continue;
+    seen.add(e.date);
+    out.push(e.date);
+  }
+  return out;
+}

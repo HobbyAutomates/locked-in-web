@@ -10,7 +10,7 @@ import { ActivityIcon, ChevronDown, Close, Flame, Search, Spinner } from "./icon
 import { Card, ErrorNote, Hair, NumberField, PillButton, fmt } from "./ui";
 
 /** The activity being logged: a quick chip, a recent one, or a row from the MET table. */
-type Pick = { id: string; name: string; code: string | null; met: number; band?: boolean };
+type Pick = { id: string; name: string; code: string | null; met: number; band?: boolean; label?: string };
 export type ExercisePick = Pick;
 
 /** Default slider position: 40 % is exactly MET ×1.0, the old "Medium". */
@@ -58,12 +58,17 @@ export default function ExerciseForm({
   onClose,
   recent = [],
   search = searchActivities,
+  quick,
+  placeholder = "Search or describe your exercise…",
 }: {
   date: string;
   weightKg: number | null;
   onClose: () => void;
   recent?: Pick[];
   search?: (q: string) => Promise<Activity[]>;
+  /** v2.5: Log → Workout → Cardio / Sport / Yoga pass their own quick picks (default: all of them). */
+  quick?: Pick[];
+  placeholder?: string;
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Activity[]>([]);
@@ -191,7 +196,7 @@ export default function ExerciseForm({
       <div className="flex flex-1 flex-col gap-3 px-4 pb-5 pt-1.5">
         <div className="searchbar">
           <Search size={17} className="muted shrink-0" />
-          <input value={query} onChange={(e) => setQuery(e.target.value.slice(0, 300))} onKeyDown={(e) => e.key === "Enter" && description && !describing && void workItOut()} placeholder="Search or describe your exercise…" aria-label="Search or describe your exercise" />
+          <input value={query} onChange={(e) => setQuery(e.target.value.slice(0, 300))} onKeyDown={(e) => e.key === "Enter" && description && !describing && void workItOut()} placeholder={placeholder} aria-label="Search or describe your exercise" />
           {typing && searching ? <Spinner size={14} /> : null}
           {query ? (
             <button type="button" aria-label="Clear" className="hit press grid h-8 w-8 shrink-0 place-items-center rounded-full muted" onClick={() => setQuery("")}>
@@ -213,7 +218,7 @@ export default function ExerciseForm({
 
         <div className="-mx-4 overflow-x-auto px-4 py-1" style={{ scrollbarWidth: "none" }}>
           <div className="flex w-max gap-1.5" role="radiogroup" aria-label="Quick activities">
-            {QUICK_ACTIVITIES.map((q) => chip({ id: q.key, name: q.name, code: q.code, met: q.met, band: q.band }, q.label))}
+            {(quick ?? QUICK_ACTIVITIES.map((q) => ({ id: q.key, name: q.name, code: q.code, met: q.met, band: q.band, label: q.label }))).map((q) => chip(q, q.label ?? q.name))}
           </div>
         </div>
 

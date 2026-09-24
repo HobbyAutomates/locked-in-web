@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { getExercises, getFoodUsage, getLatestWorkout, getPresets, getProfile, getWorkout } from "@/lib/data";
+import { getExercises, getFoodUsage, getLatestWorkout, getPresets, getProfile, getRecentLiftWorkouts, getWorkout } from "@/lib/data";
 import { listSavedMeals } from "@/lib/actions";
 import { addDays, today as todayIso } from "@/lib/dates";
 import LogScreen from "@/components/LogScreen";
@@ -15,7 +15,7 @@ export default async function LogPage({
   const { user } = await requireUser();
   if (!user) redirect("/login");
   const sp = await searchParams;
-  const [profile, existing, savedMeals, presets, usage, last, recentExercises] = await Promise.all([
+  const [profile, existing, savedMeals, presets, usage, last, recentExercises, liftHistory] = await Promise.all([
     getProfile(),
     sp.workout ? getWorkout(sp.workout) : Promise.resolve(null),
     listSavedMeals().catch(() => []),
@@ -23,6 +23,7 @@ export default async function LogPage({
     getFoodUsage().catch(() => ({})),
     sp.workout ? Promise.resolve(null) : getLatestWorkout().catch(() => null),
     getExercises(addDays(todayIso(), -60), todayIso()).catch(() => []),
+    getRecentLiftWorkouts().catch(() => []),
   ]);
   return (
     <LogScreen
@@ -36,6 +37,7 @@ export default async function LogPage({
       usage={usage}
       profile={profile}
       recentExercises={recentExercises}
+      liftHistory={liftHistory}
       prefill={sp.prefill === "1"}
     />
   );

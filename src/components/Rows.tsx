@@ -7,7 +7,8 @@ import { deleteExercise, deleteMeal } from "@/lib/actions";
 import { RUN_CODE, intensityLabel } from "@/lib/burn";
 import type { ExerciseEntry, Meal, Workout } from "@/lib/types";
 import { formatTime } from "@/lib/display";
-import { Bowl, ChevronDown, ChevronRight, Dumbbell, Run, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
+import { Band, Bowl, ChevronDown, ChevronRight, Dumbbell, Pushup, Run, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
+import { workoutTitle } from "@/lib/exercises";
 import { Hair, MacroDot, SPRING, fmt } from "./ui";
 import FoodImage, { FoodFallback } from "./FoodImage";
 
@@ -74,17 +75,13 @@ export function WorkoutRow({ workout, onOpen, burnKcal }: { workout: Workout; on
   return (
     <div className="card" style={{ padding: 0 }}>
       <Summary
-        icon={
-          <Tile>
-            <Dumbbell size={22} />
-          </Tile>
-        }
-        title={w.muscles.join(" · ") || "Workout"}
+        icon={<Tile>{w.kind === "gym" ? <Dumbbell size={22} /> : w.kind === "bodyweight" ? <Pushup size={22} /> : <Band size={22} />}</Tile>}
+        title={workoutTitle(w)}
         kcal={burnKcal != null && burnKcal > 0 ? burnKcal : null}
         time={w.minutes != null ? `${w.minutes} min` : ""}
         expands={false}
         onClick={onOpen}
-        ariaLabel={`Edit workout: ${w.muscles.join(", ")}`}
+        ariaLabel={`Edit workout: ${workoutTitle(w)}`}
       />
     </div>
   );

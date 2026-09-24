@@ -21,6 +21,7 @@ export default function LogScreen({
   usage = {},
   profile,
   recentExercises = [],
+  liftHistory = [],
   prefill = false,
 }: {
   existing: Workout | null;
@@ -35,6 +36,8 @@ export default function LogScreen({
   profile: Profile;
   /** v2.3: the last ~60 days of exercise rows, for the Exercise form's Recent row. */
   recentExercises?: ExerciseEntry[];
+  /** v2.5: recent gym / bodyweight sessions (the set grid's last-time values). */
+  liftHistory?: Workout[];
   /** v2.4: opened from a scan's "Add to plate" — the Meal form starts with those items. */
   prefill?: boolean;
 }) {
@@ -63,7 +66,16 @@ export default function LogScreen({
         </div>
       ) : null}
       {existing || seg === 0 ? (
-        <WorkoutForm existing={existing} last={existing ? null : last} initialDate={date} target={profile.weekly_workout_target} onClose={close} />
+        <WorkoutForm
+          existing={existing}
+          last={existing ? null : last}
+          initialDate={date}
+          target={profile.weekly_workout_target}
+          onClose={close}
+          weightKg={profile.weight_kg ?? null}
+          recent={recentActivities(recentExercises, profile.weight_kg ?? null, 12)}
+          history={liftHistory.filter((w) => w.id !== existing?.id)}
+        />
       ) : seg === 1 ? (
         <MealForm date={date} savedMeals={savedMeals} presets={presets} usage={usage} onClose={close} prefill={prefill} />
       ) : (

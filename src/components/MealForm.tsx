@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { createSavedMeal, saveMeal, searchFoodsForPicker } from "@/lib/actions";
 import { postJson } from "@/lib/image";
 import { looksLikeSentence } from "@/lib/mealText";
-import { applyRestaurant, foodFromItem, priceItem, restaurantOil, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
+import { applyRestaurant, countStep, countText, foodFromItem, nounFor, priceItem, restaurantOil, servingNoun, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
 import { useDictation } from "@/lib/speech";
 import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
 import type { FoodPreset, FoodSearchHit, MealItem, ParseResult, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
@@ -86,7 +86,7 @@ function defaultOf(f: QuantityFood): { q: Quantity; label: string | null } {
 
 function qtyText(r: Row): string {
   const it = r.item;
-  if (it.unit === "serving" && it.servings != null && r.servingLabel) return `${fmt(it.servings)} ${r.servingLabel.replace(/^1\s+/, "")}`;
+  if (it.unit === "serving" && it.servings != null && r.servingLabel) return `${countText(it.servings)} ${nounFor(servingNoun(r.servingLabel), it.servings)}`;
   return `${fmt(Math.round(it.grams))} g`;
 }
 
@@ -180,9 +180,22 @@ export default function MealForm({
     setToast({ id: seq.current++, text: msg });
   }
 
-  /** Tap = on the plate at the default serving (a Restaurant preset as a restaurant portion). */
+  /**
+   * Tap = on the plate at ONE unit (a Restaurant preset as a restaurant portion). v2.5: tapping a
+   * count food that is already on the plate adds one more (roti, roti, roti = 3 roti) instead of a new row.
+   */
   function addFood(f: QuantityFood, restaurant = false, image: { src?: string | null; kind?: FoodImageKind } = {}) {
     const d = defaultOf(f);
+    const step = countStep(f);
+    const same = !restaurant && step && d.label ? rows.find((r) => r.item.food_id === f.food_id && r.item.name === f.name && r.servingLabel === d.label && r.item.unit === "serving" && !r.item.cooked_in) : undefined;
+    if (same && step && d.label) {
+      const n = Number(same.item.servings ?? 1) + step;
+      const next = priceItem({ ...f, defaultServing: d.label }, { unit: "serving", value: n });
+      setRows((cur) => cur.map((r) => (r.key === same.key ? { ...r, item: { ...next, image_url: r.item.image_url } } : r)));
+      tapped.current.push(f.name);
+      say(`${countText(n)} ${nounFor(servingNoun(d.label), n)} · ${Math.round(next.calories)} kcal`);
+      return;
+    }
     const base = priceItem(f, d.q);
     const item = restaurant ? applyRestaurant(base, restaurantOil(f.name, f.category)) : base;
     addRows([{ item, servings: f.servings, servingLabel: d.label, category: f.category ?? null, image: image.src ?? null, imageKind: image.kind ?? "generic" }]);
@@ -202,7 +215,7 @@ export default function MealForm({
     setJobs((j) => [...j, { id, kind, label }]);
     p.then((r) => {
       if (handedOff.current) return;
-      addRows(r.items.map((item) => ({ item, image: item.image_url ?? null })));
+      addRows(r.items.map((item) => ({ item, image: item.image_url ?? null, servings: item.serving_unit ? [item.serving_unit] : undefined, servingLabel: item.serving_unit?.label ?? null })));
       if (r.notes?.length) setNotes((n) => [...n, ...(r.notes ?? [])]);
       if (r.photo_path) setPhotoPath((pp) => pp ?? r.photo_path ?? null);
     })
@@ -260,7 +273,7 @@ export default function MealForm({
     setError(null);
     try {
       const r = await parseMeal(rawParts.join(", ") || items.map((i) => i.name).join(", "), fixText, items);
-      setRows(plain(r.items).map((item) => ({ item, key: seq.current++, image: item.image_url ?? null })));
+      setRows(plain(r.items).map((item) => ({ item, key: seq.current++, image: item.image_url ?? null, servings: item.serving_unit ? [item.serving_unit] : undefined, servingLabel: item.serving_unit?.label ?? null })));
       setNotes([...r.assumptions, ...r.unparsed.map((u) => `Ignored: ${u}`)]);
       setFixText("");
       setFixOpen(false);
@@ -444,10 +457,10 @@ export default function MealForm({
         title="Change the amount"
         cta="Update"
         onClose={() => setEditKey(null)}
-        onDone={(item) => {
+        onDone={(item, _q, servingLabel) => {
           const key = editKey;
           setEditKey(null);
-          setRows((cur) => cur.map((r) => (r.key === key ? { ...r, item: { ...item, cooked_in: item.cooked_in ?? r.item.cooked_in ?? null, source: r.item.source, food_id: r.item.food_id } } : r)));
+          setRows((cur) => cur.map((r) => (r.key === key ? { ...r, servingLabel: servingLabel ?? r.servingLabel, item: { ...item, cooked_in: item.cooked_in ?? r.item.cooked_in ?? null, source: r.item.source, food_id: r.item.food_id, image_url: r.item.image_url } } : r)));
         }}
       />
 

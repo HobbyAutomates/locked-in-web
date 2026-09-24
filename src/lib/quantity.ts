@@ -81,24 +81,87 @@ export function priceItem(f: QuantityFood, q: Quantity): MealItem {
   };
 }
 
-/** The quick chips: ½ · 1 · 2 servings, 50 g, 100 g, ½ pack, 1 pack. */
-export function quickChips(f: QuantityFood): { label: string; q: Quantity }[] {
-  const out: { label: string; q: Quantity }[] = [];
-  const sg = servingGrams(f);
-  // Serving labels read "1 katori": the chips put their own number in front.
-  const sl = ((f.servings.find((x) => x.label === f.defaultServing) ?? f.servings[0])?.label ?? "serving").replace(/^1\s+/, "");
-  if (sg) {
-    out.push({ label: `½ ${sl}`, q: { unit: "serving", value: 0.5 } });
-    out.push({ label: `1 ${sl}`, q: { unit: "serving", value: 1 } });
-    out.push({ label: `2 ${sl}`, q: { unit: "serving", value: 2 } });
-  }
-  out.push({ label: "50 g", q: { unit: "g", value: 50 } });
-  out.push({ label: "100 g", q: { unit: "g", value: 100 } });
+// ---- v2.5: count foods get one stepper, loose foods get grams + ≤ 3 chips ----
+
+/** Serving nouns counted in whole numbers: 1, 2, 3 roti — never "2.5 eggs". */
+const WHOLE_NOUNS = new Set([
+  "roti", "chapati", "phulka", "paratha", "naan", "thepla", "idli", "dosa", "uttapam", "pesarattu", "vada", "chilla", "egg", "eggs", "white", "whites",
+  "slice", "slices", "piece", "pieces", "pcs", "scoop", "scoops", "banana", "bananas", "apple", "apples", "orange", "oranges", "mosambi", "guava", "guavas", "kiwi", "kiwis",
+  "mango", "chikoo", "date", "dates", "biscuit", "biscuits", "samosa", "pav", "momo", "momos", "ladoo", "sandwich", "sandwiches", "burger", "bar", "almond", "almonds", "tablet", "capsule",
+]);
+/** Serving nouns that take ½ steps: ½ katori, 1½ glass. */
+const HALF_NOUNS = new Set(["katori", "bowl", "bowls", "glass", "cup", "cups", "tumbler", "plate", "ladle", "tbsp", "tsp", "handful", "pack", "packs", "serving", "can", "bottle", "regular", "large", "tub"]);
+
+/** "1 roti" → "roti", "1 katori (2 pcs)" → "katori (2 pcs)", "roti" → "roti". */
+export function servingNoun(label: string | null | undefined): string {
+  return (label ?? "serving").replace(/^(1|one|½)\s+/i, "").replace(/^1-/, "").trim() || "serving";
+}
+
+/** The chosen serving of a food (its default, else the first). */
+export function defaultServingOf(f: QuantityFood): PresetServing | null {
+  const s = f.servings.find((x) => x.label === f.defaultServing) ?? f.servings[0];
+  return s && s.grams > 0 ? s : null;
+}
+
+/**
+ * How the stepper counts this food: 1 (whole numbers: roti, egg, idli, scoop, piece, slice),
+ * 0.5 (katori, bowl, glass, cup) or null for loose foods (paneer by grams, "100 g" servings).
+ */
+export function countStep(f: QuantityFood): 1 | 0.5 | null {
+  const s = defaultServingOf(f);
+  if (!s) return null;
+  // A serving that already says "2 x" / "5-6 pieces" / "100 g" is not a unit to count in.
+  if (/^\d+(\.\d+)?\s*(g|gm|ml|kg)\b/i.test(s.label)) return null;
+  const words = servingNoun(s.label).toLowerCase().replace(/[()]/g, " ").split(/[\s-]+/).filter(Boolean);
+  if (words.some((w) => WHOLE_NOUNS.has(w))) return 1;
+  if (words.some((w) => HALF_NOUNS.has(w))) return 0.5;
+  return null;
+}
+
+/** Whey and friends: a scoop stepper and nothing else. */
+export function isSupplement(f: QuantityFood): boolean {
+  const s = defaultServingOf(f);
+  return /\b(whey|protein powder|mass gainer|creatine|casein|isolate)\b/i.test(f.name) || (!!s && /\bscoops?\b/i.test(s.label) && !/ice cream/i.test(f.name));
+}
+
+/** Drinks are typed in ml. */
+export function isLiquid(f: QuantityFood): boolean {
+  return f.category === "drink" || /\b(milk|doodh|juice|lassi|chaas|buttermilk|shake|coffee|chai|tea|water|soda|cola|coke|smoothie)\b/i.test(f.name);
+}
+
+const PLURAL: Record<string, string> = { egg: "eggs", slice: "slices", piece: "pieces", scoop: "scoops", biscuit: "biscuits", banana: "bananas", apple: "apples", orange: "oranges", date: "dates", glass: "glasses", cup: "cups", bowl: "bowls", white: "whites", sandwich: "sandwiches", burger: "burgers", guava: "guavas", kiwi: "kiwis", momo: "momos", bar: "bars", almond: "almonds", plate: "plates", pack: "packs", serving: "servings", tablet: "tablets", capsule: "capsules" };
+/** "egg" × 2 → "eggs"; Hindi nouns stay as they are ("2 roti", "2 katori"). */
+export function nounFor(noun: string, n: number): string {
+  if (n <= 1) return noun;
+  return noun.replace(/^(\S+)(.*)$/, (_m, first: string, rest: string) => {
+    // "egg white" pluralises its last word, everything else its first.
+    if (/^egg white$/i.test(noun)) return "egg whites";
+    return (PLURAL[first.toLowerCase()] ?? first) + rest;
+  });
+}
+
+/** "1½", "2", "½" — how a count reads next to its noun. */
+export function countText(n: number): string {
+  const whole = Math.floor(n);
+  const half = Math.abs(n - whole - 0.5) < 1e-6;
+  if (half) return whole ? `${whole}½` : "½";
+  return fmtNum(n);
+}
+function fmtNum(n: number): string {
+  return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
+}
+
+/** Loose foods: at most three chips — 50 · 100 · 200 g (ml for drinks), or ½ / 1 pack for scans. */
+export function looseChips(f: QuantityFood): { label: string; q: Quantity }[] {
+  const u: QuantityUnit = isLiquid(f) ? "ml" : "g";
   if (f.packGrams && f.packGrams > 0) {
-    out.push({ label: "½ pack", q: { unit: "g", value: Math.round(f.packGrams / 2) } });
-    out.push({ label: "1 pack", q: { unit: "g", value: Math.round(f.packGrams) } });
+    return [
+      { label: `100 ${u}`, q: { unit: u, value: 100 } },
+      { label: "½ pack", q: { unit: "g", value: Math.round(f.packGrams / 2) } },
+      { label: "1 pack", q: { unit: "g", value: Math.round(f.packGrams) } },
+    ];
   }
-  return out;
+  return [50, 100, 200].map((v) => ({ label: `${v} ${u}`, q: { unit: u, value: v } }));
 }
 
 /** Wrap an existing review row so its grams can be re-entered through the sheet. */

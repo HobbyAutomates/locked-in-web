@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.4";
+export const APP_VERSION = "2.5";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.5",
+    date: "2026-09-24",
+    lines: [
+      "Picking an amount is one big stepper now: roti, egg, idli or a scoop of whey starts at 1 and you tap + for more (tap a food twice on the plate for two). Loose foods get a grams box and three quick sizes; restaurant portion hides under More.",
+      "Milk is five different foods: doodh / normal milk is full cream, and toned, double toned, skimmed and buffalo milk each have their own numbers — say \"toned doodh\" and you get toned.",
+      "Workouts aren't just bands any more: pick Gym, Bodyweight, Bands, Cardio, Sport or Yoga. Gym and Bodyweight log exercises with weight × reps and show last time's numbers; every kind counts for your streak.",
+    ],
+  },
   {
     version: "2.4",
     date: "2026-09-24",

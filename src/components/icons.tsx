@@ -650,3 +650,25 @@ export function ActivityIcon({ activity, size = 18 }: { activity: string; size?:
   if (/swim/.test(a)) return <Drop size={size} />;
   return <Flame size={size} />;
 }
+
+/** v2.5: resistance band loop (Bands workouts). */
+export function Band(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M4 12c0-3 2-5 4-5h8c2 0 4 2 4 5s-2 5-4 5H8c-2 0-4-2-4-5z" />
+      <path d="M7 12h10" />
+    </Stroke>
+  );
+}
+
+/** v2.5: body-weight figure (push-up). */
+export function Pushup(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="18.5" cy="8" r="1.6" />
+      <path d="M3 16l13-5" />
+      <path d="M14 11.8V17M6 15v2" />
+      <path d="M2 19h20" />
+    </Stroke>
+  );
+}

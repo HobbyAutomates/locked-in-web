@@ -58,8 +58,12 @@ export const FOODS: Food[] = [
   f("tofu", "Tofu", ["tofu"], 76, 8, 1.9, 4.8),
 
   // Dairy
-  f("milk-full", "Milk, full cream", ["milk", "full cream milk"], 65, 3.3, 4.8, 3.5, "glass", 250),
-  f("milk-toned", "Milk, toned", ["toned milk", "skim milk", "low fat milk"], 45, 3.3, 4.9, 1.5, "glass", 250),
+  // v2.5: five different milks. "doodh" / "normal milk" = full cream; toned is NOT full cream.
+  f("milk-full", "Milk (full cream)", ["milk", "full cream milk", "full fat milk", "whole milk", "doodh", "dudh", "normal milk", "plain milk", "regular milk", "malai doodh", "cow milk"], 66, 3.2, 4.8, 3.9, "glass", 250),
+  f("milk-toned", "Milk (toned)", ["toned milk", "toned doodh", "toned", "amul taaza", "nandini blue"], 58, 3.1, 4.7, 3.0, "glass", 250),
+  f("milk-double-toned", "Milk (double toned)", ["double toned milk", "double toned", "double toned doodh", "amul slim", "nandini green"], 45, 3.1, 4.7, 1.5, "glass", 250),
+  f("milk-skimmed", "Milk (skimmed)", ["skim milk", "skimmed milk", "skim", "fat free milk", "low fat milk"], 35, 3.4, 4.9, 0.1, "glass", 250),
+  f("milk-buffalo", "Milk (buffalo)", ["buffalo milk", "bhains ka doodh", "bhains doodh"], 97, 3.7, 5.2, 6.9, "glass", 250),
   f("curd", "Curd / dahi", ["curd", "dahi", "yogurt", "yoghurt", "raita"], 62, 3.5, 4.7, 3.3, "bowl", 150),
   f("greek-yogurt", "Greek yogurt", ["greek yogurt", "greek yoghurt", "hung curd"], 97, 9, 3.9, 5, "cup", 170),
   f("paneer", "Paneer", ["paneer", "cottage cheese", "paneer bhurji", "paneer tikka"], 265, 18, 3, 20, "piece", 30),

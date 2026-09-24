@@ -100,11 +100,20 @@ export async function getExercises(from: string, to: string): Promise<ExerciseEn
   })) as ExerciseEntry[];
 }
 
+const WORKOUT_COLS = "id, date, muscles, band_level, resistance_kg, minutes, exercises, notes, kind, exercises_json";
+
+/** v2.5: the last few gym / bodyweight sessions, newest first — the set grid's "last time" ghost values. */
+export async function getRecentLiftWorkouts(n = 20): Promise<Workout[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("workouts").select(WORKOUT_COLS).in("kind", ["gym", "bodyweight"]).order("date", { ascending: false }).order("created_at", { ascending: false }).limit(n);
+  return (data ?? []) as Workout[];
+}
+
 export async function getWorkouts(from: string, to: string): Promise<Workout[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("workouts")
-    .select("id, date, muscles, band_level, resistance_kg, minutes, exercises, notes")
+    .select(WORKOUT_COLS)
     .gte("date", from)
     .lte("date", to)
     .order("date", { ascending: false });
@@ -115,7 +124,7 @@ export async function getWorkout(id: string): Promise<Workout | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("workouts")
-    .select("id, date, muscles, band_level, resistance_kg, minutes, exercises, notes")
+    .select(WORKOUT_COLS)
     .eq("id", id)
     .maybeSingle();
   return (data as Workout) ?? null;
@@ -126,7 +135,7 @@ export async function getLatestWorkout(): Promise<Workout | null> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("workouts")
-    .select("id, date, muscles, band_level, resistance_kg, minutes, exercises, notes")
+    .select(WORKOUT_COLS)
     .order("date", { ascending: false })
     .limit(1)
     .maybeSingle();

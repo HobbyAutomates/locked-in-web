@@ -57,6 +57,10 @@
     "category": "breakfast",
     "servings": [
       {
+        "label": "1 idli",
+        "grams": 40
+      },
+      {
         "label": "2 idli",
         "grams": 80
       },
@@ -69,7 +73,7 @@
         "grams": 160
       }
     ],
-    "default_serving": "2 idli",
+    "default_serving": "1 idli",
     "sort": 30,
     "icon": "bowl",
     "source_note": "standard household measure: idli 40 g (INDB lists a small 25 g idli)"
@@ -203,7 +207,7 @@
         "grams": 120
       }
     ],
-    "default_serving": "2 slices",
+    "default_serving": "1 slice",
     "sort": 90,
     "icon": "roti",
     "source_note": "standard Indian household measure: slice 30 g"
@@ -216,19 +220,19 @@
     "category": "breakfast",
     "servings": [
       {
-        "label": "1-egg omelette",
+        "label": "1 egg",
         "grams": 60
       },
       {
-        "label": "2-egg omelette",
+        "label": "2 eggs",
         "grams": 120
       },
       {
-        "label": "3-egg omelette",
+        "label": "3 eggs",
         "grams": 180
       }
     ],
-    "default_serving": "2-egg omelette",
+    "default_serving": "1 egg",
     "sort": 100,
     "icon": "egg",
     "source_note": "standard Indian household measure: egg 50 g + ~10 g onion/oil per egg"
@@ -253,7 +257,7 @@
         "grams": 150
       }
     ],
-    "default_serving": "2 eggs",
+    "default_serving": "1 egg",
     "sort": 110,
     "icon": "egg",
     "source_note": "IFCT household measure: egg 50 g"
@@ -345,7 +349,7 @@
         "grams": 180
       }
     ],
-    "default_serving": "2 vada",
+    "default_serving": "1 vada",
     "sort": 150,
     "icon": "flame",
     "source_note": "standard Indian household measure: vada 60 g (INDB fried vada rows rejected: 700+ kcal/100 g)"
@@ -412,7 +416,7 @@
         "grams": 109
       }
     ],
-    "default_serving": "2 thepla",
+    "default_serving": "1 thepla",
     "sort": 180,
     "icon": "roti",
     "source_note": "INDB units: thepla=36.4 g"
@@ -425,19 +429,19 @@
     "category": "breakfast",
     "servings": [
       {
+        "label": "1 piece",
+        "grams": 40
+      },
+      {
         "label": "2 pieces",
         "grams": 80
       },
       {
         "label": "4 pieces",
         "grams": 160
-      },
-      {
-        "label": "1 piece",
-        "grams": 40
       }
     ],
-    "default_serving": "2 pieces",
+    "default_serving": "1 piece",
     "sort": 190,
     "icon": "bowl",
     "source_note": "INDB units: piece=40 g"
@@ -483,7 +487,7 @@
         "grams": 156
       }
     ],
-    "default_serving": "2 chilla",
+    "default_serving": "1 chilla",
     "sort": 210,
     "icon": "roti",
     "source_note": "INDB units: cheela=52.1 g"
@@ -496,12 +500,12 @@
     "category": "breakfast",
     "servings": [
       {
-        "label": "1 tbsp",
-        "grams": 25
-      },
-      {
         "label": "2 tbsp",
         "grams": 50
+      },
+      {
+        "label": "1 tbsp",
+        "grams": 25
       },
       {
         "label": "¼ katori",
@@ -533,7 +537,7 @@
         "grams": 120
       }
     ],
-    "default_serving": "2 roti",
+    "default_serving": "1 roti",
     "sort": 10,
     "icon": "roti",
     "source_note": "standard Indian household measure: roti 40 g"
@@ -562,7 +566,7 @@
         "grams": 144
       }
     ],
-    "default_serving": "2 phulka",
+    "default_serving": "1 phulka",
     "sort": 20,
     "icon": "roti",
     "source_note": "INDB units: chapati=36 g"
@@ -1659,7 +1663,7 @@
         "grams": 150
       }
     ],
-    "default_serving": "2 eggs",
+    "default_serving": "1 egg",
     "sort": 10,
     "icon": "egg",
     "source_note": "IFCT household measure: egg 50 g"
@@ -1684,7 +1688,7 @@
         "grams": 132
       }
     ],
-    "default_serving": "2 egg whites",
+    "default_serving": "1 egg white",
     "sort": 20,
     "icon": "egg",
     "source_note": "IFCT household measure: egg white 33 g"
@@ -1697,12 +1701,12 @@
     "category": "protein",
     "servings": [
       {
-        "label": "50 g",
-        "grams": 50
-      },
-      {
         "label": "100 g",
         "grams": 100
+      },
+      {
+        "label": "50 g",
+        "grams": 50
       },
       {
         "label": "200 g pack",
@@ -1768,12 +1772,12 @@
     "category": "protein",
     "servings": [
       {
-        "label": "100 g",
-        "grams": 100
-      },
-      {
         "label": "150 g",
         "grams": 150
+      },
+      {
+        "label": "100 g",
+        "grams": 100
       },
       {
         "label": "200 g",
@@ -1872,7 +1876,7 @@
         "grams": 210
       }
     ],
-    "default_serving": "2 eggs",
+    "default_serving": "1 egg",
     "sort": 100,
     "icon": "egg",
     "source_note": "INDB units: egg=70 g"
@@ -2104,7 +2108,7 @@
     "food_id": "milk-toned",
     "label": "Milk (toned)",
     "label_hi": "टोंड दूध",
-    "category": "protein",
+    "category": "drink",
     "servings": [
       {
         "label": "1 glass",
@@ -2120,9 +2124,9 @@
       }
     ],
     "default_serving": "1 glass",
-    "sort": 210,
+    "sort": 41,
     "icon": "glass",
-    "source_note": "standard Indian household measure: glass 250 ml, cup 150 ml"
+    "source_note": "Per 100 ml: NIN / Amul & Nandini labels; glass 250 ml"
   },
   {
     "id": "paneer-tikka",
@@ -2174,19 +2178,19 @@
     "category": "snack",
     "servings": [
       {
+        "label": "1 piece",
+        "grams": 30
+      },
+      {
         "label": "4 pieces",
         "grams": 120
       },
       {
         "label": "6 pieces",
         "grams": 180
-      },
-      {
-        "label": "1 piece",
-        "grams": 30
       }
     ],
-    "default_serving": "4 pieces",
+    "default_serving": "1 piece",
     "sort": 20,
     "icon": "flame",
     "source_note": "standard Indian household measure: pakora 30 g/piece (INDB pakora rows rejected: 550-720 kcal/100 g)"
@@ -2241,19 +2245,19 @@
     "category": "snack",
     "servings": [
       {
+        "label": "1 biscuit",
+        "grams": 10
+      },
+      {
         "label": "2 biscuits",
         "grams": 20
       },
       {
         "label": "4 biscuits",
         "grams": 40
-      },
-      {
-        "label": "1 biscuit",
-        "grams": 10
       }
     ],
-    "default_serving": "2 biscuits",
+    "default_serving": "1 biscuit",
     "sort": 50,
     "icon": "sweet",
     "source_note": "standard Indian household measure: biscuit 10 g"
@@ -2266,12 +2270,12 @@
     "category": "snack",
     "servings": [
       {
-        "label": "½ pack",
-        "grams": 25
-      },
-      {
         "label": "1 pack (50 g)",
         "grams": 50
+      },
+      {
+        "label": "½ pack",
+        "grams": 25
       }
     ],
     "default_serving": "1 pack (50 g)",
@@ -2383,7 +2387,7 @@
         "grams": 80
       }
     ],
-    "default_serving": "2 pav",
+    "default_serving": "1 pav",
     "sort": 110,
     "icon": "roti",
     "source_note": "standard Indian household measure: pav 40 g"
@@ -2438,12 +2442,12 @@
     "category": "snack",
     "servings": [
       {
-        "label": "5 almonds",
-        "grams": 6
-      },
-      {
         "label": "10 almonds",
         "grams": 12
+      },
+      {
+        "label": "5 almonds",
+        "grams": 6
       },
       {
         "label": "1 handful",
@@ -2463,19 +2467,19 @@
     "category": "snack",
     "servings": [
       {
-        "label": "6 momos",
-        "grams": 210
+        "label": "1 momo",
+        "grams": 35
       },
       {
-        "label": "4 momos",
-        "grams": 140
+        "label": "6 momos",
+        "grams": 210
       },
       {
         "label": "10 momos",
         "grams": 350
       }
     ],
-    "default_serving": "6 momos",
+    "default_serving": "1 momo",
     "sort": 150,
     "icon": "bowl",
     "source_note": "standard Indian household measure: momo 35 g"
@@ -2574,9 +2578,9 @@
   },
   {
     "id": "milk-full",
-    "food_id": "ifct-milk-whole-cow",
+    "food_id": "milk-full",
     "label": "Milk (full cream)",
-    "label_hi": "दूध",
+    "label_hi": "फुल क्रीम दूध / मलाई वाला दूध",
     "category": "drink",
     "servings": [
       {
@@ -2595,7 +2599,7 @@
     "default_serving": "1 glass",
     "sort": 40,
     "icon": "glass",
-    "source_note": "IFCT household measure: glass 250 ml, cup 150 ml"
+    "source_note": "Per 100 ml: NIN / Amul & Nandini labels; glass 250 ml"
   },
   {
     "id": "lassi",
@@ -2999,7 +3003,7 @@
         "grams": 60
       }
     ],
-    "default_serving": "2 pieces",
+    "default_serving": "1 piece",
     "sort": 90,
     "icon": "sweet",
     "source_note": "standard Indian household measure: kaju katli diamond 15 g (INDB cashew burfi=28.7 g)"
@@ -3380,7 +3384,7 @@
         "grams": 40
       }
     ],
-    "default_serving": "3 dates",
+    "default_serving": "1 date",
     "sort": 120,
     "icon": "fruit",
     "source_note": "standard Indian household measure: date 8 g"
@@ -3456,12 +3460,12 @@
     "category": "fat",
     "servings": [
       {
-        "label": "½ tsp",
-        "grams": 2.5
-      },
-      {
         "label": "1 tsp",
         "grams": 5
+      },
+      {
+        "label": "½ tsp",
+        "grams": 2.5
       },
       {
         "label": "1 tbsp",
@@ -3481,12 +3485,12 @@
     "category": "fat",
     "servings": [
       {
-        "label": "½ tsp",
-        "grams": 2.5
-      },
-      {
         "label": "1 tsp",
         "grams": 5
+      },
+      {
+        "label": "½ tsp",
+        "grams": 2.5
       },
       {
         "label": "1 tbsp",
@@ -3506,12 +3510,12 @@
     "category": "fat",
     "servings": [
       {
-        "label": "½ tsp",
-        "grams": 2.5
-      },
-      {
         "label": "1 tsp",
         "grams": 5
+      },
+      {
+        "label": "½ tsp",
+        "grams": 2.5
       },
       {
         "label": "1 tbsp",
@@ -3531,12 +3535,12 @@
     "category": "fat",
     "servings": [
       {
-        "label": "½ tsp",
-        "grams": 2.5
-      },
-      {
         "label": "1 tsp",
         "grams": 5
+      },
+      {
+        "label": "½ tsp",
+        "grams": 2.5
       },
       {
         "label": "1 tbsp",
@@ -3556,12 +3560,12 @@
     "category": "fat",
     "servings": [
       {
-        "label": "½ tsp",
-        "grams": 2.5
-      },
-      {
         "label": "1 tsp",
         "grams": 5
+      },
+      {
+        "label": "½ tsp",
+        "grams": 2.5
       },
       {
         "label": "1 tbsp",
@@ -3581,12 +3585,12 @@
     "category": "fat",
     "servings": [
       {
-        "label": "½ tsp",
-        "grams": 2.5
-      },
-      {
         "label": "1 tsp",
         "grams": 5
+      },
+      {
+        "label": "½ tsp",
+        "grams": 2.5
       },
       {
         "label": "1 tbsp",
@@ -3606,16 +3610,16 @@
     "category": "fat",
     "servings": [
       {
+        "label": "1 tbsp",
+        "grams": 15
+      },
+      {
         "label": "½ tsp",
         "grams": 2.5
       },
       {
         "label": "1 tsp",
         "grams": 5
-      },
-      {
-        "label": "1 tbsp",
-        "grams": 15
       },
       {
         "label": "2 tbsp",
@@ -3626,5 +3630,80 @@
     "sort": 70,
     "icon": "spoon",
     "source_note": "household measure: tsp 5 g, tbsp 15 g"
+  },
+  {
+    "id": "milk-double-toned",
+    "food_id": "milk-double-toned",
+    "label": "Milk (double toned)",
+    "label_hi": "डबल टोंड दूध",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 cup",
+        "grams": 150
+      },
+      {
+        "label": "½ glass",
+        "grams": 125
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 42,
+    "icon": "glass",
+    "source_note": "Per 100 ml: NIN / Amul & Nandini labels; glass 250 ml"
+  },
+  {
+    "id": "milk-skimmed",
+    "food_id": "milk-skimmed",
+    "label": "Milk (skimmed)",
+    "label_hi": "स्किम्ड दूध",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 cup",
+        "grams": 150
+      },
+      {
+        "label": "½ glass",
+        "grams": 125
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 43,
+    "icon": "glass",
+    "source_note": "Per 100 ml: NIN / Amul & Nandini labels; glass 250 ml"
+  },
+  {
+    "id": "milk-buffalo",
+    "food_id": "milk-buffalo",
+    "label": "Milk (buffalo)",
+    "label_hi": "भैंस का दूध",
+    "category": "drink",
+    "servings": [
+      {
+        "label": "1 glass",
+        "grams": 250
+      },
+      {
+        "label": "1 cup",
+        "grams": 150
+      },
+      {
+        "label": "½ glass",
+        "grams": 125
+      }
+    ],
+    "default_serving": "1 glass",
+    "sort": 44,
+    "icon": "glass",
+    "source_note": "Per 100 ml: NIN / Amul & Nandini labels; glass 250 ml"
   }
 ]

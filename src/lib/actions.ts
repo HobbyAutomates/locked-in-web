@@ -5,11 +5,31 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 import { ONBOARD_SKIP_COOKIE } from "./onboarding";
-import { bandCode, bandIntensity, bandKcal } from "./burn";
+import { bandCode, bandIntensity, bandKcal, burnKcal } from "./burn";
 import { rollupQuietly } from "./rollup";
 import { adminClient } from "./apiAuth";
 import { today as todayIso } from "./dates";
-import type { Activity, DescribedExercise, FoodSearchHit, MealItem, Profile, SavedMeal, SquadMember } from "./types";
+import type { Activity, DescribedExercise, FoodSearchHit, MealItem, Profile, SavedMeal, SquadMember, WorkoutExercise, WorkoutKind } from "./types";
+
+/** v2.5: Compendium rows for the auto-burn of gym / bodyweight sessions. */
+const LIFT_BURN: Record<"gym" | "bodyweight", { code: string; met: number; label: string }> = {
+  gym: { code: "02050", met: 6, label: "Gym" },
+  bodyweight: { code: "02020", met: 7.5, label: "Bodyweight" },
+};
+
+/** Keep only well-formed sets: a name, reps > 0 (whole), kg ≥ 0 or null. */
+function cleanExercises(list: WorkoutExercise[] | null | undefined): WorkoutExercise[] {
+  return (list ?? [])
+    .map((x) => ({
+      name: String(x?.name ?? "").trim().slice(0, 60),
+      sets: (Array.isArray(x?.sets) ? x.sets : [])
+        .map((st) => ({ kg: st?.kg == null || !Number.isFinite(Number(st.kg)) ? null : Math.max(0, Math.round(Number(st.kg) * 100) / 100), reps: Math.round(Number(st?.reps) || 0) }))
+        .filter((st) => st.reps > 0)
+        .slice(0, 30),
+    }))
+    .filter((x) => x.name)
+    .slice(0, 40);
+}
 
 async function userOrThrow() {
   const supabase = await createClient();
@@ -41,6 +61,9 @@ export async function saveWorkout(input: {
   minutes: number | null;
   exercises: string;
   notes: string;
+  /** v2.5: gym | bodyweight | bands (cardio / sport / yoga go through the exercise log). Default bands. */
+  kind?: WorkoutKind;
+  exercises_json?: WorkoutExercise[] | null;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const {
@@ -48,10 +71,14 @@ export async function saveWorkout(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "You're signed out — sign in again, then save." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { ok: false, error: "Pick a valid date for this workout." };
-  if (!input.muscles.length) return { ok: false, error: "Pick at least one muscle" };
+  const kind: WorkoutKind = input.kind ?? "bands";
+  const lift = kind === "gym" || kind === "bodyweight" ? kind : null;
+  const exercisesJson = lift ? cleanExercises(input.exercises_json) : null;
+  if (lift && !exercisesJson?.length) return { ok: false, error: "Add at least one exercise" };
+  if (!lift && !input.muscles.length) return { ok: false, error: "Pick at least one muscle" };
   const { id: _id, ...fields } = input;
   void _id;
-  const row = { ...fields, user_id: user.id };
+  const row = { ...fields, muscles: input.muscles.length ? input.muscles : ["Other"], kind, exercises_json: exercisesJson, user_id: user.id };
   const before = input.id ? ((await supabase.from("workouts").select("date").eq("id", input.id).maybeSingle()).data?.date as string | undefined) : undefined;
   const { data, error } = input.id
     ? await supabase.from("workouts").update(row).eq("id", input.id).eq("user_id", user.id).select("id").single()
@@ -73,18 +100,32 @@ export async function saveWorkout(input: {
       }
       const { data: prof } = await supabase.from("profiles").select("weight_kg").eq("id", user.id).maybeSingle();
       const weight = prof?.weight_kg == null ? null : Number(prof.weight_kg);
-      const minutes = Math.max(1, input.minutes ?? 30);
-      const burn = await supabase.from("exercise_log").insert({
-        user_id: user.id,
-        date: input.date,
-        activity_code: bandCode(input.band_level),
-        name: `Bands: ${input.muscles.join(", ")}`,
-        minutes,
-        intensity: bandIntensity(input.band_level),
-        kcal: bandKcal(input.band_level, weight, minutes),
-        source: "workout",
-        note: workoutId,
-      });
+      const minutes = Math.max(1, input.minutes ?? (lift ? 45 : 30));
+      const burn = await supabase.from("exercise_log").insert(
+        lift
+          ? {
+              user_id: user.id,
+              date: input.date,
+              activity_code: LIFT_BURN[lift].code,
+              name: `${LIFT_BURN[lift].label}: ${(exercisesJson ?? []).map((x) => x.name).slice(0, 4).join(", ")}`,
+              minutes,
+              intensity: "medium",
+              kcal: burnKcal(LIFT_BURN[lift].met, weight, minutes),
+              source: "workout",
+              note: workoutId,
+            }
+          : {
+              user_id: user.id,
+              date: input.date,
+              activity_code: bandCode(input.band_level),
+              name: `Bands: ${input.muscles.join(", ")}`,
+              minutes,
+              intensity: bandIntensity(input.band_level),
+              kcal: bandKcal(input.band_level, weight, minutes),
+              source: "workout",
+              note: workoutId,
+            },
+      );
       if (burn.error) {
         console.error("[saveWorkout] burn row insert failed", { workoutId, error: burn.error });
         warning = `Workout saved, but its calories burned didn't: ${describe(burn.error)}`;

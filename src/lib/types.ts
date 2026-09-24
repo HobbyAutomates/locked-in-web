@@ -9,7 +9,15 @@ export type Workout = {
   minutes: number | null;
   exercises: string;
   notes: string;
+  /** v2.5: what kind of session. Old rows are "bands". */
+  kind?: WorkoutKind | null;
+  /** v2.5: gym / bodyweight sets — [{ name, sets: [{ kg, reps }] }]. Same shape on Android. */
+  exercises_json?: WorkoutExercise[] | null;
 };
+
+export type WorkoutKind = "gym" | "bodyweight" | "bands" | "cardio" | "sport" | "yoga";
+export type WorkoutSet = { kg: number | null; reps: number };
+export type WorkoutExercise = { name: string; sets: WorkoutSet[] };
 
 /** Per-item micronutrients, already scaled to the item's grams. */
 export type ItemMicros = Partial<Record<"fiber_g" | "sugar_g" | "sodium_mg" | "iron_mg" | "calcium_mg" | "vitamin_c_mg" | "vitamin_a_ug" | "potassium_mg" | "magnesium_mg" | "zinc_mg" | "b12_ug" | "folate_ug", number>>;
@@ -33,6 +41,8 @@ export type MealItem = {
   cooked_in?: string | null;
   /** v2.4: cached picture (public Storage URL) — display only, never written to meal_items. */
   image_url?: string | null;
+  /** v2.5: the one unit a count item is counted in ("1 roti", 40 g) — display only, lets the plate open the stepper. */
+  serving_unit?: PresetServing | null;
 };
 
 export type Meal = {
@@ -229,6 +239,8 @@ export type ParsedItem = MealItem & {
   input: string;
   /** "table" when the numbers came from bandlog.foods, "estimated" when Haiku guessed. */
   matched_from?: "table" | "estimated";
+  /** v2.5: for count foods (roti, egg, glass of milk …) how many units — 1 unless the user said a number. */
+  default_count?: number | null;
 };
 export type ParseResult = { items: ParsedItem[]; assumptions: string[]; unparsed: string[] };
 

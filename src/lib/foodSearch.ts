@@ -138,7 +138,7 @@ const HI_WORDS: Record<string, string> = {
   रोटी: "roti", चपाती: "chapati", फुल्का: "phulka", पराठा: "paratha", नान: "naan", चावल: "rice", भात: "rice", खिचड़ी: "khichdi", पुलाव: "pulao", बिरयानी: "biryani",
   दाल: "dal", तड़का: "tadka", फ्राई: "fry", मूंग: "moong", तूर: "toor", अरहर: "arhar", मसूर: "masoor", चना: "chana", राजमा: "rajma", छोले: "chole", सांभर: "sambar", रसम: "rasam", कढ़ी: "kadhi", मखनी: "makhani",
   सब्ज़ी: "sabzi", सब्जी: "sabzi", आलू: "aloo", गोभी: "gobi", भिंडी: "bhindi", पालक: "palak", पनीर: "paneer", बैंगन: "baingan", भर्ता: "bharta", मटर: "matar", लौकी: "lauki", करेला: "karela", मशरूम: "mushroom", मिक्स: "mixed", भुर्जी: "bhurji", टिक्का: "tikka", बटर: "butter", मसाला: "masala",
-  अंडा: "egg", अंडे: "eggs", ऑमलेट: "omelette", आमलेट: "omelette", चिकन: "chicken", मछली: "fish", मटन: "mutton", झींगा: "prawns", व्हे: "whey", प्रोटीन: "protein", दही: "curd", दूध: "milk", छाछ: "chaas", लस्सी: "lassi", अंकुरित: "sprouts", सोया: "soya", चंक्स: "chunks", टोफू: "tofu", मूंगफली: "peanuts", बादाम: "almonds", काजू: "cashews", अखरोट: "walnuts",
+  अंडा: "egg", अंडे: "eggs", ऑमलेट: "omelette", आमलेट: "omelette", चिकन: "chicken", मछली: "fish", मटन: "mutton", झींगा: "prawns", व्हे: "whey", प्रोटीन: "protein", दही: "curd", दूध: "milk", टोंड: "toned", डबल: "double", स्किम्ड: "skimmed", स्किम: "skim", भैंस: "bhains", मलाई: "malai", फुल: "full", क्रीम: "cream", छाछ: "chaas", लस्सी: "lassi", अंकुरित: "sprouts", सोया: "soya", चंक्स: "chunks", टोफू: "tofu", मूंगफली: "peanuts", बादाम: "almonds", काजू: "cashews", अखरोट: "walnuts",
   घी: "ghee", तेल: "oil", सरसों: "mustard", नारियल: "coconut", मक्खन: "butter", चीनी: "sugar", शहद: "honey", नमक: "salt",
   चाय: "chai", कॉफ़ी: "coffee", कॉफी: "coffee", कोल्ड: "cold", जूस: "juice", पानी: "water", नींबू: "nimbu", शेक: "shake", कोक: "coke",
   पोहा: "poha", उपमा: "upma", इडली: "idli", डोसा: "dosa", वड़ा: "vada", उत्तपम: "uttapam", ओट्स: "oats", ब्रेड: "bread", टोस्ट: "toast", कॉर्नफ्लेक्स: "cornflakes", ढोकला: "dhokla", थेपला: "thepla", सूजी: "suji", हलवा: "halwa",
@@ -160,4 +160,31 @@ export function hindiToLatin(chunk: string): string {
     .map((w) => HI_WORDS[w] ?? HI_WORDS[w.replace(/[ः़]/g, "")] ?? w)
     .join(" ")
     .trim();
+}
+
+// ---- v2.5: Hinglish / Hindi aliases (bandlog.food_aliases, see supabase/schema_v25.sql) ----
+
+let aliasCache: { at: number; map: Map<string, string> } | null = null;
+
+/** alias → food_id, cached for 10 minutes. Empty on error (the trigram search still runs). */
+export async function aliasMap(): Promise<Map<string, string>> {
+  if (aliasCache && Date.now() - aliasCache.at < 10 * 60 * 1000) return aliasCache.map;
+  const { data, error } = await admin().from("food_aliases").select("alias, food_id, weight");
+  if (error) return aliasCache?.map ?? new Map();
+  const rows = ((data ?? []) as { alias: string; food_id: string; weight: number | null }[]).sort((a, b) => Number(a.weight ?? 100) - Number(b.weight ?? 100));
+  const map = new Map<string, string>();
+  for (const r of rows) map.set(normAlias(r.alias), r.food_id);
+  aliasCache = { at: Date.now(), map };
+  return map;
+}
+
+export function normAlias(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** One bandlog.foods row by id, shaped like a search hit (score 3 = alias hit). */
+export async function foodById(id: string): Promise<FoodHit | null> {
+  const { data, error } = await admin().from("foods").select("id, name, aliases, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg, micros, source, region, names_local, units, unit_name, unit_grams").eq("id", id).maybeSingle();
+  if (error || !data) return null;
+  return rowToHit({ ...(data as Record<string, unknown>), score: 3 });
 }

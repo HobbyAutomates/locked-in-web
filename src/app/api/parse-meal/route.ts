@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, after } from "next/server";
 import { apiUser } from "@/lib/apiAuth";
-import { chunksOf, describeHit, hasDevanagari, hindiToLatin, microsFor, searchFoods, type FoodHit } from "@/lib/foodSearch";
+import { aliasMap, chunksOf, describeHit, foodById, hasDevanagari, hindiToLatin, microsFor, normAlias, searchFoods, type FoodHit } from "@/lib/foodSearch";
 import { matchFood } from "@/lib/foods";
+import { countStep } from "@/lib/quantity";
 import { foodKey } from "@/lib/foodKey";
 import { cachedFoodImages, resolveFoodImage } from "@/lib/foodImage";
 import type { ParseResult, ParsedItem } from "@/lib/types";
@@ -70,6 +71,10 @@ HINGLISH GLOSSARY — numbers: ek = 1, do = 2, teen = 3, char = 4, paanch = 5, c
 
 DEVANAGARI — the text may be in Hindi script (from voice dictation in hi-IN). Numbers: एक = 1, दो = 2, तीन = 3, चार = 4, पाँच / पांच = 5, छह = 6, सात = 7, आठ = 8, नौ = 9, दस = 10, आधा / आधी = half, डेढ़ = 1.5, ढाई = 2.5, थोड़ा / थोड़ा सा / थोड़ी = a little, ज़्यादा = extra, बहुत = a lot; Devanagari digits ०-९ are 0-9. Measures: कटोरी = katori (150 g), कटोरा / बड़ी कटोरी = bowl (200 g), गिलास / ग्लास = glass (250 ml), कप = cup (150 ml), प्लेट = plate (250 g), चम्मच = tbsp (15 g; छोटा चम्मच = tsp 5 g), पीस / टुकड़ा = one piece, स्कूप = scoop (30 g), ग्राम = grams. Foods: रोटी / चपाती / फुल्का = roti, पराठा = paratha, चावल = rice, दाल = dal, दाल तड़का = dal tadka, सब्ज़ी / सब्जी = sabzi, अंडा / अंडे = egg(s), दूध = milk, दही = curd, पनीर = paneer, घी = ghee, तेल = oil, चाय = chai, चीनी = sugar, केला = banana, सेब = apple, मक्खन = butter, चिकन = chicken, मछली = fish, राजमा = rajma, छोले / चना = chole. Each DATABASE CANDIDATE line shows the Hindi name in brackets — match Devanagari input against those names too (the same food, whichever script it is written in). Write "food" and "input" for Devanagari items in the candidate's English name; keep "input" as the original Devanagari words.
 
+MILK — these are FIVE DIFFERENT foods, never merge them: दूध / doodh / dudh / milk / normal milk / plain milk / regular milk / malai wala doodh = Milk (full cream); toned / टोंड / toned doodh / Amul Taaza / Nandini blue = Milk (toned); double toned / डबल टोंड / Amul Slim / Nandini green = Milk (double toned); skim / skimmed = Milk (skimmed); bhains ka doodh / भैंस का दूध / buffalo = Milk (buffalo). Never merge toned and full cream — they are different foods. When a chunk is marked "EXACT ALIAS", use that food_id.
+
+COUNTS — for foods eaten in units (roti, paratha, idli, dosa, egg, slice, piece, scoop, glass, cup, katori), when the person gives NO number, it is ONE unit (one roti, one egg, one glass) — never assume two.
+
 Rules:
 - Interpret messy dictation generously ("hundred fifty grams rice comma dal hundred").
 - Indian defaults: rice, dal, sabzi and similar are COOKED weights unless the text says raw / kachcha / uncooked. Record that in "assumptions" when you apply it.
@@ -114,6 +119,27 @@ function priced(it: HaikuItem, food: FoodHit | null): ParsedItem {
   };
 }
 
+/** Did the person give an amount for this item ("2", "do", "दो", "aadha", "thoda", "200 g")? */
+const SAID_AMOUNT = /\d|[०-९]|\b(ek|do|teen|tin|char|chaar|paanch|panch|chhe|chhah|saat|aath|nau|das|aadha|adha|aadhi|dedh|dhai|half|one|two|three|four|five|six|seven|eight|nine|ten|couple|dozen|thoda|thodi|zyada|jyada|bahut|extra|little|double)\b|एक|दो|तीन|चार|पाँच|पांच|छह|सात|आठ|नौ|दस|आधा|आधी|डेढ़|ढाई|थोड़ा|थोड़ी|ज़्यादा|ज्यादा|बहुत/i;
+const SAID_WEIGHT = /\d+(\.\d+)?\s*(g|gm|gms|gram|grams|kg|ml|l|litre|liter)\b|ग्राम/i;
+
+/**
+ * v2.5: count foods (roti, egg, glass of milk, katori of dal …) come back as N units of the food's own
+ * unit, with `default_count` — ONE unit unless the person said a number. Loose foods stay in grams.
+ */
+function counted(it: HaikuItem, food: FoodHit | null): ParsedItem {
+  const base = priced(it, food);
+  if (!food || !food.unit_name || !(Number(food.unit_grams) > 0)) return base;
+  const unit = { label: `1 ${food.unit_name}`, grams: Number(food.unit_grams) };
+  const step = countStep({ name: food.name, food_id: food.id, per100: food, servings: [unit], defaultServing: unit.label, source: "table" });
+  const words = it.input ?? "";
+  if (!step || SAID_WEIGHT.test(words)) return base;
+  const said = SAID_AMOUNT.test(words);
+  const count = said ? Math.max(step, Math.round(base.grams / unit.grams / step) * step) : 1;
+  const repriced = priced({ ...it, grams: Math.round(count * unit.grams * 10) / 10 }, food);
+  return { ...repriced, unit: "serving", servings: count, serving_unit: unit, default_count: count };
+}
+
 /** Legacy fallback: the in-repo table, shaped like a search hit. */
 function localHit(name: string): FoodHit | null {
   const f = matchFood(name);
@@ -152,20 +178,26 @@ export async function POST(req: Request) {
   const chunks = chunksOf(text).slice(0, 12);
   const candidates = new Map<string, FoodHit>();
   const lines: string[] = [];
+  // v2.5: a chunk that IS an alias ("toned doodh", "दूध", "normal milk") is pinned to that food first.
+  const aliases = await aliasMap().catch(() => new Map<string, string>());
+  const aliasOf = (s: string | null) => (s ? aliases.get(normAlias(s)) ?? null : null);
   await Promise.all(
     chunks.map(async (c) => {
       // A Devanagari chunk is searched as written AND as its English name ("दाल तड़का" → "dal tadka"),
       // so it lands on the same rows a Hinglish speaker gets; the English hits rank first.
       const latin = hasDevanagari(c) ? hindiToLatin(c) : null;
-      const [own, en] = await Promise.all([
+      const aliasId = aliasOf(c) ?? aliasOf(latin);
+      const [own, en, pinned] = await Promise.all([
         searchFoods(c, 3).catch(() => [] as FoodHit[]),
         latin && latin !== c && !hasDevanagari(latin) ? searchFoods(latin, 3).catch(() => [] as FoodHit[]) : Promise.resolve([] as FoodHit[]),
+        aliasId ? foodById(aliasId).catch(() => null) : Promise.resolve(null),
       ]);
       const seen = new Set<string>();
-      const hits = [...en, ...own].filter((h) => (seen.has(h.id) ? false : (seen.add(h.id), true))).slice(0, 4);
+      const hits = [...(pinned ? [pinned] : []), ...en, ...own].filter((h) => (seen.has(h.id) ? false : (seen.add(h.id), true))).slice(0, 4);
       if (!hits.length) return;
       for (const h of hits) candidates.set(h.id, h);
-      lines.push(`"${c}"${latin && latin !== c ? ` (= ${latin})` : ""}:\n${hits.map((h) => "  - " + describeHit(h)).join("\n")}`);
+      const tag = pinned ? ` EXACT ALIAS → ${pinned.id} (use this food_id)` : "";
+      lines.push(`"${c}"${latin && latin !== c ? ` (= ${latin})` : ""}:${tag}\n${hits.map((h) => "  - " + describeHit(h)).join("\n")}`);
     }),
   );
   const candidateBlock = lines.length ? `DATABASE CANDIDATES (per chunk of the text):\n${lines.join("\n")}` : "DATABASE CANDIDATES: none found — estimate everything.";
@@ -193,12 +225,16 @@ export async function POST(req: Request) {
   for (const it of raw.items ?? []) {
     if (!(Number(it.grams) > 0)) continue;
     let food: FoodHit | null = (it.food_id && candidates.get(it.food_id)) || null;
+    // v2.5: when the words are exactly an alias, that alias wins (toned doodh stays toned, doodh stays full cream).
+    const chunk = chunksOf(it.input ?? "")[0] ?? null;
+    const pinnedId = aliasOf(chunk) ?? aliasOf(chunk && hasDevanagari(chunk) ? hindiToLatin(chunk) : null);
+    if (pinnedId && food?.id !== pinnedId) food = candidates.get(pinnedId) ?? (await foodById(pinnedId).catch(() => null)) ?? food;
     if (!food && !it.est_per_100g) {
       // Haiku named a food without an id and without numbers: one more DB look, then the legacy table.
       const [hit] = await searchFoods(it.food, 1).catch(() => [] as FoodHit[]);
       food = hit && hit.score >= 1 ? hit : localHit(it.food) ?? localHit(it.input);
     }
-    items.push(priced(it, food));
+    items.push(counted(it, food));
   }
 
   // v2.4: pictures from the shared cache so the plate shows photos with no extra round trip; the
