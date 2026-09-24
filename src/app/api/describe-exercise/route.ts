@@ -1,6 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/apiAuth";
+import { run } from "@/lib/ai/router";
+import type { JsonSchema } from "@/lib/ai/types";
 import { burnKcal, DEFAULT_WEIGHT_KG } from "@/lib/burn";
 import type { Activity, DescribedExercise } from "@/lib/types";
 
@@ -94,19 +96,14 @@ export async function POST(req: Request) {
     const { data: prof } = await admin.from("profiles").select("weight_kg").eq("id", user.id).maybeSingle();
     const weight = prof?.weight_kg == null ? null : Number(prof.weight_kg);
 
-    // 2. Haiku picks codes + minutes + intensity.
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const res = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1500,
-      system: SYSTEM,
-      tools: [TOOL],
-      tool_choice: { type: "tool", name: "log_activities" },
-      messages: [{ role: "user", content: `CANDIDATES:\n${candidateLines || "(none)"}\n\nTEXT:\n${text}` }],
-    });
-    const block = res.content.find((b) => b.type === "tool_use");
-    if (!block || block.type !== "tool_use") throw new Error("Could not read that");
-    const out = block.input as { items?: HaikuItem[]; unparsed?: string[] };
+    // 2. Haiku (or whatever `exercise_parse` is routed to) picks codes + minutes + intensity.
+    const isDescribed = (v: unknown): v is { items?: HaikuItem[]; unparsed?: string[] } => !!v && typeof v === "object";
+    const result = await run<{ items?: HaikuItem[]; unparsed?: string[] }>(
+      "exercise_parse",
+      { kind: "json", system: SYSTEM, text: `CANDIDATES:\n${candidateLines || "(none)"}\n\nTEXT:\n${text}`, maxTokens: 1500, schema: TOOL.input_schema as unknown as JsonSchema, schemaName: TOOL.name },
+      isDescribed,
+    );
+    const out = result.data;
 
     // 3. Price here from the table row (or the model's MET when nothing matched).
     const items: DescribedExercise[] = (out.items ?? [])

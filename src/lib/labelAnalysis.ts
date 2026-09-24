@@ -1,5 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { createHash } from "node:crypto";
 import type { AdminClient } from "@/lib/apiAuth";
+import { run } from "@/lib/ai/router";
+import type { JsonSchema } from "@/lib/ai/types";
+import { toUsageEntry, type UsageEntry } from "@/lib/usage";
 
 /**
  * The analysis + structuring steps shared by /api/scan-label (OCR transcript or photo) and
@@ -178,7 +182,6 @@ Be direct and concrete.`;
 }
 
 export type AnalysisInput = {
-  client: Anthropic;
   transcript: string;
   note?: string;
   lens: Lens;
@@ -222,12 +225,19 @@ function structureRules(targets: string, lens: Lens, compact: boolean) {
  *    brief notes and call the tool. Half the output tokens, one round trip — a typical barcode
  *    scan lands well under 25 s. Falls back to the two-call path if the tool wasn't called.
  */
-export async function analyseTranscript(input: AnalysisInput): Promise<{ report: Record<string, unknown>; analysis: string }> {
-  const { client, transcript, note, lens, profile } = input;
+/** Loose runtime shape check on `label_report` output for providers other than Anthropic (which is
+ *  schema-forced already via tool_choice). */
+function isReportShape(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && "verdict" in (v as object) && "fits" in (v as object);
+}
+
+export async function analyseTranscript(input: AnalysisInput): Promise<{ report: Record<string, unknown>; analysis: string; usage: UsageEntry[] }> {
+  const { transcript, note, lens, profile } = input;
   const text = (m: Anthropic.Message) => m.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("\n");
   const targets = targetsLine(profile);
   const maxSearches = input.maxSearches ?? 2;
   const compact = input.kind === "barcode" && maxSearches <= 1;
+  const usage: UsageEntry[] = [];
   const provenance =
     input.kind === "barcode"
       ? " (this is a product record from Open Food Facts, contributed by volunteers — nutrition numbers are usually right, ingredient lists may be partial; say so if a field is missing)"
@@ -242,49 +252,76 @@ export async function analyseTranscript(input: AnalysisInput): Promise<{ report:
   const userText = `LABEL TRANSCRIPT${provenance}:\n${transcript}\n\n${note ? `User note: ${note.slice(0, 300)}\n\n` : ""}${targets}${searchHint}`;
   const webSearch = { type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool;
 
+  // Both the "compact" combined call and the free-text analyse call use Anthropic's `web_search`
+  // server tool, which no other provider offers — this task always runs on Claude (see tasks.ts),
+  // but still goes through router.run for timing + the usage log line.
   let analysis = "";
   if (compact) {
-    const one = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2500,
-      system: analyseSystem(profile, lens) + "\n\nFor this record: write your notes as short bullets (under 150 words in total — the numbers, the trust call, one line per lens), then call the label_report tool exactly once with the full report. Every number in the report comes from the record.",
-      tools: [webSearch, REPORT_TOOL],
-      messages: [{ role: "user", content: `${userText}\n\nAnalyse it briefly, then call label_report.\n\n${structureRules(targets, lens, true)}` }],
+    const one = await run<Anthropic.Message>("label_analysis", {
+      kind: "anthropic_native",
+      build: (client) =>
+        client.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 2500,
+          system: analyseSystem(profile, lens) + "\n\nFor this record: write your notes as short bullets (under 150 words in total — the numbers, the trust call, one line per lens), then call the label_report tool exactly once with the full report. Every number in the report comes from the record.",
+          tools: [webSearch, REPORT_TOOL],
+          messages: [{ role: "user", content: `${userText}\n\nAnalyse it briefly, then call label_report.\n\n${structureRules(targets, lens, true)}` }],
+        }),
     });
-    analysis = text(one).trim();
-    const block = one.content.find((b) => b.type === "tool_use" && b.name === "label_report");
-    if (block && block.type === "tool_use") return { report: block.input as Record<string, unknown>, analysis };
+    usage.push(toUsageEntry("label_analysis", one.model, one.usage));
+    const msg = one.data;
+    analysis = text(msg).trim();
+    const block = msg.content.find((b) => b.type === "tool_use" && b.name === "label_report");
+    if (block && block.type === "tool_use") return { report: block.input as Record<string, unknown>, analysis, usage };
     // The model wrote prose but skipped the tool: structure what it wrote, below.
   } else {
-    const a = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 3000,
-      system: analyseSystem(profile, lens),
-      tools: [webSearch],
-      messages: [{ role: "user", content: `${userText}\n\nAnalyse it.` }],
+    const a = await run<Anthropic.Message>("label_analysis", {
+      kind: "anthropic_native",
+      build: (client) =>
+        client.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 3000,
+          system: analyseSystem(profile, lens),
+          tools: [webSearch],
+          messages: [{ role: "user", content: `${userText}\n\nAnalyse it.` }],
+        }),
     });
-    analysis = text(a).trim();
+    usage.push(toUsageEntry("label_analysis", a.model, a.usage));
+    analysis = text(a.data).trim();
   }
 
-  const s = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 2500,
-    tools: [REPORT_TOOL],
-    tool_choice: { type: "tool", name: "label_report" },
-    messages: [
-      {
-        role: "user",
-        content:
-          `Convert this analysis into the label_report tool call. Keep every number as written. Set readable=true.\n\n` +
-          structureRules(targets, lens, compact) +
-          `TRANSCRIPT:\n${transcript}\n\nANALYSIS:\n${analysis}`,
-      },
-    ],
-  });
-  const block = s.content.find((b) => b.type === "tool_use");
-  if (!block || block.type !== "tool_use") throw new Error("Could not structure the report");
-  const report = block.input as Record<string, unknown>;
-  return { report, analysis };
+  // Structuring has no Anthropic-only feature — a generic structured-JSON task, provider-flexible.
+  const s = await run<Record<string, unknown>>(
+    "label_structure",
+    {
+      kind: "json",
+      maxTokens: 2500,
+      schema: REPORT_TOOL.input_schema as unknown as JsonSchema,
+      schemaName: "label_report",
+      text:
+        `Convert this analysis into the label_report tool call. Keep every number as written. Set readable=true.\n\n` +
+        structureRules(targets, lens, compact) +
+        `TRANSCRIPT:\n${transcript}\n\nANALYSIS:\n${analysis}`,
+    },
+    isReportShape,
+  );
+  usage.push(toUsageEntry("label_structure", s.model, s.usage));
+  return { report: s.data, analysis, usage };
+}
+
+// ---- Barcode AI-report cache (v2.7: keyed on barcode + lens + a hash of the profile targets used
+//      in the prompt, stored inside barcode_cache.product so a repeat scan skips Haiku entirely) ----
+
+export type CachedReport = { report: Record<string, unknown>; analysis: string; cachedAt: string };
+export type ReportCache = Record<string, CachedReport>;
+
+/** Short, stable hash of the profile numbers that actually shape the report's wording and infographic. */
+export function reportCacheKey(lens: Lens, profile: ScanProfile): string {
+  const h = createHash("sha1")
+    .update(JSON.stringify({ p: profile.protein_target_g, c: profile.calorie_target, cb: profile.carb_target_g, f: profile.fat_target_g, g: profile.goal_type, w: profile.weekly_workout_target }))
+    .digest("hex")
+    .slice(0, 10);
+  return `${lens}:${h}`;
 }
 
 /** The "couldn't read that" report, in the same shape, so clients never special-case it. */

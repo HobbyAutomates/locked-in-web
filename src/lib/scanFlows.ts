@@ -1,11 +1,29 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "node:crypto";
 import type { AdminClient } from "@/lib/apiAuth";
+import { escalateBelow } from "@/lib/ai/config";
+import { run } from "@/lib/ai/router";
+import type { JsonSchema } from "@/lib/ai/types";
+import { validateLabel, type LabelNumbers } from "@/lib/ai/validate/label";
 import { microsFor, searchFoods, sourceBonus, type FoodHit } from "@/lib/foodSearch";
-import { TRANSCRIBE, analyseTranscript, fetchOff, lensFor, loadScanProfile, offComplete, offTranscript, saveScan, unreadableReport, type OffProduct } from "@/lib/labelAnalysis";
+import {
+  TRANSCRIBE,
+  analyseTranscript,
+  fetchOff,
+  lensFor,
+  loadScanProfile,
+  offComplete,
+  offTranscript,
+  reportCacheKey,
+  saveScan,
+  unreadableReport,
+  type OffProduct,
+  type ReportCache,
+} from "@/lib/labelAnalysis";
 import { RESTAURANT_MULTIPLIER, RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
 import { scanName } from "@/lib/scanNames";
 import type { ItemMicros, PlateEstimate, PlateItem } from "@/lib/types";
+import { toUsageEntry, type UsageEntry } from "@/lib/usage";
 
 /**
  * The three scan pipelines (label, barcode, plate photo) as plain functions, so the original
@@ -56,12 +74,27 @@ export async function attachThumb(admin: AdminClient, userId: string, scanId: st
 }
 export const mediaType = (mt?: string | null): MediaType => (mt === "image/png" || mt === "image/webp" ? mt : "image/jpeg");
 
-function anthropic() {
-  if (!process.env.ANTHROPIC_API_KEY) throw new FlowError("ANTHROPIC_API_KEY is not set", 500);
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+/** Deterministic sanity checks (kJ-as-kcal, decimal slips, …) on a structured label_report's numbers.
+ *  Never blocks the scan — the flags just ride along as `report.validation`. */
+function attachValidation(report: Record<string, unknown>): void {
+  const per100 = (report.per_100g ?? {}) as Record<string, unknown>;
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const numbers: LabelNumbers = {
+    calories: num(per100.calories),
+    protein_g: num(per100.protein_g),
+    carbs_g: num(per100.carbs_g),
+    fat_g: num(per100.fat_g),
+    sugar_g: num(per100.sugar_g),
+    fiber_g: num(per100.fiber_g),
+    sodium_mg: num(per100.sodium_mg),
+    serving_g: num(report.serving_g),
+  };
+  report.validation = validateLabel(numbers);
 }
 
-/** The vision model every scan route uses (transcription, barcode digits, plate estimates, the classifier). */
+/** The vision model every scan route uses by default (transcription, barcode digits, plate estimates,
+ *  the classifier) — resolved through the model router (src/lib/ai/router.ts), so an `AI_ROUTE_*` env
+ *  var can point any of these at a different provider without touching this file. */
 export const VISION_MODEL = "claude-sonnet-5";
 
 // ---------------------------------------------------------------------------------------------
@@ -84,40 +117,36 @@ export async function labelFlow(input: {
   lens?: string | null;
   /** v2.2: optional <= 320 px JPEG thumbnail (base64) from the browser. */
   thumb?: string | null;
+  /** Usage from a call already made on this image (the /api/scan classifier), folded into `usage`. */
+  extraUsage?: UsageEntry[];
 }): Promise<Record<string, unknown>> {
   const ocrText = (input.text ?? "").trim();
   if (!input.image && ocrText.length === 0 && !input.transcript) throw new FlowError("No image", 400);
   const mt = mediaType(input.mediaType);
   const profile = await loadScanProfile(input.admin, input.userId);
   const lens = lensFor(profile.goal_type, input.lens, profile.lens_default);
-  const client = anthropic();
+  const usage: UsageEntry[] = [...(input.extraUsage ?? [])];
 
   // 1. Transcribe. The phone's own OCR wins when it read enough, then a transcript the classifier
-  //    already made; otherwise Sonnet looks at the photo.
+  //    already made; otherwise Sonnet (or whatever `label_ocr` is routed to) looks at the photo.
   const fromPhone = ocrText.length >= OCR_MIN_CHARS;
   let transcript = fromPhone ? ocrText : (input.transcript ?? "").trim();
   if (!transcript) {
     if (!input.image) throw new FlowError("Couldn't read enough text — retake the photo.", 400);
-    const t = await client.messages.create({
-      model: VISION_MODEL,
-      max_tokens: 2000,
-      system: TRANSCRIBE,
-      messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: input.image } }, { type: "text", text: "Transcribe this label." }] }],
-    });
-    transcript = t.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as Anthropic.TextBlock).text)
-      .join("\n")
-      .trim();
+    const t = await run<string>("label_ocr", { kind: "text", system: TRANSCRIBE, images: [{ mediaType: mt, base64: input.image }], text: "Transcribe this label.", maxTokens: 2000 });
+    usage.push(toUsageEntry("label_ocr", t.model, t.usage));
+    transcript = t.data.trim();
   }
   if (!transcript || transcript.startsWith("NOT_A_LABEL")) {
     return unreadableReport(transcript.replace("NOT_A_LABEL", "").trim() || "Couldn't read a food label in that photo.", transcript);
   }
 
-  const { report, analysis } = await analyseTranscript({ client, transcript, note: input.note ?? undefined, lens, profile, fromPhoneOcr: fromPhone, kind: "label" });
+  const { report, analysis, usage: analyseUsage } = await analyseTranscript({ transcript, note: input.note ?? undefined, lens, profile, fromPhoneOcr: fromPhone, kind: "label" });
+  usage.push(...analyseUsage);
+  attachValidation(report);
   // Never store "<UNKNOWN>" or a blank name: the model's name, else the first ingredient, else "Unnamed label".
   const product = scanName("label", { model: report.product, ingredients: transcript });
-  const full = { ...report, product, kind: "label", lens, transcript, analysis };
+  const full = { ...report, product, kind: "label", lens, transcript, analysis, usage };
   const id = await saveScan(input.admin, {
     userId: input.userId,
     kind: "label",
@@ -137,18 +166,15 @@ export async function labelFlow(input: {
 const CACHE_DAYS = 30;
 
 /** The digits printed under a barcode, read by the vision model. "" when none are legible. */
-export async function readBarcodeDigits(image: string, mt: MediaType): Promise<string> {
-  const m = await anthropic().messages.create({
-    model: VISION_MODEL,
-    max_tokens: 60,
+export async function readBarcodeDigits(image: string, mt: MediaType): Promise<{ digits: string; usage: UsageEntry }> {
+  const r = await run<string>("barcode_digits", {
+    kind: "text",
     system: "You read retail barcodes. Reply with ONLY the digits printed under the barcode (EAN-13, EAN-8 or UPC), no spaces. If no barcode digits are legible, reply NONE.",
-    messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: image } }, { type: "text", text: "Digits?" }] }],
+    images: [{ mediaType: mt, base64: image }],
+    text: "Digits?",
+    maxTokens: 60,
   });
-  return m.content
-    .filter((b) => b.type === "text")
-    .map((b) => (b as Anthropic.TextBlock).text)
-    .join("")
-    .replace(/\D/g, "");
+  return { digits: r.data.replace(/\D/g, ""), usage: toUsageEntry("barcode_digits", r.model, r.usage) };
 }
 
 export async function barcodeFlow(input: {
@@ -161,11 +187,18 @@ export async function barcodeFlow(input: {
   lens?: string | null;
   /** v2.2: optional thumbnail of the photo; only kept when OFF has no product image. */
   thumb?: string | null;
+  /** Usage from a call already made on this image (the /api/scan classifier), folded into `usage`. */
+  extraUsage?: UsageEntry[];
 }): Promise<Record<string, unknown>> {
   let barcode = String(input.barcode ?? "").replace(/\D/g, "");
+  const usage: UsageEntry[] = [...(input.extraUsage ?? [])];
   // No digits but a photo: iPhone Safari has no barcode reader, and ZXing in the browser can miss a
   // curved or glossy pack. The digits are printed under the bars, so let the vision model read them.
-  if (barcode.length < 8 && input.image) barcode = await readBarcodeDigits(input.image, mediaType(input.mediaType));
+  if (barcode.length < 8 && input.image) {
+    const d = await readBarcodeDigits(input.image, mediaType(input.mediaType));
+    barcode = d.digits;
+    usage.push(d.usage);
+  }
   if (barcode.length < 8 || barcode.length > 14) {
     return { found: false, barcode, kind: "barcode", message: barcode ? "That doesn't look like an EAN/UPC barcode" : "Couldn't read the barcode digits - get the numbers under the bars sharp and well lit, or type them." };
   }
@@ -173,25 +206,54 @@ export async function barcodeFlow(input: {
   const profile = await loadScanProfile(input.admin, input.userId);
   const lens = lensFor(profile.goal_type, input.lens, profile.lens_default);
 
-  // 1. Cache, then Open Food Facts.
-  let product: OffProduct | null = null;
-  const { data: cached } = await input.admin.from("barcode_cache").select("product, fetched_at").eq("barcode", barcode).maybeSingle();
-  const fresh = cached && Date.now() - new Date(cached.fetched_at as string).getTime() < CACHE_DAYS * 86400e3;
-  if (fresh && cached?.product && (cached.product as OffProduct).product_name) product = cached.product as OffProduct;
+  // 1. Cache, then Open Food Facts. The AI report itself is cached too (v2.7), inside the same
+  // jsonb under `__reports`, keyed on lens + a hash of this user's targets — no schema change.
+  type CachedProduct = OffProduct & { __reports?: ReportCache };
+  let product: CachedProduct | null = null;
+  let needsWrite = false;
+  const { data: cachedRow } = await input.admin.from("barcode_cache").select("product, fetched_at").eq("barcode", barcode).maybeSingle();
+  const cachedProduct = (cachedRow?.product ?? null) as CachedProduct | null;
+  const fresh = cachedRow && Date.now() - new Date(cachedRow.fetched_at as string).getTime() < CACHE_DAYS * 86400e3;
+  if (fresh && cachedProduct?.product_name) product = cachedProduct;
   if (!product) {
-    product = await fetchOff(barcode);
-    if (product) await input.admin.from("barcode_cache").upsert({ barcode, product, fetched_at: new Date().toISOString() });
-    else if (cached?.product && (cached.product as OffProduct).product_name) product = cached.product as OffProduct;
+    const fetched = await fetchOff(barcode);
+    if (fetched) {
+      // Keep any AI reports already cached for this barcode — the product facts rarely change.
+      product = { ...fetched, __reports: cachedProduct?.__reports };
+      needsWrite = true;
+    } else if (cachedProduct?.product_name) product = cachedProduct;
   }
   if (!product) return { found: false, barcode, kind: "barcode", lens, message: "Not in the database yet — scan the label instead." };
 
-  // 2-3. Same analysis + structuring as a label. A complete OFF record (ingredients + full
-  // nutrition) only needs one search at most — recall / counterfeit checks.
+  // 2-3. Same analysis + structuring as a label — unless this exact lens + these exact targets were
+  // already reported for this barcode, in which case Haiku is skipped entirely.
   const transcript = offTranscript(product);
-  const { report, analysis } = await analyseTranscript({ client: anthropic(), transcript, note: input.note ?? undefined, lens, profile, kind: "barcode", maxSearches: offComplete(product) ? 1 : 2 });
+  const key = reportCacheKey(lens, profile);
+  const hit = product.__reports?.[key];
+  let report: Record<string, unknown>;
+  let analysis: string;
+  if (hit) {
+    report = hit.report;
+    analysis = hit.analysis;
+  } else {
+    const r = await analyseTranscript({ transcript, note: input.note ?? undefined, lens, profile, kind: "barcode", maxSearches: offComplete(product) ? 1 : 2 });
+    report = r.report;
+    analysis = r.analysis;
+    usage.push(...r.usage);
+    product = { ...product, __reports: { ...(product.__reports ?? {}), [key]: { report, analysis, cachedAt: new Date().toISOString() } } };
+    needsWrite = true;
+  }
+  attachValidation(report);
+  if (needsWrite) {
+    try {
+      await input.admin.from("barcode_cache").upsert({ barcode, product, fetched_at: fresh && cachedRow ? cachedRow.fetched_at : new Date().toISOString() });
+    } catch (e) {
+      console.error("[barcodeFlow] barcode_cache upsert failed", { barcode, error: e });
+    }
+  }
   const image_url = product.image_url ?? null;
   const productName = scanName("barcode", { model: report.product, off: product.product_name, ingredients: product.ingredients_text });
-  const full = { ...report, product: productName, kind: "barcode", lens, barcode, image_url, transcript, analysis };
+  const full = { ...report, product: productName, kind: "barcode", lens, barcode, image_url, transcript, analysis, usage };
   const id = await saveScan(input.admin, {
     userId: input.userId,
     kind: "barcode",
@@ -272,34 +334,72 @@ function n(v: unknown, fallback = 0) {
  *   3. The JPEG goes to Storage (meal-photos/<user>/<uuid>.jpg) and the estimate to label_scans
  *      kind='photo', so the History list can show it and "Save as meal" can reuse the photo.
  */
-export async function plateFlow(input: { admin: AdminClient; userId: string; image: string; mediaType?: string | null; note?: string | null; thumb?: string | null }): Promise<PlateEstimate & { thumb_path?: string | null }> {
+export type PlateInput = { admin: AdminClient; userId: string; image: string; mediaType?: string | null; note?: string | null; thumb?: string | null };
+type PlateRaw = { items?: Record<string, unknown>[]; notes?: string[]; plate_note?: string; is_food?: boolean };
+
+/** Loose runtime shape check on `plate_estimate` output — every provider's structured JSON gets this,
+ *  not just Anthropic's (which is schema-forced already, so this mostly matters for the others). */
+function isPlateRaw(v: unknown): v is PlateRaw {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  if ("items" in o && o.items !== undefined && !Array.isArray(o.items)) return false;
+  if ("notes" in o && o.notes !== undefined && !Array.isArray(o.notes)) return false;
+  if ("is_food" in o && o.is_food !== undefined && typeof o.is_food !== "boolean") return false;
+  return true;
+}
+
+const CONF_RANK: Record<string, number> = { low: 0, medium: 1, high: 2 };
+
+/** True when any item's confidence is at or below `threshold` — triggers the meal_vision_hard escalation. */
+function hasLowConfidence(raw: PlateRaw, threshold: "low" | "medium"): boolean {
+  const limit = CONF_RANK[threshold];
+  return (raw.items ?? []).some((it) => {
+    const rank = CONF_RANK[String((it as Record<string, unknown>).confidence)];
+    return rank !== undefined && rank <= limit;
+  });
+}
+
+export async function plateFlow(input: PlateInput & { extraUsage?: UsageEntry[] }): Promise<PlateEstimate & { thumb_path?: string | null }> {
   const image = (input.image ?? "").trim();
   if (!image) throw new FlowError("No image", 400);
   const mt = mediaType(input.mediaType);
   const note = input.note ?? undefined;
+  const request = {
+    kind: "json" as const,
+    system: PLATE_SYSTEM,
+    images: [{ mediaType: mt, base64: image }],
+    text: `Estimate this plate.${note ? ` The user says: "${String(note).slice(0, 300)}"` : ""}`,
+    maxTokens: 2500,
+    schema: PLATE_TOOL.input_schema as unknown as JsonSchema,
+    schemaName: "plate_estimate",
+  };
+  // 1. Vision, forced structured output (Sonnet by default).
+  const first = await run<PlateRaw>("meal_vision", request, isPlateRaw);
+  const usage = [...(input.extraUsage ?? []), toUsageEntry("meal_vision", first.model, first.usage)];
+  let raw = first.data;
+  // Escalation (off by default — AI_ESCALATE_BELOW): a low-confidence routine-model estimate gets a
+  // second look from meal_vision_hard.
+  const threshold = escalateBelow();
+  if (threshold && hasLowConfidence(raw, threshold)) {
+    const hard = await run<PlateRaw>("meal_vision_hard", request, isPlateRaw);
+    usage.push(toUsageEntry("meal_vision_hard", hard.model, hard.usage));
+    raw = hard.data;
+  }
+  return plateFromEstimate(input, raw, usage);
+}
+
+/**
+ * Everything after the vision call: cross-validate against the food table, apply the restaurant
+ * rule, store the photo, and save the scan. Shared by `plateFlow` (its own forced tool call) and the
+ * one-button classifier (/api/scan), which — since v2.7 — can return `plate_estimate` directly from
+ * the SAME call that decides the photo is a meal, so a plate scan there costs one vision call, not two.
+ */
+export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage: UsageEntry[]): Promise<PlateEstimate & { thumb_path?: string | null }> {
+  const image = (input.image ?? "").trim();
+  const mt = mediaType(input.mediaType);
+  const note = input.note ?? undefined;
   const admin = input.admin;
   const userId = input.userId;
-  const client = anthropic();
-  // 1. Sonnet vision, forced tool.
-  const msg = await client.messages.create({
-    model: VISION_MODEL,
-    max_tokens: 2500,
-    system: PLATE_SYSTEM,
-    tools: [PLATE_TOOL],
-    tool_choice: { type: "tool", name: "plate_estimate" },
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: mt, data: image } },
-          { type: "text", text: `Estimate this plate.${note ? ` The user says: "${String(note).slice(0, 300)}"` : ""}` },
-        ],
-      },
-    ],
-  });
-  const block = msg.content.find((b) => b.type === "tool_use");
-  if (!block || block.type !== "tool_use") throw new FlowError("Could not read that plate", 502);
-  const raw = block.input as { items?: Record<string, unknown>[]; notes?: string[]; plate_note?: string; is_food?: boolean };
   if (raw.is_food === false || !(raw.items ?? []).length) {
     return { id: null, items: [], raw: { items: [] }, notes: raw.notes ?? [], plate_note: raw.plate_note || "That doesn't look like food.", photo_path: null } satisfies PlateEstimate;
   }
@@ -386,7 +486,7 @@ export async function plateFlow(input: { admin: AdminClient; userId: string; ima
   if (restaurant) notes.unshift(`Restaurant portion: amounts ×${RESTAURANT_MULTIPLIER}, plus 1 tsp hidden oil on curries, dal and sabzi.`);
   const plate_note = String(raw.plate_note ?? "");
   const portion_hint = restaurant ? ("restaurant" as const) : null;
-  const report = { kind: "photo", items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint };
+  const report = { kind: "photo", items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, usage };
   const id = await saveScan(admin, {
     userId: userId,
     kind: "photo",
@@ -432,23 +532,56 @@ const CLASSIFY_TOOL: Anthropic.Tool = {
   },
 };
 
-export type Classified = { kind: ScanKind | "other"; barcode: string; hasLabel: boolean; transcript: string; summary: string };
+export type Classified = {
+  kind: ScanKind | "other";
+  barcode: string;
+  hasLabel: boolean;
+  transcript: string;
+  summary: string;
+  /** Set when the model called `plate_estimate` directly — the plate path can skip its own vision call. */
+  plateRaw?: PlateRaw;
+  usage: UsageEntry;
+};
+
+/** v2.7: offer both tools in the one classifier call, forced to call ONE of them ({type: "any"}), so a
+ *  plate scan needs no second vision call — the model is told to call `plate_estimate` directly for a
+ *  meal instead of `scan_kind` first. Barcode / label still go through `scan_kind` as before. */
+const CLASSIFY_SYSTEM = `You triage food photos for a nutrition app. First decide what the photo shows, then call exactly ONE tool, exactly once.
+
+- Retail barcode or packaged-food label: call scan_kind. Transcribe label text only when it is legible; never guess numbers.
+- Cooked food or a meal on a plate / in a bowl: call plate_estimate DIRECTLY instead of scan_kind, and estimate it fully:
+
+${PLATE_SYSTEM}
+
+- Anything else (not food, not a label, not a barcode): call scan_kind with kind="other".`;
 
 /**
- * One forced tool call on the photo: which scan it is, the barcode digits when it's a barcode,
- * and — when a label is legible — the OCR transcript, so the label path needs no second read.
+ * One forced tool call on the photo: which scan it is, the barcode digits when it's a barcode, the
+ * OCR transcript when a label is legible (so the label path needs no second read), or — since v2.7 —
+ * a full plate estimate when it's a meal, so the plate path needs no second vision call either.
  */
 export async function classifyScan(image: string, mt: MediaType): Promise<Classified> {
-  const m = await anthropic().messages.create({
-    model: VISION_MODEL,
-    max_tokens: 2500,
-    system:
-      "You triage food photos for a nutrition app. Decide whether the photo is a retail barcode, a packaged-food label, or a plate of food, and call scan_kind exactly once. Transcribe label text only when it is legible; never guess numbers.",
-    tools: [CLASSIFY_TOOL],
-    tool_choice: { type: "tool", name: "scan_kind" },
-    messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: image } }, { type: "text", text: "What is this?" }] }],
+  // Anthropic-only: the fused scan_kind/plate_estimate tool_choice {type:"any"} isn't something a
+  // generic provider adapter can express, so this task always runs on Claude (see tasks.ts) — but
+  // still goes through router.run, which owns timing + the usage log line.
+  const result = await run<Anthropic.Message>("scan_classify", {
+    kind: "anthropic_native",
+    build: (client) =>
+      client.messages.create({
+        model: VISION_MODEL,
+        max_tokens: 2500,
+        system: CLASSIFY_SYSTEM,
+        tools: [CLASSIFY_TOOL, PLATE_TOOL],
+        tool_choice: { type: "any" },
+        messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: image } }, { type: "text", text: "What is this?" }] }],
+      }),
   });
+  const m = result.data;
+  const usage = toUsageEntry("scan_classify", result.model, result.usage);
   const block = m.content.find((b) => b.type === "tool_use");
+  if (block && block.type === "tool_use" && block.name === "plate_estimate") {
+    return { kind: "plate", barcode: "", hasLabel: false, transcript: "", summary: "", plateRaw: block.input as PlateRaw, usage };
+  }
   const raw = (block && block.type === "tool_use" ? block.input : {}) as { kind?: string; barcode_digits?: string; has_label_text?: boolean; transcript?: string; summary?: string };
   const kind = raw.kind === "barcode" || raw.kind === "label" || raw.kind === "plate" ? raw.kind : "other";
   const transcript = String(raw.transcript ?? "").trim();
@@ -458,5 +591,6 @@ export async function classifyScan(image: string, mt: MediaType): Promise<Classi
     hasLabel: raw.has_label_text === true && transcript.length > 40,
     transcript,
     summary: String(raw.summary ?? "").trim(),
+    usage,
   };
 }

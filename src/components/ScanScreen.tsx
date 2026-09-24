@@ -95,7 +95,9 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
     reset();
     setDigits("");
     try {
-      const [out, thumb] = await Promise.all([toJpegBase64(file, 2000, 0.86), makeThumb(file)]);
+      // v2.7: 1600 px covers label OCR and barcode digits (the harder cases); the classifier / plate
+      // path shares this same photo since kind isn't known until the server looks at it.
+      const [out, thumb] = await Promise.all([toJpegBase64(file, 1600, 0.86), makeThumb(file)]);
       const pl: Payload = { base64: out.base64, media_type: out.media_type, thumb };
       setPayload(pl);
       setPreview(out.preview);
