@@ -35,6 +35,15 @@ type Payload = { base64: string; media_type: string; thumb: string | null };
 /** What /api/scan came back with, as the screen renders it. */
 export type ScanResult = { kind: ScanKind; report?: LabelReport; plate?: PlateEstimate; notFound?: string };
 
+/**
+ * per_100g now comes with provenance: the deterministic parser in src/lib/labelParse.ts (see
+ * scanFlows.ts labelFlow/barcodeFlow) either sets real, sanity-checked numbers with a source, or
+ * clears per_100g and flags needs_back_of_pack so the UI never shows a fabricated table again.
+ */
+type NutritionMeta = { nutrition_source?: "label" | "openfoodfacts" | "web_estimate" | null; needs_back_of_pack?: boolean };
+const withMeta = (r: LabelReport) => r as LabelReport & NutritionMeta;
+const BACK_OF_PACK_HINT = "Flip the pack and scan the Nutrition Facts table for real numbers.";
+
 function toResult(r: Record<string, unknown>): ScanResult {
   const kind = (r.kind === "plate" || r.kind === "barcode" ? r.kind : "label") as ScanKind;
   if (kind === "plate") return { kind, plate: r as unknown as PlateEstimate };
@@ -510,6 +519,21 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
  * one serving — or per 100 g, labelled, when the pack gives no serving size. Big numbers, tiny labels.
  */
 function SummaryGrid({ r }: { r: LabelReport }) {
+  const meta = withMeta(r);
+  if (meta.needs_back_of_pack) {
+    return (
+      <Rise index={3}>
+        <Card padding={14}>
+          <div className="flex items-start gap-2.5">
+            <span style={{ color: "var(--orange)" }}>
+              <Alert size={18} />
+            </span>
+            <p className="text-[13px] leading-relaxed">{BACK_OF_PACK_HINT}</p>
+          </div>
+        </Card>
+      </Rise>
+    );
+  }
   const p = r.per_100g ?? {};
   const hasServing = !!(r.serving_g && r.serving_g > 0);
   const k = hasServing ? (r.serving_g as number) / 100 : 1;
@@ -523,10 +547,18 @@ function SummaryGrid({ r }: { r: LabelReport }) {
   ];
   if (cells.every((c) => c.value == null)) return null;
   const show = (v: number, unit: string) => (unit === "kcal" || v >= 10 ? String(Math.round(v)) : fmt(Math.round(v * 10) / 10));
+  const isEstimate = !!meta.nutrition_source && meta.nutrition_source !== "label";
   return (
     <Rise index={3}>
       <Card padding={14}>
-        <p className="px-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] muted">{hasServing ? `Per serving · ${Math.round(r.serving_g as number)} g` : "Per 100 g"}</p>
+        <div className="flex items-center justify-between">
+          <p className="px-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] muted">{hasServing ? `Per serving · ${Math.round(r.serving_g as number)} g` : "Per 100 g"}</p>
+          {isEstimate ? (
+            <span className="badge" style={{ background: "var(--orange-bg)", color: "var(--orange)" }}>
+              Estimate
+            </span>
+          ) : null}
+        </div>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {cells.map((c) => (
             <div key={c.label} className="rounded-2xl px-3.5 py-3" style={{ background: "var(--card2)" }}>
@@ -587,9 +619,29 @@ function Details({ r }: { r: LabelReport }) {
       <p className="mt-2 text-sm leading-relaxed">{r.verdict_reason}</p>
     </Section>,
   );
-  if (Object.keys(per100).length > 0) {
+  const meta = withMeta(r);
+  if (meta.needs_back_of_pack) {
     sections.push(
       <Section key="serving" title="One serving">
+        <p className="text-sm leading-relaxed" style={{ color: "var(--orange)" }}>
+          {BACK_OF_PACK_HINT}
+        </p>
+      </Section>,
+    );
+  } else if (Object.keys(per100).length > 0) {
+    const isEstimate = !!meta.nutrition_source && meta.nutrition_source !== "label";
+    sections.push(
+      <Section
+        key="serving"
+        title="One serving"
+        right={
+          isEstimate ? (
+            <span className="badge" style={{ background: "var(--orange-bg)", color: "var(--orange)" }}>
+              Estimate
+            </span>
+          ) : undefined
+        }
+      >
         <MacroDonut per100={per100} servingG={r.serving_g} />
         {share && share.calories_pct + share.protein_pct + share.carbs_pct + share.fat_pct > 0 ? (
           <div className="mt-3.5 flex flex-col gap-2">

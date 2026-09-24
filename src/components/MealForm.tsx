@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { createSavedMeal, saveMeal, searchFoodsForPicker } from "@/lib/actions";
+import { createSavedMeal, logWater, saveMeal, searchFoodsForPicker, undoLastWater } from "@/lib/actions";
 import { postJson } from "@/lib/image";
 import { looksLikeSentence } from "@/lib/mealText";
 import { applyRestaurant, countStep, countText, foodFromItem, nounFor, priceItem, restaurantOil, servingNoun, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
 import { useDictation } from "@/lib/speech";
 import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
-import type { FoodPreset, FoodSearchHit, MealItem, ParseResult, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
+import type { FoodPreset, FoodSearchHit, MealItem, ParsedWater, ParseResult, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
 import { Close, Drop, Mic, Search, Spinner } from "./icons";
 import FoodImage, { FoodFallback, type FoodImageKind } from "./FoodImage";
 import QuantitySheet from "./QuantitySheet";
@@ -133,6 +133,7 @@ export default function MealForm({
   const [fixing, setFixing] = useState(false);
   const [repeatOpen, setRepeatOpen] = useState(false);
   const [repeatName, setRepeatName] = useState("");
+  const [waterToast, setWaterToast] = useState<{ id: number; ml: number; glasses: number; undone: boolean } | null>(null);
   const seq = useRef(1);
   const tapped = useRef<string[]>([]);
   const promises = useRef(new Map<number, Promise<PlateJob>>());
@@ -179,6 +180,38 @@ export default function MealForm({
   function say(msg: string) {
     setToast({ id: seq.current++, text: msg });
   }
+
+  /**
+   * v2.7: "2 glasses of water" in a dictated sentence — parse-meal already pulled it out of the
+   * food text; this writes it to bandlog.water_log the same way the Water page's + button does,
+   * and shows an Undo chip. Logged immediately (not gated on Save) so a water-only utterance like
+   * "do glass paani piya" — which never puts anything on the plate — still gets recorded, and so
+   * saying it twice with Fix/re-parse (server skips re-detecting water on a correction) can't
+   * double-log it.
+   */
+  function handleWater(w: ParsedWater) {
+    const id = seq.current++;
+    setWaterToast({ id, ml: w.ml, glasses: w.glasses, undone: false });
+    void logWater(w.ml, date, "custom")
+      .then(() => router.refresh())
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not log that water"));
+  }
+
+  async function undoWaterToast(id: number) {
+    setWaterToast((t) => (t && t.id === id ? { ...t, undone: true } : t));
+    try {
+      await undoLastWater(date);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not undo that");
+    }
+  }
+
+  useEffect(() => {
+    if (!waterToast) return;
+    const t = setTimeout(() => setWaterToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [waterToast]);
 
   /**
    * Tap = on the plate at ONE unit (a Restaurant preset as a restaurant portion). v2.5: tapping a
@@ -237,7 +270,10 @@ export default function MealForm({
     startJob(
       "parse",
       t,
-      parseMeal(t).then((r) => ({ items: plain(r.items), notes: [...r.assumptions, ...r.unparsed.map((u) => `Ignored: ${u}`)] })),
+      parseMeal(t).then((r) => {
+        if (r.water) handleWater(r.water);
+        return { items: plain(r.items), notes: [...r.assumptions, ...r.unparsed.map((u) => `Ignored: ${u}`)] };
+      }),
     );
   }
 
@@ -323,6 +359,27 @@ export default function MealForm({
 
   return (
     <div className="flex flex-1 flex-col">
+      <AnimatePresence>
+        {waterToast ? (
+          <motion.div
+            key={waterToast.id}
+            className="pointer-events-none fixed inset-x-0 z-50 flex justify-center"
+            style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+          >
+            <span role="status" className="pointer-events-auto badge flex items-center gap-2" style={{ background: "var(--blue-bg)", color: "var(--blue)", padding: "8px 8px 8px 14px", fontSize: 13, boxShadow: "var(--shadow)" }}>
+              💧 {waterToast.undone ? "Undone" : `+${waterToast.glasses % 1 === 0 ? waterToast.glasses : waterToast.glasses.toFixed(1)} glass${waterToast.glasses === 1 ? "" : "es"} to Water (${waterToast.ml} mL)`}
+              {!waterToast.undone ? (
+                <button type="button" className="hit press font-bold underline" onClick={() => void undoWaterToast(waterToast.id)}>
+                  Undo
+                </button>
+              ) : null}
+            </span>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       <div className="flex flex-1 flex-col gap-3 px-4 pb-5 pt-1.5">
         {/* ---- the bar: search / say it / photo ---- */}
         <div className="flex items-center gap-2">

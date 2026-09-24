@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AdminClient } from "@/lib/apiAuth";
+import { derivePer100FromServing, roundPer100, sanityCheckPer100, type Per100 } from "@/lib/labelParse";
 
 /**
  * The analysis + structuring steps shared by /api/scan-label (OCR transcript or photo) and
@@ -205,6 +206,7 @@ function structureRules(targets: string, lens: Lens, compact: boolean) {
     `- infographic.score_out_of_10: how well this product serves the "${lens}" lens for THIS user. 0 is useless for that lens, 10 is ideal.\n` +
     `- infographic.one_liner: at most 12 words, descriptive ("Mostly refined flour and palm oil; 7 g protein per pack").\n` +
     `- infographic.eat_it: for the "${lens}" lens — "yes" great fit, "sometimes" ok, "skip" weak.\n` +
+    `- per_100g / protein.per_serving_g: ONLY the numbers actually printed in the transcript's nutrition table. If the transcript has no nutrition table (front-of-pack only, ingredients only, etc.), leave per_100g and protein.per_serving_g out entirely — never estimate, round from memory, or restate a number you are not looking at. A parser re-derives these fields from the transcript afterward and will overwrite whatever you put here when it finds a real table, so guessing only risks being wrong when it can't.\n` +
     (compact
       ? `- Keep it tight: at most 4 concerns, 3 suggestions, 3 alternatives, 2 research lines (only what you actually found; an empty array when you did not search), and only claims actually printed on the pack. One sentence per "why", "note" and "issue".\n\n`
       : `\n`)
@@ -347,6 +349,63 @@ export type OffProduct = {
   nova_group?: number;
   countries_tags?: string[];
 };
+
+/**
+ * The OFF record's own per-100g numbers (not the model's restatement of them), run through the
+ * same sanity gate as a label scan. This is what caught the True Elements Muesli bug: OFF's
+ * per-100g fields for that product were mis-scaled per-serving values (1037 kcal/100g), and got
+ * cached and shown unchecked. Tries the printed per-100g fields first, then re-derives from
+ * per-serving + serving size if those fail the gate; returns null (never cache, never show) if
+ * neither checks out.
+ */
+export function offPer100g(p: OffProduct): { per_100g: Per100 | null; source: "openfoodfacts" | null; reasons: string[] } {
+  const n = p.nutriments ?? {};
+  const num = (k: string) => {
+    const v = n[k];
+    if (v == null || v === "") return null;
+    const x = Number(v);
+    return Number.isFinite(x) ? x : null;
+  };
+  const direct: Per100 = {
+    calories: num("energy-kcal_100g") ?? undefined,
+    protein_g: num("proteins_100g") ?? undefined,
+    carbs_g: num("carbohydrates_100g") ?? undefined,
+    sugar_g: num("sugars_100g") ?? undefined,
+    fat_g: num("fat_100g") ?? undefined,
+    saturated_fat_g: num("saturated-fat_100g") ?? undefined,
+    trans_fat_g: num("trans-fat_100g") ?? undefined,
+    fiber_g: num("fiber_100g") ?? undefined,
+    sodium_mg: num("sodium_100g") != null ? (num("sodium_100g") as number) * 1000 : num("salt_100g") != null ? (num("salt_100g") as number) * 400 : undefined,
+  };
+  const directGate = sanityCheckPer100(direct);
+  if (directGate.ok) return { per_100g: roundPer100(direct), source: "openfoodfacts", reasons: [] };
+
+  // Try re-deriving from per-serving values + a printed serving size.
+  const servingG = (() => {
+    const m = String(p.serving_size ?? "").match(/(\d+(?:[.,]\d+)?)\s*g\b/i);
+    return m ? Number(m[1].replace(",", ".")) : null;
+  })();
+  if (servingG && servingG > 0) {
+    const perServing: Per100 = {
+      calories: num("energy-kcal_serving") ?? undefined,
+      protein_g: num("proteins_serving") ?? undefined,
+      carbs_g: num("carbohydrates_serving") ?? undefined,
+      sugar_g: num("sugars_serving") ?? undefined,
+      fat_g: num("fat_serving") ?? undefined,
+      saturated_fat_g: num("saturated-fat_serving") ?? undefined,
+      trans_fat_g: num("trans-fat_serving") ?? undefined,
+      fiber_g: num("fiber_serving") ?? undefined,
+      sodium_mg: num("sodium_serving") != null ? (num("sodium_serving") as number) * 1000 : num("salt_serving") != null ? (num("salt_serving") as number) * 400 : undefined,
+    };
+    if (perServing.calories != null && perServing.protein_g != null && perServing.carbs_g != null && perServing.fat_g != null) {
+      const derived = derivePer100FromServing(perServing, servingG);
+      const derivedGate = sanityCheckPer100(derived);
+      if (derivedGate.ok) return { per_100g: roundPer100(derived), source: "openfoodfacts", reasons: [] };
+      return { per_100g: null, source: null, reasons: derivedGate.reasons };
+    }
+  }
+  return { per_100g: null, source: null, reasons: directGate.reasons };
+}
 
 const OFF_FIELDS = "product_name,brands,ingredients_text,nutriments,serving_size,quantity,image_url,nutriscore_grade,nova_group,countries_tags";
 const OFF_UA = "LockedIn/1.7 (sohumai.team@gmail.com)";

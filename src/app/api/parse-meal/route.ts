@@ -6,6 +6,7 @@ import { matchFood } from "@/lib/foods";
 import { countStep } from "@/lib/quantity";
 import { foodKey } from "@/lib/foodKey";
 import { cachedFoodImages, resolveFoodImage } from "@/lib/foodImage";
+import { extractWater } from "@/lib/waterParse";
 import type { ParseResult, ParsedItem } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -174,8 +175,28 @@ export async function POST(req: Request) {
   if (!text || !text.trim()) return NextResponse.json({ error: "Nothing to parse" }, { status: 400 });
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 });
 
+  // 0. Deterministic water pre-pass — "2 glasses of water" / "500 ml paani" never reaches the LLM
+  // as a food. Skipped on a "Fix issue" correction: that re-parse works from the already-cleaned
+  // food text, and re-detecting water there would risk double-logging what the first parse already
+  // wrote (see MealForm.tsx, which logs water once, right after the FIRST parse of a sentence).
+  let water: ParseResult["water"] = null;
+  let workingText = text;
+  if (!correction) {
+    const glassMl = await Promise.resolve(admin.from("profiles").select("water_glass_ml").eq("id", user.id).maybeSingle())
+      .then((r) => (r.data?.water_glass_ml && r.data.water_glass_ml > 0 ? r.data.water_glass_ml : 250))
+      .catch(() => 250);
+    const extracted = extractWater(text, glassMl);
+    water = extracted.water;
+    workingText = extracted.remainder;
+    if (water && !workingText.trim()) {
+      // Water-only utterance ("do glass paani piya") — nothing left to feed the LLM, and no
+      // reason to create an empty meal.
+      return NextResponse.json({ items: [], assumptions: [], unparsed: [], water } satisfies ParseResult);
+    }
+  }
+
   // 1. Database candidates per chunk (best-effort: a search failure never blocks the parse).
-  const chunks = chunksOf(text).slice(0, 12);
+  const chunks = chunksOf(workingText).slice(0, 12);
   const candidates = new Map<string, FoodHit>();
   const lines: string[] = [];
   // v2.5: a chunk that IS an alias ("toned doodh", "दूध", "normal milk") is pinned to that food first.
@@ -205,7 +226,7 @@ export async function POST(req: Request) {
   // "Fix issue": the user tells us what was wrong with the last result; re-parse with that in view.
   const userContent = correction
     ? `Original description:\n${text.slice(0, 2000)}\n\nMy previous parse (JSON):\n${JSON.stringify(previous ?? []).slice(0, 4000)}\n\nThe user says this is wrong: "${String(correction).slice(0, 500)}"\nProduce the corrected full item list.\n\n${candidateBlock}`
-    : `${text.slice(0, 2000)}\n\n${candidateBlock}`;
+    : `${workingText.slice(0, 2000)}\n\n${candidateBlock}`;
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const msg = await client.messages.create({
@@ -248,6 +269,6 @@ export async function POST(req: Request) {
   }
   if (unpictured.length) after(() => Promise.all(unpictured.slice(0, 4).map((n) => resolveFoodImage(n, { admin }).catch(() => null))).then(() => undefined));
 
-  const result: ParseResult = { items, assumptions: raw.assumptions ?? [], unparsed: raw.unparsed ?? [] };
+  const result: ParseResult = { items, assumptions: raw.assumptions ?? [], unparsed: raw.unparsed ?? [], water };
   return NextResponse.json(result);
 }

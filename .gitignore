@@ -43,3 +43,6 @@ next-env.d.ts
 
 # v1.9 presets are source data, not a raw dataset dump
 !/data/presets.json
+
+# large open-dataset mirrors downloaded by scripts/import-foods* (re-downloadable, see script headers)
+/scripts/data/

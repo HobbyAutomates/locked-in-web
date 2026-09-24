@@ -13,7 +13,7 @@ export type FoodHit = {
   sugar_g: number | null;
   sodium_mg: number | null;
   micros: Record<string, number>;
-  source: "custom" | "dish" | "ifct" | "usda" | "off";
+  source: "custom" | "dish" | "ifct" | "usda" | "off" | "ai";
   region: string | null;
   names_local: Record<string, string>;
   units: { name: string; grams: number }[];
@@ -55,15 +55,76 @@ export async function searchFoods(q: string, limit = 5): Promise<FoodHit[]> {
   return hits;
 }
 
-/** Like searchFoods but returns only a confident match (exact alias, or similarity ≥ `min`). */
+/** Like searchFoods but returns only a confident match (exact alias, or an acceptable match ≥ `min`). */
 export async function bestFood(q: string, min = 0.5): Promise<FoodHit | null> {
   const [top] = await searchFoods(q, 3);
   if (!top) return null;
-  return top.score >= 1 || top.score - sourceBonus(top.source) >= min ? top : null;
+  return isAcceptableMatch(q, top, min) ? top : null;
 }
 
 export function sourceBonus(source: string) {
   return source === "custom" ? 0.2 : source === "dish" ? 0.15 : source === "ifct" ? 0.1 : source === "usda" ? 0.05 : 0;
+}
+
+// ---- v2.7: reject cross-species matches (cucumber -> "cold cucumber cream soup") ----
+
+/**
+ * Descriptor / cooking words that never change what the core ingredient IS — stripped before
+ * comparing a query's words against a hit's words so "peeled cucumber" reduces to "cucumber".
+ */
+const DESCRIPTOR_WORDS = new Set([
+  "cold", "hot", "warm", "fresh", "raw", "boiled", "fried", "roasted", "peeled", "unpeeled", "chopped", "sliced",
+  "diced", "grated", "steamed", "plain", "mixed", "whole", "cooked", "baked", "grilled", "cream", "creamy", "ripe",
+  "green", "red", "small", "medium", "large", "big", "half", "extra", "spicy", "sweet", "sour", "org", "organic",
+]);
+
+/**
+ * Words that mark a hit as a composite dish rather than a bare ingredient. If the query is a
+ * single ingredient (doesn't itself mention one of these) and the hit's name introduces one that
+ * the query didn't ask for, the hit is a different food and gets rejected — e.g. "cucumber" must
+ * never resolve to "cold cucumber cream soup".
+ */
+const DISH_WORDS = new Set([
+  "soup", "sandwich", "raita", "curry", "sabzi", "salad", "sharbat", "chaat", "kadhi", "stew", "gravy", "cutlet",
+  "pickle", "achar", "halwa", "kheer", "shake", "smoothie", "juice", "roll", "wrap", "poriyal", "thoran", "kofta",
+  "koftas", "biryani", "pulao", "khichdi", "idli", "dosa", "uttapam", "momos", "pakora", "bhurji", "tikka",
+  "masala", "bharta", "cutlets", "chutney", "dip", "spread", "paratha", "toast", "burger", "pizza", "cake", "pie",
+]);
+
+function significantWords(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !DESCRIPTOR_WORDS.has(w));
+}
+
+/**
+ * True when `hit` is a trustworthy match for the searched `query`. Exact name/alias hits
+ * (score ≥ 1) are always trusted — they come from curated aliases. Otherwise the trigram
+ * similarity must clear `min`, the hit must not be a composite dish carrying an ingredient the
+ * single-word query never mentioned, and the two names must share at least one core word.
+ */
+export function isAcceptableMatch(query: string, hit: FoodHit, min = 0.5): boolean {
+  if (hit.score >= 1) return true;
+  const sim = hit.score - sourceBonus(hit.source);
+  if (sim < min) return false;
+
+  const qWords = significantWords(query);
+  const hWords = significantWords(hit.name);
+  if (qWords.length === 0 || hWords.length === 0) return sim >= min;
+
+  const qSet = new Set(qWords);
+  const extras = hWords.filter((w) => !qSet.has(w));
+  const queryMentionsDish = qWords.some((w) => DISH_WORDS.has(w));
+  const hitAddsUnaskedDish = extras.some((w) => DISH_WORDS.has(w));
+  const querySingleIngredient = qWords.length <= 2 && !queryMentionsDish;
+  if (querySingleIngredient && hitAddsUnaskedDish) return false;
+
+  // The two names must still share a core word (e.g. "cucumber" in both), otherwise it's a
+  // same-similarity-bucket but unrelated food.
+  const overlap = qWords.some((w) => hWords.includes(w));
+  return overlap;
 }
 
 function rowToHit(r: Record<string, unknown>): FoodHit {

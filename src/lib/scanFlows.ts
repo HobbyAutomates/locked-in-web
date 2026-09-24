@@ -1,8 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "node:crypto";
 import type { AdminClient } from "@/lib/apiAuth";
-import { microsFor, searchFoods, sourceBonus, type FoodHit } from "@/lib/foodSearch";
-import { TRANSCRIBE, analyseTranscript, fetchOff, lensFor, loadScanProfile, offComplete, offTranscript, saveScan, unreadableReport, type OffProduct } from "@/lib/labelAnalysis";
+import { isAcceptableMatch, microsFor, searchFoods, type FoodHit } from "@/lib/foodSearch";
+import { TRANSCRIBE, analyseTranscript, fetchOff, lensFor, loadScanProfile, offComplete, offPer100g, offTranscript, saveScan, unreadableReport, type OffProduct } from "@/lib/labelAnalysis";
+import { extractBarcode, parseNutritionLabel, roundPer100, sanityCheckPer100 } from "@/lib/labelParse";
+import { liveLookup } from "@/lib/liveFood";
 import { RESTAURANT_MULTIPLIER, RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
 import { scanName } from "@/lib/scanNames";
 import type { ItemMicros, PlateEstimate, PlateItem } from "@/lib/types";
@@ -92,9 +94,13 @@ export async function labelFlow(input: {
   const lens = lensFor(profile.goal_type, input.lens, profile.lens_default);
   const client = anthropic();
 
-  // 1. Transcribe. The phone's own OCR wins when it read enough, then a transcript the classifier
-  //    already made; otherwise Sonnet looks at the photo.
-  const fromPhone = ocrText.length >= OCR_MIN_CHARS;
+  // 1. Transcribe. The phone's own OCR wins when it read enough AND it actually contains a
+  //    nutrition table (front-of-pack marketing text — "Omega Loaded Mix Seeds... Protein..." —
+  //    can clear the character count without ever showing a number, so it doesn't count as a
+  //    usable label read on its own); otherwise a transcript the classifier already made; else
+  //    Sonnet looks at the photo, which is the only way to actually get to the back-of-pack table.
+  const ocrHasTable = parseNutritionLabel(ocrText).hasTable;
+  const fromPhone = ocrText.length >= OCR_MIN_CHARS && (ocrHasTable || !input.image);
   let transcript = fromPhone ? ocrText : (input.transcript ?? "").trim();
   if (!transcript) {
     if (!input.image) throw new FlowError("Couldn't read enough text — retake the photo.", 400);
@@ -115,6 +121,17 @@ export async function labelFlow(input: {
   }
 
   const { report, analysis } = await analyseTranscript({ client, transcript, note: input.note ?? undefined, lens, profile, fromPhoneOcr: fromPhone, kind: "label" });
+
+  // 2. The parser is the source of truth for per_100g, never the model. No table -> no numbers.
+  const parsed = parseNutritionLabel(transcript);
+  applyParsedNutrition(report, parsed);
+  // A label transcript sometimes carries the barcode digits too ("8 i9 0 6..."); recover them
+  // opportunistically so the scan isn't barcode-less when it didn't need to be.
+  if (!report.barcode) {
+    const digits = extractBarcode(transcript);
+    if (digits) report.barcode = digits;
+  }
+
   // Never store "<UNKNOWN>" or a blank name: the model's name, else the first ingredient, else "Unnamed label".
   const product = scanName("label", { model: report.product, ingredients: transcript });
   const full = { ...report, product, kind: "label", lens, transcript, analysis };
@@ -128,6 +145,38 @@ export async function labelFlow(input: {
   });
   const thumb_path = await attachThumb(input.admin, input.userId, id, input.thumb);
   return { id, ...report, product, kind: "label", lens, transcript, thumb_path };
+}
+
+/**
+ * Overwrites `report.per_100g` (and related per-serving fields) with the parser's own numbers,
+ * or clears them with a `needs_back_of_pack` flag when the transcript has no real nutrition
+ * table. Mutates `report` in place; shared by labelFlow and, for the OFF path, barcodeFlow.
+ */
+function applyParsedNutrition(report: Record<string, unknown>, parsed: ReturnType<typeof parseNutritionLabel>): void {
+  if (parsed.coreComplete) {
+    const gate = sanityCheckPer100(parsed.per_100g);
+    if (gate.ok) {
+      report.per_100g = roundPer100(parsed.per_100g);
+      report.nutrition_source = "label";
+      report.needs_back_of_pack = false;
+      if (parsed.serving_g && !((report.serving_g as number | null | undefined) ?? 0)) report.serving_g = parsed.serving_g;
+      return;
+    }
+  }
+  // No table, or the numbers we found don't check out: never let a fabricated/implausible
+  // per_100g through. Clear it and tell the user what to do instead.
+  delete report.per_100g;
+  report.nutrition_source = null;
+  report.needs_back_of_pack = true;
+  const hint = "Flip the pack and scan the Nutrition Facts table for real numbers.";
+  report.verdict_reason = report.verdict_reason && String(report.verdict_reason).trim() ? `${report.verdict_reason} ${hint}` : hint;
+  if (report.protein && typeof report.protein === "object") delete (report.protein as Record<string, unknown>).per_serving_g;
+  if (report.infographic && typeof report.infographic === "object") {
+    const info = report.infographic as Record<string, unknown>;
+    info.serving_share = { protein_pct: 0, carbs_pct: 0, fat_pct: 0, calories_pct: 0 };
+    info.sugar_teaspoons_per_serving = 0;
+    info.sodium_pct_of_2000mg = 0;
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -173,22 +222,44 @@ export async function barcodeFlow(input: {
   const profile = await loadScanProfile(input.admin, input.userId);
   const lens = lensFor(profile.goal_type, input.lens, profile.lens_default);
 
-  // 1. Cache, then Open Food Facts.
+  // 1. Cache, then Open Food Facts. A record only gets cached once its own per-100g numbers pass
+  //    the sanity gate below — the True Elements Muesli bug was exactly a bad OFF record (mis-scaled
+  //    per-serving data reported as per-100g: 1037 kcal, 177.75 g carbs) cached and shown unchecked.
   let product: OffProduct | null = null;
   const { data: cached } = await input.admin.from("barcode_cache").select("product, fetched_at").eq("barcode", barcode).maybeSingle();
   const fresh = cached && Date.now() - new Date(cached.fetched_at as string).getTime() < CACHE_DAYS * 86400e3;
   if (fresh && cached?.product && (cached.product as OffProduct).product_name) product = cached.product as OffProduct;
   if (!product) {
-    product = await fetchOff(barcode);
-    if (product) await input.admin.from("barcode_cache").upsert({ barcode, product, fetched_at: new Date().toISOString() });
-    else if (cached?.product && (cached.product as OffProduct).product_name) product = cached.product as OffProduct;
+    const fetched = await fetchOff(barcode);
+    if (fetched && offPer100g(fetched).per_100g) {
+      await input.admin.from("barcode_cache").upsert({ barcode, product: fetched, fetched_at: new Date().toISOString() });
+      product = fetched;
+    } else if (fetched) {
+      // Fetched, but its nutrition numbers don't check out: use it for name/ingredients (below,
+      // per_100g gets cleared) but never cache it, so a later fix to OFF's data isn't shadowed.
+      product = fetched;
+    } else if (cached?.product && (cached.product as OffProduct).product_name) {
+      product = cached.product as OffProduct;
+    }
   }
   if (!product) return { found: false, barcode, kind: "barcode", lens, message: "Not in the database yet — scan the label instead." };
+
+  const gated = offPer100g(product);
 
   // 2-3. Same analysis + structuring as a label. A complete OFF record (ingredients + full
   // nutrition) only needs one search at most — recall / counterfeit checks.
   const transcript = offTranscript(product);
   const { report, analysis } = await analyseTranscript({ client: anthropic(), transcript, note: input.note ?? undefined, lens, profile, kind: "barcode", maxSearches: offComplete(product) ? 1 : 2 });
+  const reasonBefore = report.verdict_reason && String(report.verdict_reason).trim() ? String(report.verdict_reason) : "";
+  applyParsedNutrition(report, { per_100g: gated.per_100g ?? {}, per_serving: {}, serving_g: null, hasTable: gated.per_100g != null, coreComplete: gated.per_100g != null });
+  if (gated.per_100g) {
+    report.nutrition_source = "openfoodfacts";
+  } else {
+    // Overwrite the generic "no table" hint applyParsedNutrition just added with the OFF-specific one.
+    report.verdict_reason = reasonBefore
+      ? `${reasonBefore} Open Food Facts' numbers for this product didn't check out (${gated.reasons[0] ?? "inconsistent"}) — scan the label for real numbers.`
+      : "Open Food Facts' numbers for this product didn't check out — scan the label for real numbers.";
+  }
   const image_url = product.image_url ?? null;
   const productName = scanName("barcode", { model: report.product, off: product.product_name, ingredients: product.ingredients_text });
   const full = { ...report, product: productName, kind: "barcode", lens, barcode, image_url, transcript, analysis };
@@ -328,24 +399,28 @@ export async function plateFlow(input: { admin: AdminClient; userId: string; ima
   });
 
   // 2. Cross-validate against the food table (keep the model's grams, take the table's per-100 g).
+  //    A hit is only accepted when isAcceptableMatch says it's really the same food — a single
+  //    ingredient like "cucumber" must never be replaced by a composite dish's numbers just
+  //    because the dish's name happens to share a word ("cold cucumber cream soup"). When there's
+  //    no acceptable table row, fall back to a live AI nutrition lookup (liveFood.ts) rather than
+  //    silently keeping a table match that doesn't fit; if that also comes up empty, the model's
+  //    own plate estimate stands.
   const items: PlateItem[] = await Promise.all(
     rawItems.map(async (it) => {
       const hits = await searchFoods(it.name, 3).catch(() => [] as FoodHit[]);
       const top = hits[0];
-      if (!top) return it;
-      const sim = top.score >= 1 ? 1 : top.score - sourceBonus(top.source);
-      if (sim < 0.5) return it;
+      const match = top && isAcceptableMatch(it.name, top) ? top : await liveLookup(it.name).catch(() => null);
+      if (!match) return it;
       const k = it.grams / 100;
       return {
         ...it,
-        name: top.source === "custom" || top.source === "dish" ? it.name : it.name,
-        calories: Math.round(top.calories * k),
-        protein_g: Math.round(top.protein_g * k * 10) / 10,
-        carbs_g: Math.round(top.carbs_g * k * 10) / 10,
-        fat_g: Math.round(top.fat_g * k * 10) / 10,
-        micros: { ...it.micros, ...microsFor(top, it.grams) },
+        calories: Math.round(match.calories * k),
+        protein_g: Math.round(match.protein_g * k * 10) / 10,
+        carbs_g: Math.round(match.carbs_g * k * 10) / 10,
+        fat_g: Math.round(match.fat_g * k * 10) / 10,
+        micros: { ...it.micros, ...microsFor(match, it.grams) },
         source: "table",
-        food_id: top.id,
+        food_id: match.id,
       };
     }),
   );

@@ -9,9 +9,11 @@ import { bandCode, bandIntensity, bandKcal, burnKcal } from "./burn";
 import { rollupQuietly } from "./rollup";
 import { adminClient } from "./apiAuth";
 import { today as todayIso } from "./dates";
-import type { Activity, DescribedExercise, FoodSearchHit, LeaderRow, MealItem, Profile, SavedMeal, SquadMember, SquadPost, WaterEntry, WaterVessel, WorkoutExercise, WorkoutKind } from "./types";
+import type { Activity, BattleBoardRow, BattleWinner, DescribedExercise, FoodSearchHit, GraffitiEntry, LeaderRow, MealItem, Profile, SavedMeal, SquadMember, SquadPost, WaterEntry, WaterVessel, WorkoutExercise, WorkoutKind } from "./types";
 import { mealPostBody, prPostBody, workoutPostBody } from "./squadPosts";
 import { fetchSquadPosts } from "./data";
+import { battleLine } from "./battleLines";
+import { battleTarget, type BattleGoal } from "./battle";
 
 /** v2.5: Compendium rows for the auto-burn of gym / bodyweight sessions. */
 const LIFT_BURN: Record<"gym" | "bodyweight", { code: string; met: number; label: string }> = {
@@ -290,6 +292,7 @@ export async function saveMeal(input: { date: string; raw_text: string; items: M
   await rollupQuietly(supabase, user.id, [input.date]);
   await postMealToSquads(supabase, user.id, meal.id as string, mealPostBody(items, input.raw_text), input.photo_path ?? null);
   revalidatePath("/", "layout");
+  return { id: meal.id as string };
 }
 
 export async function deleteMeal(id: string) {
@@ -829,4 +832,72 @@ export async function loadLeaderboard(groupId: string): Promise<LeaderRow[]> {
   const { data, error } = await supabase.rpc("group_leaderboard", { g: groupId });
   if (error) throw new Error(error.message);
   return ((data ?? []) as LeaderRow[]).map((r) => ({ ...r, rank: Number(r.rank), flames: Number(r.flames ?? 0), week_points: Number(r.week_points ?? 0) }));
+}
+
+// ---- v2.8: Squad Food Battle (docs/food-battle-spec.md, supabase/schema_v28.sql) ----
+
+/** Owner only: turn the Food Battle on/off for a squad. */
+export async function toggleBattle(groupId: string, enabled: boolean) {
+  const { supabase, user } = await userOrThrow();
+  const { data, error } = await supabase.from("groups").update({ battle_enabled: enabled }).eq("id", groupId).eq("owner_id", user.id).select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("Only the owner can change this");
+  revalidatePath(`/squad/${groupId}`, "page");
+}
+
+/** The live board for one squad/day (bandlog.battle_board). */
+export async function loadBattleBoard(groupId: string, date: string): Promise<BattleBoardRow[]> {
+  const { supabase } = await userOrThrow();
+  const { data, error } = await supabase.rpc("battle_board", { g: groupId, d: date });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as BattleBoardRow[]).map((r) => ({ ...r, eaten: Number(r.eaten), target: Number(r.target), r: Number(r.r), score: Number(r.score), meals: Number(r.meals) }));
+}
+
+/** Closes a past day for a squad (idempotent) and returns the crown winner, if any. Safe to call on every page load. */
+export async function closeBattleDay(groupId: string, date: string): Promise<BattleWinner> {
+  const { supabase } = await userOrThrow();
+  const { data, error } = await supabase.rpc("battle_close", { g: groupId, d: date });
+  if (error) return null; // Best-effort: a missed close just gets caught by the next page load.
+  const row = (Array.isArray(data) ? data[0] : data) as BattleWinner;
+  if (row) revalidatePath(`/squad/${groupId}`, "page");
+  return row ?? null;
+}
+
+/** Crown count + last 7 wins for the profile's graffiti wall. Defaults to the signed-in user. */
+export async function loadGraffiti(userId?: string): Promise<{ total: number; recent: GraffitiEntry[] }> {
+  const { supabase, user } = await userOrThrow();
+  const { data, error } = await supabase.rpc("my_graffiti", { u: userId ?? user.id });
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as GraffitiEntry[];
+  return { total: Number(rows[0]?.total ?? 0), recent: rows.map((r) => ({ ...r, score: Number(r.score), total: Number(r.total) })) };
+}
+
+/**
+ * After a Snap meal is saved the normal way (saveMeal already auto-posted it to every squad the
+ * user is in, kind 'meal' — see post_to_my_groups in schema_v26.sql), enrich that post for THIS
+ * squad only: the item summary, the kcal range and a hype one-liner from src/lib/battleLines.ts.
+ * No LLM call. Never shaming — see battleLines.ts.
+ */
+export async function postBattleSnap(input: { groupId: string; mealId: string; photoPath: string | null; itemsSummary: string; kcal: number; kcalLow: number; kcalHigh: number }): Promise<{ ok: true; line: string } | { ok: false; error: string }> {
+  const { supabase, user } = await userOrThrow();
+  const [{ data: profile }, { data: stats }] = await Promise.all([
+    supabase.from("profiles").select("goal_type, calorie_target, add_burned_to_goal").eq("id", user.id).maybeSingle(),
+    supabase.from("daily_stats").select("calories, burned").eq("user_id", user.id).eq("date", todayIso()).maybeSingle(),
+  ]);
+  const goal = (profile?.goal_type ?? "maintain") as BattleGoal;
+  const target = battleTarget(Number(profile?.calorie_target ?? 2200), Number(stats?.burned ?? 0), !!profile?.add_burned_to_goal);
+  const eaten = Number(stats?.calories ?? input.kcal);
+  const line = battleLine(goal, eaten, target, input.mealId ? input.mealId.charCodeAt(0) : Date.now());
+  const range = `~${Math.round(input.kcal)} kcal (${Math.round(input.kcalLow)}–${Math.round(input.kcalHigh)})`;
+  const body = `${input.itemsSummary} · ${range}\n${line}`.slice(0, 1000);
+  const { error } = await supabase
+    .from("group_posts")
+    .update({ body, photo_path: input.photoPath })
+    .eq("group_id", input.groupId)
+    .eq("user_id", user.id)
+    .eq("kind", "meal")
+    .eq("ref_id", input.mealId);
+  if (error) return { ok: false, error: describe(error) };
+  revalidatePath(`/squad/${input.groupId}`, "page");
+  return { ok: true, line };
 }

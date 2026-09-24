@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Permanent+Marker&display=swap");
 @import "tailwindcss";
 
 /* ───────── Cal AI-style palette, mirroring the Android app's Color.kt ───────── */
@@ -669,4 +670,63 @@ button {
 }
 .searchbar input::placeholder {
   color: var(--muted);
+}
+
+/* ───────── v2.8 Squad Food Battle: graffiti crown card (docs/food-battle-spec.md) ─────────
+   Bright spray-paint colors are fixed (not theme tokens) so the crown always pops; the card
+   shell around it still uses --card/--ink so it sits correctly in light or dark mode. */
+.graffiti-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 18px 18px 16px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2b2b2b 100%);
+  color: #fff;
+  box-shadow: var(--shadow-lg);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .graffiti-card {
+    background: linear-gradient(135deg, #0b0b0c 0%, #1f1f22 100%);
+  }
+}
+:root[data-theme="dark"] .graffiti-card {
+  background: linear-gradient(135deg, #0b0b0c 0%, #1f1f22 100%);
+}
+.graffiti-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 12% 20%, rgba(255, 60, 172, 0.25), transparent 45%), radial-gradient(circle at 85% 15%, rgba(60, 220, 255, 0.22), transparent 45%),
+    radial-gradient(circle at 70% 90%, rgba(255, 210, 0, 0.2), transparent 45%);
+  pointer-events: none;
+}
+.graffiti-name {
+  position: relative;
+  display: inline-block;
+  font-family: "Rubik Mono One", "Permanent Marker", "Arial Black", system-ui, sans-serif;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #ffe15a 0%, #ff3cac 55%, #ff3cac 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1.5px #1a1a1a;
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+  transform: rotate(-2deg);
+}
+.graffiti-drip {
+  position: relative;
+  display: inline-block;
+  width: 8px;
+  height: 22px;
+  margin-left: 2px;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(180deg, #ff3cac 0%, transparent 100%);
+  vertical-align: -8px;
+  opacity: 0.85;
+}
+.graffiti-tag {
+  font-family: "Permanent Marker", "Rubik Mono One", system-ui, sans-serif;
+  letter-spacing: 0.02em;
 }

@@ -375,7 +375,7 @@ export async function getSentNudges(): Promise<string[]> {
 
 // ---- v2.6: squads v2 ----
 
-const SQUAD_COLS = "id, name, code, owner_id, created_at, description, icon, cover_url, tagline, is_public, join_policy";
+const SQUAD_COLS = "id, name, code, owner_id, created_at, description, icon, cover_url, tagline, is_public, join_policy, battle_enabled";
 
 /** One squad I'm in (RLS hides the rest), with its member count. */
 export async function getSquad(id: string): Promise<Squad | null> {

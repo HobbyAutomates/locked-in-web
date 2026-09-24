@@ -8,14 +8,15 @@ import { deleteSquadPost, loadLeaderboard, loadSquadPosts, nudgeMember, postSqua
 import { postStamp } from "@/lib/display";
 import { CHAT_KINDS, FEED_KINDS } from "@/lib/squadPosts";
 import { toJpegBase64 } from "@/lib/image";
-import type { LeaderRow, Squad, SquadPost } from "@/lib/types";
+import type { BattleWinner, LeaderRow, Squad, SquadPost } from "@/lib/types";
 import { Avatar } from "./Avatar";
+import { BattleTab } from "./BattleTab";
 import { ArrowLeft, Bowl, Chat, Check, Dumbbell, Fist, Flame, Medal, People, Photo, Plus, Send, Spinner, Trash } from "./icons";
 import { SquadIcon } from "./SquadIcon";
 import { BottomSheet, BreathingFlame, ErrorNote } from "./ui";
 
 
-type Tab = "chat" | "feed" | "leaderboard";
+type Tab = "chat" | "feed" | "leaderboard" | "battle";
 
 type Props = {
   me: string;
@@ -28,14 +29,19 @@ type Props = {
   shareStats: boolean;
   pendingRequests: number;
   initialTab: Tab;
+  /** v2.8: yesterday's Food Battle crown, already closed server-side on this page load. */
+  crown?: BattleWinner;
+  /** v2.8: yesterday's date (Asia/Kolkata) — what the crown card refers to; today's board reads live. */
+  yesterday?: string;
 };
 
 /**
  * v2.6 squad page (Cal AI group): header with the squad's icon and a members button, then
- * Chat · Feed · Leaderboard. Chat and Feed poll every 5 s / 15 s while visible; meals, workouts
- * and PRs arrive in the Feed by themselves (see actions.ts → post_to_my_groups).
+ * Chat · Feed · Leaderboard (· Battle, v2.8, when the owner has turned it on). Chat and Feed poll
+ * every 5 s / 15 s while visible; meals, workouts and PRs arrive in the Feed by themselves (see
+ * actions.ts → post_to_my_groups).
  */
-export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, sentNudges, shareStats, pendingRequests, initialTab }: Props) {
+export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, sentNudges, shareStats, pendingRequests, initialTab, crown = null }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [chat, setChat] = useState(chat0);
@@ -46,7 +52,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
   const photoRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(
-    async (which: Tab) => {
+    async (which: Exclude<Tab, "battle">) => {
       try {
         if (which === "chat") setChat(await loadSquadPosts(squad.id, CHAT_KINDS));
         else if (which === "feed") setFeed(await loadSquadPosts(squad.id, FEED_KINDS));
@@ -59,7 +65,9 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
   );
 
   // Poll the open tab while the page is visible: chat 5 s, feed 15 s, leaderboard once on open.
+  // Battle has its own polling inside <BattleTab>.
   useEffect(() => {
+    if (tab === "battle") return;
     const first = setTimeout(() => void refresh(tab), 0);
     if (tab === "leaderboard") return () => clearTimeout(first);
     const every = tab === "chat" ? 5000 : 15000;
@@ -110,7 +118,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           </Link>
         </div>
         <div className="flex" role="tablist" aria-label="Squad">
-          {(["chat", "feed", "leaderboard"] as const).map((t) => (
+          {(["chat", "feed", "leaderboard", ...(squad.battle_enabled ? (["battle"] as const) : [])] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -120,7 +128,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
               style={{ background: "none", border: 0, color: tab === t ? "var(--ink)" : "var(--muted)" }}
               onClick={() => setTab(t)}
             >
-              {t === "chat" ? "Chat" : t === "feed" ? "Feed" : "Leaderboard"}
+              {t === "chat" ? "Chat" : t === "feed" ? "Feed" : t === "leaderboard" ? "Leaderboard" : "Battle 👑"}
               {tab === t ? <motion.span layoutId="squad-tab" className="absolute inset-x-3 bottom-0 h-[3px] rounded-full" style={{ background: "var(--ink)" }} /> : null}
             </button>
           ))}
@@ -138,8 +146,10 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
         <ChatTab me={me} today={today} posts={chat} onPhoto={() => photoRef.current?.click()} onSent={() => void refresh("chat")} squadId={squad.id} setPosts={setChat} onError={setError} />
       ) : tab === "feed" ? (
         <FeedTab me={me} today={today} posts={feed} shareStats={shareStats} isOwner={squad.owner_id === me} onPhoto={() => photoRef.current?.click()} onDeleted={(id) => setFeed((f) => f.filter((p) => p.id !== id))} onError={setError} />
-      ) : (
+      ) : tab === "leaderboard" ? (
         <LeaderboardTab me={me} squadId={squad.id} rows={board} sentNudges={sentNudges} onError={setError} />
+      ) : (
+        <BattleTab me={me} squad={squad} date={today} crown={crown} onError={setError} />
       )}
 
       <input
@@ -162,7 +172,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           const res = await postSquadPhoto(squad.id, photoSheet.base64, caption);
           if (!res.ok) throw new Error(res.error);
           setPhotoSheet(null);
-          void refresh(tab === "leaderboard" ? "feed" : tab);
+          void refresh(tab === "leaderboard" || tab === "battle" ? "feed" : tab);
         }}
       />
     </div>
