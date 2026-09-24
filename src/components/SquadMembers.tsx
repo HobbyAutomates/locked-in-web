@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { approveJoin, declineJoin, leaveSquad, updateSquad } from "@/lib/actions";
+import { approveJoin, declineJoin, leaveSquad, toggleBattle, updateSquad } from "@/lib/actions";
 import { inviteLink } from "@/lib/squadPosts";
 import type { JoinRequest, Squad, SquadMemberDetail } from "@/lib/types";
 import { Avatar } from "./Avatar";
@@ -267,6 +267,7 @@ function EditSheet({ open, onClose, squad }: { open: boolean; onClose: () => voi
   const [description, setDescription] = useState(squad.description ?? "");
   const [icon, setIcon] = useState<string | null>(squad.icon ?? null);
   const [isPublic, setIsPublic] = useState(!!squad.is_public);
+  const [battleEnabled, setBattleEnabled] = useState(!!squad.battle_enabled);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function save() {
@@ -274,6 +275,7 @@ function EditSheet({ open, onClose, squad }: { open: boolean; onClose: () => voi
     setError(null);
     try {
       await updateSquad(squad.id, { name, description, icon: isSquadIcon(icon) ? icon : (squad.icon ?? null), isPublic });
+      if (battleEnabled !== !!squad.battle_enabled) await toggleBattle(squad.id, battleEnabled);
       router.refresh();
       onClose();
     } catch (e) {
@@ -300,6 +302,13 @@ function EditSheet({ open, onClose, squad }: { open: boolean; onClose: () => voi
           <span className="text-[12px] muted">{isPublic ? "Shown in Discover; anyone can join." : "Private: people request, you approve."}</span>
         </span>
         <Toggle on={isPublic} onChange={setIsPublic} label="Public squad" />
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl px-4 py-3" style={{ background: "var(--card2)" }}>
+        <span className="flex flex-col">
+          <span className="text-[15px] font-bold">Food Battle 👑</span>
+          <span className="text-[12px] muted">Daily calorie-goal game with a graffiti crown for the winner.</span>
+        </span>
+        <Toggle on={battleEnabled} onChange={setBattleEnabled} label="Food Battle" />
       </div>
       {error ? (
         <div className="mt-2">

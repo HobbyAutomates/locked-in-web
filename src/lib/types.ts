@@ -256,7 +256,9 @@ export type ParsedItem = MealItem & {
   /** v2.5: for count foods (roti, egg, glass of milk …) how many units — 1 unless the user said a number. */
   default_count?: number | null;
 };
-export type ParseResult = { items: ParsedItem[]; assumptions: string[]; unparsed: string[] };
+/** v2.7: plain water pulled out of the dictated text BEFORE the LLM ever sees it — see waterParse.ts. */
+export type ParsedWater = { ml: number; glasses: number; phrase: string };
+export type ParseResult = { items: ParsedItem[]; assumptions: string[]; unparsed: string[]; water?: ParsedWater | null };
 
 /** A repeatable meal ("rice dal eggs whey") saved for one-tap logging. */
 export type SavedMeal = {
@@ -364,9 +366,34 @@ export type Squad = {
   is_public?: boolean | null;
   join_policy?: JoinPolicy | null;
   member_count?: number;
+  /** v2.8: Squad Food Battle, owner-toggled. */
+  battle_enabled?: boolean | null;
 };
 
-export type SquadPostKind = "message" | "meal" | "workout" | "pr" | "photo" | "challenge";
+export type SquadPostKind = "message" | "meal" | "workout" | "pr" | "photo" | "challenge" | "battle";
+
+// ---- v2.8: Squad Food Battle (see docs/food-battle-spec.md, src/lib/battle.ts) ----
+
+/** One row of `bandlog.battle_board(g, d)`. */
+export type BattleBoardRow = {
+  user_id: string;
+  name: string;
+  avatar_path: string | null;
+  goal_type: GoalType;
+  eaten: number;
+  target: number;
+  r: number;
+  score: number;
+  meals: number;
+  eligible: boolean;
+  private: boolean;
+};
+
+/** `bandlog.battle_close(g, d)`'s result: null when the day isn't closeable yet or nobody won. */
+export type BattleWinner = { user_id: string; name: string; score: number; goal_type: GoalType } | null;
+
+/** One row of `bandlog.my_graffiti(u)` (profile's graffiti wall). */
+export type GraffitiEntry = { total: number; group_id: string; group_name: string; date: string; score: number; goal_type: GoalType };
 
 /** One row of `bandlog.group_feed(g, before, n, kinds)`; `photo_url` is signed server-side. */
 export type SquadPost = {

@@ -1,8 +1,8 @@
 import type { MealItem, WorkoutExercise, WorkoutKind } from "./types";
 
-/** v2.6: what each squad tab shows (the `kinds` argument of group_feed). Photos appear in both. v2.7: + challenge. */
+/** v2.6: what each squad tab shows (the `kinds` argument of group_feed). Photos appear in both. v2.7: + challenge, battle. */
 export const CHAT_KINDS = ["message", "photo"];
-export const FEED_KINDS = ["meal", "workout", "pr", "photo", "challenge"];
+export const FEED_KINDS = ["meal", "workout", "pr", "photo", "challenge", "battle"];
 
 export const WEB_URL = "https://web-production-ff1cf.up.railway.app";
 

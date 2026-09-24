@@ -25,7 +25,8 @@ export type TaskId =
   | "label_analysis"
   | "barcode_digits"
   | "meal_text_parse"
-  | "exercise_parse";
+  | "exercise_parse"
+  | "food_lookup";
 
 /** A minimal JSON-Schema-compatible object description — the same shape Anthropic tool
  *  input_schema, Gemini responseSchema and an OpenAI json_schema response_format all accept. */

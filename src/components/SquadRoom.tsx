@@ -8,8 +8,9 @@ import { deleteSquadPost, loadChallenges, loadLeaderboard, loadSquadPosts, nudge
 import { postStamp } from "@/lib/display";
 import { CHAT_KINDS, FEED_KINDS } from "@/lib/squadPosts";
 import { toJpegBase64 } from "@/lib/image";
-import type { Challenge, ChallengeBoardRow, LeaderRow, Squad, SquadPost } from "@/lib/types";
+import type { BattleWinner, Challenge, ChallengeBoardRow, LeaderRow, Squad, SquadPost } from "@/lib/types";
 import { Avatar } from "./Avatar";
+import { BattleTab } from "./BattleTab";
 import { ArrowLeft, Bowl, Chat, Check, ChevronRight, Dumbbell, Fist, Flame, Medal, People, Photo, Plus, Send, Spinner, Target, Trash } from "./icons";
 import { ChallengesTab } from "./SquadChallenges";
 import { SquadRankRow } from "./SquadRankRow";
@@ -17,11 +18,13 @@ import { SquadIcon } from "./SquadIcon";
 import { BottomSheet, BreathingFlame, ErrorNote } from "./ui";
 
 
-type Tab = "chat" | "challenges" | "feed" | "leaderboard";
+type Tab = "chat" | "challenges" | "battle" | "feed" | "leaderboard";
 
-const TABS: { key: Tab; label: string }[] = [
+/** Battle (v2.8) only shows when the squad owner has turned it on. */
+const TABS: { key: Tab; label: string; battle?: true }[] = [
   { key: "chat", label: "Chat" },
   { key: "challenges", label: "Challenges" },
+  { key: "battle", label: "Battle 👑", battle: true },
   { key: "feed", label: "Feed" },
   { key: "leaderboard", label: "Leaderboard" },
 ];
@@ -39,14 +42,19 @@ type Props = {
   shareStats: boolean;
   pendingRequests: number;
   initialTab: Tab;
+  /** v2.8: yesterday's Food Battle crown, already closed server-side on this page load. */
+  crown?: BattleWinner;
+  /** v2.8: yesterday's date (Asia/Kolkata) — what the crown card refers to; today's board reads live. */
+  yesterday?: string;
 };
 
 /**
  * v2.6 squad page (Cal AI group): header with the squad's icon and a members button, then
- * Chat · Challenges (v2.7) · Feed · Leaderboard. Chat and Feed poll every 5 s / 15 s while visible; meals, workouts
- * and PRs arrive in the Feed by themselves (see actions.ts → post_to_my_groups).
+ * Chat · Challenges (v2.7) · Battle (v2.8, when the owner has turned it on) · Feed · Leaderboard.
+ * Chat and Feed poll every 5 s / 15 s while visible; meals, workouts and PRs arrive in the Feed by
+ * themselves (see actions.ts → post_to_my_groups).
  */
-export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, challenges: challenges0, proteinGoal, sentNudges, shareStats, pendingRequests, initialTab }: Props) {
+export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, challenges: challenges0, proteinGoal, sentNudges, shareStats, pendingRequests, initialTab, crown = null }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [chat, setChat] = useState(chat0);
@@ -59,7 +67,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
   const photoRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(
-    async (which: Tab) => {
+    async (which: Exclude<Tab, "battle">) => {
       try {
         if (which === "chat") setChat(await loadSquadPosts(squad.id, CHAT_KINDS));
         else if (which === "feed") setFeed(await loadSquadPosts(squad.id, FEED_KINDS));
@@ -77,7 +85,9 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
 
   // Poll the open tab while the page is visible: chat 5 s, feed 15 s, leaderboard and challenges
   // once on open (opening Challenges also posts "🏆 completed" for anything just finished).
+  // Battle has its own polling inside <BattleTab>.
   useEffect(() => {
+    if (tab === "battle") return;
     const first = setTimeout(() => void refresh(tab), 0);
     if (tab === "leaderboard" || tab === "challenges") return () => clearTimeout(first);
     const every = tab === "chat" ? 5000 : 15000;
@@ -128,7 +138,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           </Link>
         </div>
         <div className="flex" role="tablist" aria-label="Squad">
-          {TABS.map(({ key: t, label }) => (
+          {TABS.filter((t) => !t.battle || squad.battle_enabled).map(({ key: t, label }) => (
             <button
               key={t}
               type="button"
@@ -169,8 +179,10 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
         />
       ) : tab === "feed" ? (
         <FeedTab me={me} today={today} squadId={squad.id} posts={feed} shareStats={shareStats} isOwner={squad.owner_id === me} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDeleted={(id) => setFeed((f) => f.filter((p) => p.id !== id))} onError={setError} />
-      ) : (
+      ) : tab === "leaderboard" ? (
         <LeaderboardTab me={me} squadId={squad.id} rows={board} sentNudges={sentNudges} onError={setError} />
+      ) : (
+        <BattleTab me={me} squad={squad} date={today} crown={crown} onError={setError} />
       )}
 
       <input
@@ -322,6 +334,7 @@ const KIND_META: Record<string, { verb: string; tint: string; Icon: (p: { size?:
   pr: { verb: "hit a new PR", tint: "var(--flame)", Icon: Medal },
   photo: { verb: "shared a photo", tint: "var(--blue)", Icon: Photo },
   challenge: { verb: "started a challenge", tint: "var(--flame)", Icon: Target },
+  battle: { verb: "took the Food Battle crown", tint: "var(--orange)", Icon: Medal },
 };
 
 /** v2.7: "🏆 completed ..." posts carry ref_id = challenge id; "🏁 started ..." ones don't. */

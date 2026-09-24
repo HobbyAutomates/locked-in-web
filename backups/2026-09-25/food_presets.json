@@ -1,0 +1,3900 @@
+{
+ "rows": [
+  {
+   "id": "almonds",
+   "food_id": "almonds",
+   "label": "Almonds",
+   "label_hi": "बादाम",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 12,
+     "label": "10 almonds"
+    },
+    {
+     "grams": 6,
+     "label": "5 almonds"
+    },
+    {
+     "grams": 30,
+     "label": "1 handful"
+    }
+   ],
+   "default_serving": "10 almonds",
+   "sort": 140,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/almonds.jpg?v=mufmibxl"
+  },
+  {
+   "id": "aloo-curry",
+   "food_id": "dish-potato-curry",
+   "label": "Aloo curry (rasedar)",
+   "label_hi": "आलू की सब्ज़ी",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 202,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 170,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/aloo-curry.jpg?v=mufmh2b4"
+  },
+  {
+   "id": "aloo-gobi",
+   "food_id": "dish-potato-cauliflower",
+   "label": "Aloo gobi",
+   "label_hi": "आलू गोभी",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 176,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 10,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/aloo-gobi.jpg?v=mufmgpce"
+  },
+  {
+   "id": "aloo-jeera",
+   "food_id": "dish-dry-potato",
+   "label": "Jeera aloo",
+   "label_hi": "जीरा आलू",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 106,
+     "label": "1 katori"
+    },
+    {
+     "grams": 212,
+     "label": "2 katori"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 70,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/jeera-aloo.jpg?v=mufmgv6n"
+  },
+  {
+   "id": "aloo-matar",
+   "food_id": "dish-pea-potato-curry",
+   "label": "Aloo matar",
+   "label_hi": "आलू मटर",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 277,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 60,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/aloo-matar.jpg?v=mufmguxb"
+  },
+  {
+   "id": "aloo-paratha",
+   "food_id": "dish-potato-parantha",
+   "label": "Aloo paratha",
+   "label_hi": "आलू पराठा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 93,
+     "label": "1 paratha"
+    },
+    {
+     "grams": 187,
+     "label": "2 paratha"
+    }
+   ],
+   "default_serving": "1 paratha",
+   "sort": 70,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/aloo-paratha.jpg?v=mufmfsvv"
+  },
+  {
+   "id": "apple",
+   "food_id": "ifct-apple-big",
+   "label": "Apple",
+   "label_hi": "सेब",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 180,
+     "label": "1 apple"
+    },
+    {
+     "grams": 90,
+     "label": "½ apple"
+    }
+   ],
+   "default_serving": "1 apple",
+   "sort": 20,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/apple.jpg?v=mufmiztg"
+  },
+  {
+   "id": "avial",
+   "food_id": "dish-avial",
+   "label": "Avial",
+   "label_hi": "अवियल",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 335,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 210,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/avial.jpg?v=mufmh66j"
+  },
+  {
+   "id": "baingan-bharta",
+   "food_id": "dish-brinjal-bhartha",
+   "label": "Baingan bharta",
+   "label_hi": "बैंगन भर्ता",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 326,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 50,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/baingan-bharta.jpg?v=mufmgstf"
+  },
+  {
+   "id": "banana",
+   "food_id": "ifct-banana-ripe-robusta",
+   "label": "Banana",
+   "label_hi": "केला",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 120,
+     "label": "1 banana"
+    },
+    {
+     "grams": 240,
+     "label": "2 bananas"
+    }
+   ],
+   "default_serving": "1 banana",
+   "sort": 10,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/banana.jpg?v=mufmcsst"
+  },
+  {
+   "id": "banana-shake",
+   "food_id": "dish-banana-milkshake",
+   "label": "Banana shake",
+   "label_hi": "बनाना शेक",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 346,
+     "label": "1 tall glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 110,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/banana-shake.jpg?v=mufmikdx"
+  },
+  {
+   "id": "barfi",
+   "food_id": "dish-plain-burfi",
+   "label": "Barfi (khoya)",
+   "label_hi": "बर्फ़ी",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 44,
+     "label": "1 piece"
+    },
+    {
+     "grams": 87,
+     "label": "2 pieces"
+    }
+   ],
+   "default_serving": "1 piece",
+   "sort": 80,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/barfi.jpg?v=mufmisz5"
+  },
+  {
+   "id": "beans-poriyal",
+   "food_id": "dish-beans-with-coconut",
+   "label": "Beans poriyal",
+   "label_hi": "बीन्स पोरियल",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 75,
+     "label": "½ katori"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 220,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/beans-poriyal.jpg?v=mufmh8bo"
+  },
+  {
+   "id": "besan-chilla",
+   "food_id": "dish-gram-flour-chilla",
+   "label": "Besan chilla",
+   "label_hi": "बेसन चीला",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 52,
+     "label": "1 chilla"
+    },
+    {
+     "grams": 104,
+     "label": "2 chilla"
+    },
+    {
+     "grams": 156,
+     "label": "3 chilla"
+    }
+   ],
+   "default_serving": "1 chilla",
+   "sort": 210,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/besan-chilla.jpg?v=mufmg44g"
+  },
+  {
+   "id": "besan-ladoo",
+   "food_id": "dish-gram-flour-ladoo",
+   "label": "Besan ladoo",
+   "label_hi": "बेसन लड्डू",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 35,
+     "label": "1 ladoo"
+    },
+    {
+     "grams": 71,
+     "label": "2 ladoo"
+    }
+   ],
+   "default_serving": "1 ladoo",
+   "sort": 20,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/besan-ladoo.jpg?v=mufmipr5"
+  },
+  {
+   "id": "bhindi",
+   "food_id": "dish-okra",
+   "label": "Bhindi sabzi",
+   "label_hi": "भिंडी",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 166,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 20,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/bhindi-sabzi.jpg?v=mufmgquz"
+  },
+  {
+   "id": "bhindi-masala",
+   "food_id": "dish-stuffed-okra",
+   "label": "Bhindi masala (bharwa)",
+   "label_hi": "भिंडी मसाला",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 111,
+     "label": "1 katori"
+    },
+    {
+     "grams": 221,
+     "label": "2 katori"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 160,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/bhindi-masala.jpg?v=mufmh2xf"
+  },
+  {
+   "id": "black-coffee",
+   "food_id": "black-coffee",
+   "label": "Black coffee",
+   "label_hi": "ब्लैक कॉफ़ी",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 200,
+     "label": "1 cup"
+    },
+    {
+     "grams": 250,
+     "label": "1 glass"
+    }
+   ],
+   "default_serving": "1 cup",
+   "sort": 30,
+   "icon": "cup",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/black-coffee.jpg?v=mufmigcy"
+  },
+  {
+   "id": "boiled-egg",
+   "food_id": "ifct-egg-poultry-whole-boiled",
+   "label": "Boiled egg",
+   "label_hi": "उबला अंडा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 50,
+     "label": "1 egg"
+    },
+    {
+     "grams": 100,
+     "label": "2 eggs"
+    },
+    {
+     "grams": 150,
+     "label": "3 eggs"
+    }
+   ],
+   "default_serving": "1 egg",
+   "sort": 110,
+   "icon": "egg",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/boiled-egg.jpg?v=mufmfvlg"
+  },
+  {
+   "id": "bread-white",
+   "food_id": "bread-white",
+   "label": "Bread / toast (white)",
+   "label_hi": "ब्रेड / टोस्ट",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 30,
+     "label": "1 slice"
+    },
+    {
+     "grams": 60,
+     "label": "2 slices"
+    },
+    {
+     "grams": 120,
+     "label": "4 slices"
+    }
+   ],
+   "default_serving": "1 slice",
+   "sort": 90,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/bread-toast.jpg?v=mufmfuxe"
+  },
+  {
+   "id": "brown-rice",
+   "food_id": "brown-rice-cooked",
+   "label": "Brown rice (cooked)",
+   "label_hi": "ब्राउन राइस",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 250,
+     "label": "1 plate"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 50,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/brown-rice.jpg?v=mufmg8cp"
+  },
+  {
+   "id": "butter",
+   "food_id": "butter",
+   "label": "Butter",
+   "label_hi": "मक्खन",
+   "category": "fat",
+   "servings": [
+    {
+     "grams": 5,
+     "label": "1 tsp"
+    },
+    {
+     "grams": 2.5,
+     "label": "½ tsp"
+    },
+    {
+     "grams": 14,
+     "label": "1 tbsp"
+    }
+   ],
+   "default_serving": "1 tsp",
+   "sort": 50,
+   "icon": "drop",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/butter.jpg?v=mufmjdmc"
+  },
+  {
+   "id": "butter-chicken",
+   "food_id": "dish-butter-chicken",
+   "label": "Butter chicken",
+   "label_hi": "बटर चिकन",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 275,
+     "label": "1 serving"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 80,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/butter-chicken.jpg?v=mufmhg5y"
+  },
+  {
+   "id": "cabbage-sabzi",
+   "food_id": "dish-cabbage-and-peas",
+   "label": "Cabbage matar sabzi",
+   "label_hi": "पत्ता गोभी मटर",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 166,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 80,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/cabbage-matar-sabzi.jpg?v=mufmgx5u"
+  },
+  {
+   "id": "chaas",
+   "food_id": "buttermilk",
+   "label": "Chaas / buttermilk",
+   "label_hi": "छाछ",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 150,
+     "label": "1 cup"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 60,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chaas-buttermilk.jpg?v=mufmiheb"
+  },
+  {
+   "id": "chai",
+   "food_id": "tea",
+   "label": "Chai (milk + sugar)",
+   "label_hi": "चाय",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 cup"
+    },
+    {
+     "grams": 210,
+     "label": "1 large cup"
+    },
+    {
+     "grams": 250,
+     "label": "1 glass"
+    }
+   ],
+   "default_serving": "1 cup",
+   "sort": 10,
+   "icon": "cup",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chai.jpg?v=mufmie2k"
+  },
+  {
+   "id": "chana-boiled",
+   "food_id": "chana-black",
+   "label": "Kala chana (boiled)",
+   "label_hi": "उबला काला चना",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 75,
+     "label": "½ katori"
+    },
+    {
+     "grams": 150,
+     "label": "1 katori"
+    }
+   ],
+   "default_serving": "½ katori",
+   "sort": 190,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/kala-chana.jpg?v=mufmhtil"
+  },
+  {
+   "id": "chana-chaat",
+   "food_id": "dish-khatta-channa",
+   "label": "Chana chaat",
+   "label_hi": "चना चाट",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 120,
+     "label": "1 katori"
+    },
+    {
+     "grams": 157,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 30,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chana-chaat.jpg?v=mufmhzo4"
+  },
+  {
+   "id": "chana-dal",
+   "food_id": "dish-split-bengal-gram-dal",
+   "label": "Chana dal",
+   "label_hi": "चना दाल",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    },
+    {
+     "grams": 292,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 50,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chana-dal.jpg?v=mufmgiin"
+  },
+  {
+   "id": "chicken-biryani",
+   "food_id": "biryani-chicken",
+   "label": "Chicken biryani",
+   "label_hi": "चिकन बिरयानी",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 300,
+     "label": "1 plate"
+    },
+    {
+     "grams": 150,
+     "label": "1 katori"
+    }
+   ],
+   "default_serving": "1 plate",
+   "sort": 90,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chicken-biryani.jpg?v=mufmgb7v"
+  },
+  {
+   "id": "chicken-breast",
+   "food_id": "chicken-breast",
+   "label": "Chicken breast (grilled)",
+   "label_hi": "चिकन ब्रेस्ट",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "150 g"
+    },
+    {
+     "grams": 100,
+     "label": "100 g"
+    },
+    {
+     "grams": 200,
+     "label": "200 g"
+    }
+   ],
+   "default_serving": "150 g",
+   "sort": 60,
+   "icon": "flame",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chicken-breast.jpg?v=mufmhc6h"
+  },
+  {
+   "id": "chicken-curry",
+   "food_id": "dish-chicken-curry",
+   "label": "Chicken curry",
+   "label_hi": "चिकन करी",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori (2 pcs)"
+    },
+    {
+     "grams": 248,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori (2 pcs)",
+   "sort": 50,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chicken-curry.jpg?v=mufmhat7"
+  },
+  {
+   "id": "chikoo",
+   "food_id": "ifct-sapota",
+   "label": "Chikoo / sapota",
+   "label_hi": "चीकू",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 chikoo"
+    },
+    {
+     "grams": 200,
+     "label": "2 chikoo"
+    }
+   ],
+   "default_serving": "1 chikoo",
+   "sort": 110,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chikoo-sapota.jpg?v=mufmj699"
+  },
+  {
+   "id": "chips",
+   "food_id": "chips",
+   "label": "Potato chips",
+   "label_hi": "चिप्स",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 30,
+     "label": "1 small pack"
+    },
+    {
+     "grams": 52,
+     "label": "1 large pack"
+    }
+   ],
+   "default_serving": "1 small pack",
+   "sort": 130,
+   "icon": "flame",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/potato-chips.jpg?v=mufmia7c"
+  },
+  {
+   "id": "chocolate",
+   "food_id": "chocolate",
+   "label": "Chocolate (milk)",
+   "label_hi": "चॉकलेट",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 13,
+     "label": "1 small bar"
+    },
+    {
+     "grams": 20,
+     "label": "½ bar"
+    },
+    {
+     "grams": 40,
+     "label": "1 bar"
+    }
+   ],
+   "default_serving": "1 small bar",
+   "sort": 110,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chocolate.jpg?v=mufmncrd"
+  },
+  {
+   "id": "chole",
+   "food_id": "dish-chickpeas-curry",
+   "label": "Chole / chana masala",
+   "label_hi": "छोले",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 70,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chole-chana-masala.jpg?v=mufmgk19"
+  },
+  {
+   "id": "coconut-chutney",
+   "food_id": "dish-coconut-chutney",
+   "label": "Coconut chutney",
+   "label_hi": "नारियल चटनी",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 50,
+     "label": "2 tbsp"
+    },
+    {
+     "grams": 25,
+     "label": "1 tbsp"
+    },
+    {
+     "grams": 40,
+     "label": "¼ katori"
+    }
+   ],
+   "default_serving": "2 tbsp",
+   "sort": 220,
+   "icon": "spoon",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/coconut-chutney.jpg?v=mufmg5vn"
+  },
+  {
+   "id": "coconut-oil",
+   "food_id": "usda-oil-coconut",
+   "label": "Coconut oil",
+   "label_hi": "नारियल तेल",
+   "category": "fat",
+   "servings": [
+    {
+     "grams": 5,
+     "label": "1 tsp"
+    },
+    {
+     "grams": 2.5,
+     "label": "½ tsp"
+    },
+    {
+     "grams": 15,
+     "label": "1 tbsp"
+    }
+   ],
+   "default_serving": "1 tsp",
+   "sort": 40,
+   "icon": "drop",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/coconut-oil.jpg?v=mufmnesl"
+  },
+  {
+   "id": "coconut-water",
+   "food_id": "ifct-coconut-water",
+   "label": "Coconut water",
+   "label_hi": "नारियल पानी",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 tender coconut"
+    },
+    {
+     "grams": 150,
+     "label": "1 cup"
+    }
+   ],
+   "default_serving": "1 tender coconut",
+   "sort": 90,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/coconut-water.jpg?v=mufmbmuh"
+  },
+  {
+   "id": "cola",
+   "food_id": "coke",
+   "label": "Cola / soft drink",
+   "label_hi": "कोल्ड ड्रिंक",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 300,
+     "label": "1 can (300 ml)"
+    },
+    {
+     "grams": 600,
+     "label": "1 bottle (600 ml)"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 140,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/cola-soft-drink.jpg?v=mufmiohb"
+  },
+  {
+   "id": "cold-coffee",
+   "food_id": "dish-cold-coffee",
+   "label": "Cold coffee",
+   "label_hi": "कोल्ड कॉफ़ी",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 300,
+     "label": "1 large glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 70,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/cold-coffee.jpg?v=mufmihna"
+  },
+  {
+   "id": "cornflakes",
+   "food_id": "dish-cornflakes-with-milk",
+   "label": "Cornflakes with milk",
+   "label_hi": "कॉर्नफ्लेक्स दूध के साथ",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 278,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 139,
+     "label": "½ bowl"
+    }
+   ],
+   "default_serving": "1 bowl",
+   "sort": 130,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/cornflakes-with-milk.jpg?v=mufmfxkn"
+  },
+  {
+   "id": "curd",
+   "food_id": "curd",
+   "label": "Curd / dahi",
+   "label_hi": "दही",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 cup"
+    },
+    {
+     "grams": 30,
+     "label": "2 tbsp"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 140,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/curd-dahi.jpg?v=mufmhqos"
+  },
+  {
+   "id": "curd-rice",
+   "food_id": "dish-curd-rice",
+   "label": "Curd rice",
+   "label_hi": "दही चावल",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 216,
+     "label": "1 plate"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 130,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/curd-rice.jpg?v=mufmgdth"
+  },
+  {
+   "id": "dal-makhani",
+   "food_id": "dish-moti-mahal-dal",
+   "label": "Dal makhani",
+   "label_hi": "दाल मखनी",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 287,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 110,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/dal-makhani.jpg?v=mufmglo9"
+  },
+  {
+   "id": "dal-palak",
+   "food_id": "dish-arhar-with-spinach",
+   "label": "Dal palak",
+   "label_hi": "दाल पालक",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 120,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/dal-palak.jpg?v=mufmgo0j"
+  },
+  {
+   "id": "dal-tadka",
+   "food_id": "dal-cooked",
+   "label": "Dal tadka / dal fry",
+   "label_hi": "दाल तड़का",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 10,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/dal-tadka-dal-fry.jpg?v=mufmgera"
+  },
+  {
+   "id": "dates",
+   "food_id": "dates",
+   "label": "Dates (khajur)",
+   "label_hi": "खजूर",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 8,
+     "label": "1 date"
+    },
+    {
+     "grams": 24,
+     "label": "3 dates"
+    },
+    {
+     "grams": 40,
+     "label": "5 dates"
+    }
+   ],
+   "default_serving": "1 date",
+   "sort": 120,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/dates.jpg?v=mufmj6pr"
+  },
+  {
+   "id": "dhokla",
+   "food_id": "dish-dhokla",
+   "label": "Dhokla",
+   "label_hi": "ढोकला",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 40,
+     "label": "1 piece"
+    },
+    {
+     "grams": 80,
+     "label": "2 pieces"
+    },
+    {
+     "grams": 160,
+     "label": "4 pieces"
+    }
+   ],
+   "default_serving": "1 piece",
+   "sort": 190,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/dhokla.jpg?v=mufmg22d"
+  },
+  {
+   "id": "egg-bhurji",
+   "food_id": "dish-scrambled-egg",
+   "label": "Egg bhurji / scrambled",
+   "label_hi": "अंडा भुर्जी",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 70,
+     "label": "1 egg"
+    },
+    {
+     "grams": 140,
+     "label": "2 eggs"
+    },
+    {
+     "grams": 210,
+     "label": "3 eggs"
+    }
+   ],
+   "default_serving": "1 egg",
+   "sort": 100,
+   "icon": "egg",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/egg-bhurji-scrambled.jpg?v=mufmhimi"
+  },
+  {
+   "id": "egg-curry",
+   "food_id": "dish-egg-curry",
+   "label": "Egg curry",
+   "label_hi": "अंडा करी",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 152,
+     "label": "1 katori"
+    },
+    {
+     "grams": 303,
+     "label": "2 katori"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 90,
+   "icon": "egg",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/egg-curry.jpg?v=mufmhmt9"
+  },
+  {
+   "id": "egg-white",
+   "food_id": "ifct-egg-poultry-white-boiled",
+   "label": "Egg white",
+   "label_hi": "अंडे की सफ़ेदी",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 33,
+     "label": "1 egg white"
+    },
+    {
+     "grams": 66,
+     "label": "2 egg whites"
+    },
+    {
+     "grams": 132,
+     "label": "4 egg whites"
+    }
+   ],
+   "default_serving": "1 egg white",
+   "sort": 20,
+   "icon": "egg",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/egg-white.jpg?v=mufmh9e1"
+  },
+  {
+   "id": "egg-whole",
+   "food_id": "ifct-egg-poultry-whole-raw",
+   "label": "Egg (whole)",
+   "label_hi": "अंडा",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 50,
+     "label": "1 egg"
+    },
+    {
+     "grams": 100,
+     "label": "2 eggs"
+    },
+    {
+     "grams": 150,
+     "label": "3 eggs"
+    }
+   ],
+   "default_serving": "1 egg",
+   "sort": 10,
+   "icon": "egg",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/egg.jpg?v=mufmh7i2"
+  },
+  {
+   "id": "filter-coffee",
+   "food_id": "coffee-milk",
+   "label": "Filter coffee / coffee with milk",
+   "label_hi": "फ़िल्टर कॉफ़ी",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 tumbler"
+    },
+    {
+     "grams": 200,
+     "label": "1 cup"
+    },
+    {
+     "grams": 250,
+     "label": "1 glass"
+    }
+   ],
+   "default_serving": "1 tumbler",
+   "sort": 20,
+   "icon": "cup",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/filter-coffee-coffee-with-milk.jpg?v=mufmifmr"
+  },
+  {
+   "id": "fish-curry",
+   "food_id": "dish-fish-curry",
+   "label": "Fish curry",
+   "label_hi": "मछली करी",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 254,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 110,
+   "icon": "fish",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/fish-curry.jpg?v=mufmhjs3"
+  },
+  {
+   "id": "fruit-juice",
+   "food_id": "juice",
+   "label": "Fruit juice",
+   "label_hi": "फलों का रस",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 150,
+     "label": "1 cup"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 130,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/fruit-juice.jpg?v=mufmim8v"
+  },
+  {
+   "id": "gajar-halwa",
+   "food_id": "dish-carrot-halwa",
+   "label": "Gajar halwa",
+   "label_hi": "गाजर का हलवा",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 katori"
+    },
+    {
+     "grams": 168,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 50,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/gajar-halwa.jpg?v=mufmirlf"
+  },
+  {
+   "id": "ghee",
+   "food_id": "ghee",
+   "label": "Ghee",
+   "label_hi": "घी",
+   "category": "fat",
+   "servings": [
+    {
+     "grams": 5,
+     "label": "1 tsp"
+    },
+    {
+     "grams": 2.5,
+     "label": "½ tsp"
+    },
+    {
+     "grams": 15,
+     "label": "1 tbsp"
+    }
+   ],
+   "default_serving": "1 tsp",
+   "sort": 10,
+   "icon": "drop",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/ghee.jpg?v=mufmnihh"
+  },
+  {
+   "id": "gobi-matar",
+   "food_id": "dish-cauliflower-pea-and-potato-bhujia",
+   "label": "Gobi matar",
+   "label_hi": "गोभी मटर",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 191,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 130,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/gobi-matar.jpg?v=mufmh019"
+  },
+  {
+   "id": "grapes",
+   "food_id": "ifct-grapes-seedless-round-green",
+   "label": "Grapes",
+   "label_hi": "अंगूर",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 cup"
+    },
+    {
+     "grams": 75,
+     "label": "½ cup"
+    }
+   ],
+   "default_serving": "1 cup",
+   "sort": 80,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/grapes.jpg?v=mufmj5ms"
+  },
+  {
+   "id": "greek-yogurt",
+   "food_id": "greek-yogurt",
+   "label": "Greek yogurt",
+   "label_hi": "ग्रीक योगर्ट",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 small tub"
+    },
+    {
+     "grams": 170,
+     "label": "1 cup"
+    }
+   ],
+   "default_serving": "1 small tub",
+   "sort": 150,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/greek-yogurt.jpg?v=mufmhpb7"
+  },
+  {
+   "id": "guava",
+   "food_id": "ifct-guava-white-flesh",
+   "label": "Guava",
+   "label_hi": "अमरूद",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 120,
+     "label": "1 guava"
+    },
+    {
+     "grams": 240,
+     "label": "2 guavas"
+    }
+   ],
+   "default_serving": "1 guava",
+   "sort": 70,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/guava.jpg?v=mufmj2mw"
+  },
+  {
+   "id": "gulab-jamun",
+   "food_id": "gulab-jamun",
+   "label": "Gulab jamun",
+   "label_hi": "गुलाब जामुन",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 40,
+     "label": "1 piece"
+    },
+    {
+     "grams": 80,
+     "label": "2 pieces"
+    }
+   ],
+   "default_serving": "1 piece",
+   "sort": 10,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/gulab-jamun.jpg?v=mufmioxb"
+  },
+  {
+   "id": "ice-cream",
+   "food_id": "dish-vanilla-ice-cream-without-egg",
+   "label": "Ice cream (vanilla)",
+   "label_hi": "आइसक्रीम",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 70,
+     "label": "1 scoop"
+    },
+    {
+     "grams": 140,
+     "label": "2 scoops"
+    },
+    {
+     "grams": 157,
+     "label": "1 cup"
+    }
+   ],
+   "default_serving": "1 scoop",
+   "sort": 100,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/ice-cream.jpg?v=mufmivy2"
+  },
+  {
+   "id": "idli",
+   "food_id": "dish-idli",
+   "label": "Idli",
+   "label_hi": "इडली",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 40,
+     "label": "1 idli"
+    },
+    {
+     "grams": 80,
+     "label": "2 idli"
+    },
+    {
+     "grams": 120,
+     "label": "3 idli"
+    },
+    {
+     "grams": 160,
+     "label": "4 idli"
+    }
+   ],
+   "default_serving": "1 idli",
+   "sort": 30,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/idli.jpg?v=mufmes9s"
+  },
+  {
+   "id": "jaggery",
+   "food_id": "ifct-jaggery-cane",
+   "label": "Jaggery (gud)",
+   "label_hi": "गुड़",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 5,
+     "label": "1 tsp"
+    },
+    {
+     "grams": 15,
+     "label": "1 tbsp"
+    },
+    {
+     "grams": 10,
+     "label": "1 piece"
+    }
+   ],
+   "default_serving": "1 tsp",
+   "sort": 140,
+   "icon": "spoon",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/jaggery.jpg?v=mufmiyfs"
+  },
+  {
+   "id": "jeera-rice",
+   "food_id": "dish-cumin-pulao",
+   "label": "Jeera rice",
+   "label_hi": "जीरा चावल",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 271,
+     "label": "1 plate"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 40,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/jeera-rice.jpg?v=mufmg87x"
+  },
+  {
+   "id": "kadai-paneer",
+   "food_id": "dish-kadhai-paneer",
+   "label": "Kadai paneer",
+   "label_hi": "कड़ाही पनीर",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 318,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 110,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/kadai-paneer.jpg?v=mufmgybj"
+  },
+  {
+   "id": "kaju-katli",
+   "food_id": "dish-cashewnut-burfi",
+   "label": "Kaju katli",
+   "label_hi": "काजू कतली",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 15,
+     "label": "1 piece"
+    },
+    {
+     "grams": 30,
+     "label": "2 pieces"
+    },
+    {
+     "grams": 60,
+     "label": "4 pieces"
+    }
+   ],
+   "default_serving": "1 piece",
+   "sort": 90,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/kaju-katli.jpg?v=mufmiu1i"
+  },
+  {
+   "id": "kala-chana",
+   "food_id": "dish-black-channa-curry",
+   "label": "Kala chana curry",
+   "label_hi": "काला चना",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 80,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/kala-chana-curry.jpg?v=mufmgjk2"
+  },
+  {
+   "id": "karela",
+   "food_id": "dish-stuffed-bittergourd",
+   "label": "Karela (bharwa)",
+   "label_hi": "भरवां करेला",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 157,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 75,
+     "label": "½ katori"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 140,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/karela.jpg?v=mufmh0tz"
+  },
+  {
+   "id": "kesari-bath",
+   "food_id": "dish-kesari-bath",
+   "label": "Kesari bath / sheera",
+   "label_hi": "केसरी भात / शीरा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 katori"
+    },
+    {
+     "grams": 177,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 140,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/kesari-bath-sheera.jpg?v=mufmfxbi"
+  },
+  {
+   "id": "kheer",
+   "food_id": "dish-phirni",
+   "label": "Kheer / phirni",
+   "label_hi": "खीर",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 290,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 30,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/kheer-phirni.jpg?v=mufmiq7x"
+  },
+  {
+   "id": "khichdi",
+   "food_id": "dish-vegetable-khichdi",
+   "label": "Khichdi",
+   "label_hi": "खिचड़ी",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 60,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/khichdi.jpg?v=mufmg9id"
+  },
+  {
+   "id": "kiwi",
+   "food_id": "usda-kiwifruit-green-raw",
+   "label": "Kiwi",
+   "label_hi": "कीवी",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 69,
+     "label": "1 kiwi"
+    },
+    {
+     "grams": 138,
+     "label": "2 kiwis"
+    }
+   ],
+   "default_serving": "1 kiwi",
+   "sort": 150,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/kiwi.jpg?v=mufmj8mo"
+  },
+  {
+   "id": "lassi",
+   "food_id": "dish-sweet-lassi",
+   "label": "Lassi (sweet)",
+   "label_hi": "लस्सी",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 443,
+     "label": "1 tall glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 50,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/lassi.jpg?v=mufmigtj"
+  },
+  {
+   "id": "lemon-rice",
+   "food_id": "dish-lemon-rice",
+   "label": "Lemon rice",
+   "label_hi": "नींबू चावल",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 319,
+     "label": "1 plate"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 140,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/lemon-rice.jpg?v=mufmgebn"
+  },
+  {
+   "id": "lobia",
+   "food_id": "dish-lobia-curry",
+   "label": "Lobia curry",
+   "label_hi": "लोबिया",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 140,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/lobia-curry.jpg?v=mufmgpfa"
+  },
+  {
+   "id": "maggi",
+   "food_id": "noodles-cooked",
+   "label": "Maggi (cooked)",
+   "label_hi": "मैगी",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 pack"
+    },
+    {
+     "grams": 500,
+     "label": "2 packs"
+    },
+    {
+     "grams": 125,
+     "label": "½ pack"
+    }
+   ],
+   "default_serving": "1 pack",
+   "sort": 70,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/maggi.jpg?v=mufmcqjh"
+  },
+  {
+   "id": "makki-roti",
+   "food_id": "dish-makki-ki-roti",
+   "label": "Makki ki roti",
+   "label_hi": "मक्की की रोटी",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 85,
+     "label": "1 roti"
+    },
+    {
+     "grams": 170,
+     "label": "2 roti"
+    }
+   ],
+   "default_serving": "1 roti",
+   "sort": 120,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/makki-ki-roti.jpg?v=mufmgcn0"
+  },
+  {
+   "id": "mango",
+   "food_id": "mango",
+   "label": "Mango",
+   "label_hi": "आम",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 200,
+     "label": "1 mango"
+    },
+    {
+     "grams": 100,
+     "label": "½ mango"
+    },
+    {
+     "grams": 150,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 mango",
+   "sort": 40,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/mango.jpg?v=mufmj0oq"
+  },
+  {
+   "id": "mango-shake",
+   "food_id": "dish-mango-milkshake",
+   "label": "Mango shake",
+   "label_hi": "मैंगो शेक",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 356,
+     "label": "1 tall glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 100,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/mango-shake.jpg?v=mufminyw"
+  },
+  {
+   "id": "marie-biscuit",
+   "food_id": "biscuit",
+   "label": "Marie / Good Day biscuit",
+   "label_hi": "मैरी बिस्कुट",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 10,
+     "label": "1 biscuit"
+    },
+    {
+     "grams": 20,
+     "label": "2 biscuits"
+    },
+    {
+     "grams": 40,
+     "label": "4 biscuits"
+    }
+   ],
+   "default_serving": "1 biscuit",
+   "sort": 50,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/marie-good-day-biscuit.jpg?v=mufmi16j"
+  },
+  {
+   "id": "masala-dosa",
+   "food_id": "dish-masala-dosa",
+   "label": "Masala dosa",
+   "label_hi": "मसाला डोसा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 210,
+     "label": "1 masala dosa"
+    },
+    {
+     "grams": 105,
+     "label": "½ masala dosa"
+    }
+   ],
+   "default_serving": "1 masala dosa",
+   "sort": 50,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/masala-dosa.jpg?v=mufmfq8x"
+  },
+  {
+   "id": "masoor-dal",
+   "food_id": "dal-cooked",
+   "label": "Masoor dal",
+   "label_hi": "मसूर दाल",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 40,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/masoor-dal.jpg?v=mufmgh3h"
+  },
+  {
+   "id": "matar-paneer",
+   "food_id": "dish-pea-paneer-curry",
+   "label": "Matar paneer",
+   "label_hi": "मटर पनीर",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 277,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 90,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/matar-paneer.jpg?v=mufmgwsf"
+  },
+  {
+   "id": "medu-vada",
+   "food_id": "vada",
+   "label": "Medu vada",
+   "label_hi": "मेदू वड़ा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 60,
+     "label": "1 vada"
+    },
+    {
+     "grams": 120,
+     "label": "2 vada"
+    },
+    {
+     "grams": 180,
+     "label": "3 vada"
+    }
+   ],
+   "default_serving": "1 vada",
+   "sort": 150,
+   "icon": "flame",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/medu-vada.jpg?v=mufmg41l"
+  },
+  {
+   "id": "methi-aloo",
+   "food_id": "dish-potato-fenugreek",
+   "label": "Aloo methi",
+   "label_hi": "आलू मेथी",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 204,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 120,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/aloo-methi.jpg?v=mufmgzr7"
+  },
+  {
+   "id": "milk-buffalo",
+   "food_id": "milk-buffalo",
+   "label": "Milk (buffalo)",
+   "label_hi": "भैंस का दूध",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 150,
+     "label": "1 cup"
+    },
+    {
+     "grams": 125,
+     "label": "½ glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 44,
+   "icon": "glass",
+   "image_url": null
+  },
+  {
+   "id": "milk-double-toned",
+   "food_id": "milk-double-toned",
+   "label": "Milk (double toned)",
+   "label_hi": "डबल टोंड दूध",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 150,
+     "label": "1 cup"
+    },
+    {
+     "grams": 125,
+     "label": "½ glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 42,
+   "icon": "glass",
+   "image_url": null
+  },
+  {
+   "id": "milk-full",
+   "food_id": "milk-full",
+   "label": "Milk (full cream)",
+   "label_hi": "फुल क्रीम दूध / मलाई वाला दूध",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 150,
+     "label": "1 cup"
+    },
+    {
+     "grams": 125,
+     "label": "½ glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 40,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/milk.jpg?v=mufmhw7r"
+  },
+  {
+   "id": "milk-skimmed",
+   "food_id": "milk-skimmed",
+   "label": "Milk (skimmed)",
+   "label_hi": "स्किम्ड दूध",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 150,
+     "label": "1 cup"
+    },
+    {
+     "grams": 125,
+     "label": "½ glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 43,
+   "icon": "glass",
+   "image_url": null
+  },
+  {
+   "id": "milk-toned",
+   "food_id": "milk-toned",
+   "label": "Milk (toned)",
+   "label_hi": "टोंड दूध",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 150,
+     "label": "1 cup"
+    },
+    {
+     "grams": 125,
+     "label": "½ glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 41,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/milk.jpg?v=mufmhw7r"
+  },
+  {
+   "id": "mixed-veg",
+   "food_id": "sabzi-mixed",
+   "label": "Mixed veg sabzi",
+   "label_hi": "मिक्स वेज",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 40,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/mixed-veg-sabzi.jpg?v=mufmgrvy"
+  },
+  {
+   "id": "momos",
+   "food_id": "momos",
+   "label": "Momos (steamed)",
+   "label_hi": "मोमोज़",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 35,
+     "label": "1 momo"
+    },
+    {
+     "grams": 210,
+     "label": "6 momos"
+    },
+    {
+     "grams": 350,
+     "label": "10 momos"
+    }
+   ],
+   "default_serving": "1 momo",
+   "sort": 150,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/momos.jpg?v=mufmicuf"
+  },
+  {
+   "id": "moong-dal",
+   "food_id": "dal-cooked",
+   "label": "Moong dal",
+   "label_hi": "मूंग दाल",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 30,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/moong-dal.jpg?v=mufmghca"
+  },
+  {
+   "id": "mosambi",
+   "food_id": "ifct-lime-sweet-pulp",
+   "label": "Mosambi / sweet lime",
+   "label_hi": "मौसंबी",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 mosambi"
+    },
+    {
+     "grams": 300,
+     "label": "2 mosambi"
+    }
+   ],
+   "default_serving": "1 mosambi",
+   "sort": 60,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/mosambi-sweet-lime.jpg?v=mufmj2uz"
+  },
+  {
+   "id": "murmura",
+   "food_id": "ifct-rice-puffed",
+   "label": "Murmura / puffed rice",
+   "label_hi": "मुरमुरा",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 30,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 60,
+     "label": "2 bowls"
+    }
+   ],
+   "default_serving": "1 bowl",
+   "sort": 40,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/murmura-puffed-rice.jpg?v=mufmi17t"
+  },
+  {
+   "id": "mushroom-matar",
+   "food_id": "dish-mushroom-matar",
+   "label": "Mushroom matar",
+   "label_hi": "मशरूम मटर",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 263,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 190,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/mushroom-matar.jpg?v=mufmh4pw"
+  },
+  {
+   "id": "muskmelon",
+   "food_id": "ifct-musk-melon-orange-flesh",
+   "label": "Muskmelon",
+   "label_hi": "खरबूजा",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 300,
+     "label": "2 bowls"
+    }
+   ],
+   "default_serving": "1 bowl",
+   "sort": 130,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/muskmelon.jpg?v=mufmj72b"
+  },
+  {
+   "id": "mustard-oil",
+   "food_id": "usda-oil-mustard",
+   "label": "Mustard oil",
+   "label_hi": "सरसों का तेल",
+   "category": "fat",
+   "servings": [
+    {
+     "grams": 5,
+     "label": "1 tsp"
+    },
+    {
+     "grams": 2.5,
+     "label": "½ tsp"
+    },
+    {
+     "grams": 15,
+     "label": "1 tbsp"
+    }
+   ],
+   "default_serving": "1 tsp",
+   "sort": 30,
+   "icon": "drop",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/mustard-oil.jpg?v=mufmna9y"
+  },
+  {
+   "id": "mutton-biryani",
+   "food_id": "dish-mutton-biryani",
+   "label": "Mutton biryani",
+   "label_hi": "मटन बिरयानी",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 208,
+     "label": "1 plate"
+    },
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "1 large plate"
+    }
+   ],
+   "default_serving": "1 plate",
+   "sort": 100,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/mutton-biryani.jpg?v=mufmgbaa"
+  },
+  {
+   "id": "mutton-curry",
+   "food_id": "dish-roghan-josh",
+   "label": "Mutton curry / rogan josh",
+   "label_hi": "मटन करी",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 236,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 130,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/mutton-curry-rogan-josh.jpg?v=mufmho5t"
+  },
+  {
+   "id": "naan",
+   "food_id": "dish-naan",
+   "label": "Naan",
+   "label_hi": "नान",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 53,
+     "label": "1 naan"
+    },
+    {
+     "grams": 106,
+     "label": "2 naan"
+    },
+    {
+     "grams": 90,
+     "label": "1 large naan"
+    }
+   ],
+   "default_serving": "1 naan",
+   "sort": 110,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/naan.jpg?v=mufmgcyn"
+  },
+  {
+   "id": "nimbu-pani",
+   "food_id": "dish-lemonade",
+   "label": "Nimbu pani (sweet)",
+   "label_hi": "नींबू पानी",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 349,
+     "label": "1 large glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 80,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/nimbu-pani.jpg?v=mufmijfg"
+  },
+  {
+   "id": "oats",
+   "food_id": "dish-oatmeal-porridge",
+   "label": "Oats porridge",
+   "label_hi": "ओट्स दलिया",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 250,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 398,
+     "label": "1 large bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 120,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/oats-porridge.jpg?v=mufmfwby"
+  },
+  {
+   "id": "olive-oil",
+   "food_id": "oil",
+   "label": "Olive oil",
+   "label_hi": "जैतून का तेल",
+   "category": "fat",
+   "servings": [
+    {
+     "grams": 5,
+     "label": "1 tsp"
+    },
+    {
+     "grams": 2.5,
+     "label": "½ tsp"
+    },
+    {
+     "grams": 15,
+     "label": "1 tbsp"
+    }
+   ],
+   "default_serving": "1 tsp",
+   "sort": 60,
+   "icon": "drop",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/olive-oil.jpg?v=mufmn72i"
+  },
+  {
+   "id": "omelette",
+   "food_id": "ifct-egg-poultry-omlet",
+   "label": "Omelette",
+   "label_hi": "ऑमलेट",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 60,
+     "label": "1 egg"
+    },
+    {
+     "grams": 120,
+     "label": "2 eggs"
+    },
+    {
+     "grams": 180,
+     "label": "3 eggs"
+    }
+   ],
+   "default_serving": "1 egg",
+   "sort": 100,
+   "icon": "egg",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/omelette.jpg?v=mufmfu78"
+  },
+  {
+   "id": "orange",
+   "food_id": "ifct-orange-pulp",
+   "label": "Orange",
+   "label_hi": "संतरा",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 130,
+     "label": "1 orange"
+    },
+    {
+     "grams": 260,
+     "label": "2 oranges"
+    }
+   ],
+   "default_serving": "1 orange",
+   "sort": 50,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/orange.jpg?v=mufmj1l3"
+  },
+  {
+   "id": "pakora",
+   "food_id": "pakora",
+   "label": "Pakora / bhajji",
+   "label_hi": "पकौड़ा",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 30,
+     "label": "1 piece"
+    },
+    {
+     "grams": 120,
+     "label": "4 pieces"
+    },
+    {
+     "grams": 180,
+     "label": "6 pieces"
+    }
+   ],
+   "default_serving": "1 piece",
+   "sort": 20,
+   "icon": "flame",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/pakora-bhajji.jpg?v=mufmhzq5"
+  },
+  {
+   "id": "palak-paneer",
+   "food_id": "dish-spinach-paneer",
+   "label": "Palak paneer",
+   "label_hi": "पालक पनीर",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 296,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 30,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/palak-paneer.jpg?v=mufmgu8m"
+  },
+  {
+   "id": "panchmel-dal",
+   "food_id": "dish-panchmel-dal",
+   "label": "Panchmel dal",
+   "label_hi": "पंचमेल दाल",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 301,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 130,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/panchmel-dal.jpg?v=mufmgn8g"
+  },
+  {
+   "id": "paneer",
+   "food_id": "ifct-paneer",
+   "label": "Paneer (raw)",
+   "label_hi": "पनीर",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "100 g"
+    },
+    {
+     "grams": 50,
+     "label": "50 g"
+    },
+    {
+     "grams": 200,
+     "label": "200 g pack"
+    }
+   ],
+   "default_serving": "100 g",
+   "sort": 30,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/paneer.jpg?v=mufmh9vb"
+  },
+  {
+   "id": "paneer-butter-masala",
+   "food_id": "dish-paneer-in-butter-sauce",
+   "label": "Paneer butter masala",
+   "label_hi": "पनीर बटर मसाला",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 157,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 100,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/paneer-butter-masala.jpg?v=mufmgy28"
+  },
+  {
+   "id": "paneer-tikka",
+   "food_id": "dish-paneer-shaslik",
+   "label": "Paneer tikka / shashlik",
+   "label_hi": "पनीर टिक्का",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 439,
+     "label": "1 plate"
+    },
+    {
+     "grams": 220,
+     "label": "½ plate"
+    }
+   ],
+   "default_serving": "1 plate",
+   "sort": 220,
+   "icon": "flame",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/paneer-tikka-shashlik.jpg?v=mufmhypk"
+  },
+  {
+   "id": "papaya",
+   "food_id": "papaya",
+   "label": "Papaya",
+   "label_hi": "पपीता",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 300,
+     "label": "2 bowls"
+    }
+   ],
+   "default_serving": "1 bowl",
+   "sort": 30,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/papaya.jpg?v=mufmj1gk"
+  },
+  {
+   "id": "parle-g",
+   "food_id": "biscuit",
+   "label": "Parle-G",
+   "label_hi": "पारले-जी बिस्कुट",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 50,
+     "label": "1 pack (50 g)"
+    },
+    {
+     "grams": 25,
+     "label": "½ pack"
+    }
+   ],
+   "default_serving": "1 pack (50 g)",
+   "sort": 60,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/parle-g.jpg?v=mufmibxv"
+  },
+  {
+   "id": "pav",
+   "food_id": "bread-white",
+   "label": "Pav / bun",
+   "label_hi": "पाव",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 40,
+     "label": "1 pav"
+    },
+    {
+     "grams": 80,
+     "label": "2 pav"
+    }
+   ],
+   "default_serving": "1 pav",
+   "sort": 110,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/pav-bun.jpg?v=mufmi6kh"
+  },
+  {
+   "id": "pav-bhaji",
+   "food_id": "dish-pav-bhaji",
+   "label": "Pav bhaji (bhaji only)",
+   "label_hi": "पाव भाजी",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 100,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/pav-bhaji.jpg?v=mufmi4u5"
+  },
+  {
+   "id": "payasam",
+   "food_id": "dish-vermicelli-kheer",
+   "label": "Semiya payasam",
+   "label_hi": "सेवइयां खीर / पायसम",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 232,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 120,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/semiya-payasam.jpg?v=mufmix4q"
+  },
+  {
+   "id": "peanut-butter",
+   "food_id": "peanut-butter",
+   "label": "Peanut butter",
+   "label_hi": "पीनट बटर",
+   "category": "fat",
+   "servings": [
+    {
+     "grams": 15,
+     "label": "1 tbsp"
+    },
+    {
+     "grams": 2.5,
+     "label": "½ tsp"
+    },
+    {
+     "grams": 5,
+     "label": "1 tsp"
+    },
+    {
+     "grams": 30,
+     "label": "2 tbsp"
+    }
+   ],
+   "default_serving": "1 tbsp",
+   "sort": 70,
+   "icon": "spoon",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/peanut-butter.jpg?v=mufmjeze"
+  },
+  {
+   "id": "peanuts",
+   "food_id": "ifct-ground-nut",
+   "label": "Peanuts",
+   "label_hi": "मूंगफली",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 30,
+     "label": "1 handful"
+    },
+    {
+     "grams": 10,
+     "label": "1 tbsp"
+    },
+    {
+     "grams": 60,
+     "label": "2 handfuls"
+    }
+   ],
+   "default_serving": "1 handful",
+   "sort": 200,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/peanuts.jpg?v=mufmhvv6"
+  },
+  {
+   "id": "pesarattu",
+   "food_id": "dish-moong-bean-dosa",
+   "label": "Pesarattu (moong dosa)",
+   "label_hi": "पेसरट्टू",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 pesarattu"
+    },
+    {
+     "grams": 200,
+     "label": "2 pesarattu"
+    }
+   ],
+   "default_serving": "1 pesarattu",
+   "sort": 200,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/pesarattu.jpg?v=mufmg35r"
+  },
+  {
+   "id": "phulka",
+   "food_id": "dish-chapati",
+   "label": "Phulka (no ghee)",
+   "label_hi": "फुल्का",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 36,
+     "label": "1 phulka"
+    },
+    {
+     "grams": 72,
+     "label": "2 phulka"
+    },
+    {
+     "grams": 108,
+     "label": "3 phulka"
+    },
+    {
+     "grams": 144,
+     "label": "4 phulka"
+    }
+   ],
+   "default_serving": "1 phulka",
+   "sort": 20,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/phulka.jpg?v=mufmg6ey"
+  },
+  {
+   "id": "pineapple",
+   "food_id": "ifct-pineapple",
+   "label": "Pineapple",
+   "label_hi": "अनानास",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 80,
+     "label": "1 slice"
+    }
+   ],
+   "default_serving": "1 bowl",
+   "sort": 140,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/pineapple.jpg?v=mufmj7le"
+  },
+  {
+   "id": "plain-dosa",
+   "food_id": "dosa",
+   "label": "Plain dosa",
+   "label_hi": "सादा डोसा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 dosa"
+    },
+    {
+     "grams": 200,
+     "label": "2 dosa"
+    }
+   ],
+   "default_serving": "1 dosa",
+   "sort": 40,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/plain-dosa.jpg?v=mufmfq5k"
+  },
+  {
+   "id": "plain-paratha",
+   "food_id": "dish-plain-parantha",
+   "label": "Plain paratha",
+   "label_hi": "सादा पराठा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 56,
+     "label": "1 paratha"
+    },
+    {
+     "grams": 112,
+     "label": "2 paratha"
+    },
+    {
+     "grams": 167,
+     "label": "3 paratha"
+    }
+   ],
+   "default_serving": "1 paratha",
+   "sort": 80,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/plain-paratha.jpg?v=mufmfslt"
+  },
+  {
+   "id": "poha",
+   "food_id": "dish-vegetable-poha",
+   "label": "Poha",
+   "label_hi": "पोहा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 plate"
+    },
+    {
+     "grams": 98,
+     "label": "1 small bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 10,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/poha.jpg?v=mufmfoko"
+  },
+  {
+   "id": "poha-chivda",
+   "food_id": "dish-rice-flakes-and-roasted-channa",
+   "label": "Poha chivda (roasted)",
+   "label_hi": "पोहा चिवड़ा",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 30,
+     "label": "1 handful"
+    },
+    {
+     "grams": 50,
+     "label": "1 small bowl"
+    }
+   ],
+   "default_serving": "1 handful",
+   "sort": 80,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/poha-chivda.jpg?v=mufmi2ns"
+  },
+  {
+   "id": "pomegranate",
+   "food_id": "ifct-pomegranate-maroon-seeds",
+   "label": "Pomegranate",
+   "label_hi": "अनार",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 cup seeds"
+    },
+    {
+     "grams": 75,
+     "label": "½ cup seeds"
+    }
+   ],
+   "default_serving": "1 cup seeds",
+   "sort": 100,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/pomegranate.jpg?v=mufmj5fp"
+  },
+  {
+   "id": "prawn-curry",
+   "food_id": "dish-prawn-curry",
+   "label": "Prawn curry",
+   "label_hi": "झींगा करी",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 286,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 120,
+   "icon": "fish",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/prawn-curry.jpg?v=mufmhl36"
+  },
+  {
+   "id": "r-biryani",
+   "food_id": "biryani-chicken",
+   "label": "Chicken biryani",
+   "label_hi": null,
+   "category": "restaurant",
+   "servings": [
+    {
+     "grams": 300,
+     "label": "1 plate"
+    },
+    {
+     "grams": 150,
+     "label": "1 katori"
+    }
+   ],
+   "default_serving": "1 plate",
+   "sort": 10,
+   "icon": null,
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/chicken-biryani.jpg?v=mufmgb7v"
+  },
+  {
+   "id": "r-burger",
+   "food_id": "burger",
+   "label": "Burger",
+   "label_hi": null,
+   "category": "restaurant",
+   "servings": [
+    {
+     "grams": 200,
+     "label": "1 burger"
+    }
+   ],
+   "default_serving": "1 burger",
+   "sort": 80,
+   "icon": null,
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/burger.jpg?v=mufmjj3a"
+  },
+  {
+   "id": "r-butter-chicken",
+   "food_id": "dish-butter-chicken",
+   "label": "Butter chicken",
+   "label_hi": null,
+   "category": "restaurant",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 275,
+     "label": "1 serving"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 20,
+   "icon": null,
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/butter-chicken.jpg?v=mufmhg5y"
+  },
+  {
+   "id": "r-fries",
+   "food_id": "fries",
+   "label": "French fries",
+   "label_hi": null,
+   "category": "restaurant",
+   "servings": [
+    {
+     "grams": 120,
+     "label": "1 regular"
+    },
+    {
+     "grams": 160,
+     "label": "1 large"
+    }
+   ],
+   "default_serving": "1 regular",
+   "sort": 90,
+   "icon": null,
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/french-fries.jpg?v=mufmjix7"
+  },
+  {
+   "id": "r-masala-dosa",
+   "food_id": "dish-masala-dosa",
+   "label": "Masala dosa",
+   "label_hi": null,
+   "category": "restaurant",
+   "servings": [
+    {
+     "grams": 210,
+     "label": "1 masala dosa"
+    }
+   ],
+   "default_serving": "1 masala dosa",
+   "sort": 40,
+   "icon": null,
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/masala-dosa.jpg?v=mufmfq8x"
+  },
+  {
+   "id": "r-momos",
+   "food_id": "momos",
+   "label": "Momos",
+   "label_hi": null,
+   "category": "restaurant",
+   "servings": [
+    {
+     "grams": 35,
+     "label": "1 momo"
+    },
+    {
+     "grams": 210,
+     "label": "6 momos"
+    },
+    {
+     "grams": 350,
+     "label": "10 momos"
+    }
+   ],
+   "default_serving": "1 momo",
+   "sort": 60,
+   "icon": null,
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/momos.jpg?v=mufmicuf"
+  },
+  {
+   "id": "r-paneer-butter-masala",
+   "food_id": "dish-paneer-in-butter-sauce",
+   "label": "Paneer butter masala",
+   "label_hi": null,
+   "category": "restaurant",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 250,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 30,
+   "icon": null,
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/paneer-butter-masala.jpg?v=mufmgy28"
+  },
+  {
+   "id": "r-pav-bhaji",
+   "food_id": "dish-pav-bhaji",
+   "label": "Pav bhaji (bhaji)",
+   "label_hi": null,
+   "category": "restaurant",
+   "servings": [
+    {
+     "grams": 200,
+     "label": "1 plate bhaji"
+    },
+    {
+     "grams": 150,
+     "label": "1 katori"
+    }
+   ],
+   "default_serving": "1 plate bhaji",
+   "sort": 50,
+   "icon": null,
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/pav-bhaji.jpg?v=mufmi4u5"
+  },
+  {
+   "id": "r-pizza",
+   "food_id": "pizza",
+   "label": "Pizza slice",
+   "label_hi": null,
+   "category": "restaurant",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 slice"
+    },
+    {
+     "grams": 200,
+     "label": "2 slices"
+    },
+    {
+     "grams": 400,
+     "label": "4 slices"
+    }
+   ],
+   "default_serving": "1 slice",
+   "sort": 70,
+   "icon": null,
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/pizza.jpg?v=mufmjhrn"
+  },
+  {
+   "id": "rajma",
+   "food_id": "dish-kidney-bean-curry",
+   "label": "Rajma",
+   "label_hi": "राजमा",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 60,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/rajma.jpg?v=mufmgil5"
+  },
+  {
+   "id": "rasam",
+   "food_id": "dish-rasam-with-tamarind",
+   "label": "Rasam",
+   "label_hi": "रसम",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 390,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 100,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/rasam.jpg?v=mufmglno"
+  },
+  {
+   "id": "rasgulla",
+   "food_id": "dish-rasgulla",
+   "label": "Rasgulla",
+   "label_hi": "रसगुल्ला",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 50,
+     "label": "1 piece"
+    },
+    {
+     "grams": 100,
+     "label": "2 pieces"
+    }
+   ],
+   "default_serving": "1 piece",
+   "sort": 60,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/rasgulla.jpg?v=mufmiry7"
+  },
+  {
+   "id": "rasmalai",
+   "food_id": "dish-rasmalai",
+   "label": "Rasmalai",
+   "label_hi": "रसमलाई",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 70,
+     "label": "1 piece"
+    },
+    {
+     "grams": 140,
+     "label": "2 pieces"
+    }
+   ],
+   "default_serving": "1 piece",
+   "sort": 70,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/rasmalai.jpg?v=mufmiszc"
+  },
+  {
+   "id": "rava-dosa",
+   "food_id": "dish-semolina-dosa",
+   "label": "Rava dosa",
+   "label_hi": "रवा डोसा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 73,
+     "label": "1 dosa"
+    },
+    {
+     "grams": 147,
+     "label": "2 dosa"
+    }
+   ],
+   "default_serving": "1 dosa",
+   "sort": 60,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/rava-dosa.jpg?v=mufmfraa"
+  },
+  {
+   "id": "refined-oil",
+   "food_id": "oil",
+   "label": "Refined oil",
+   "label_hi": "रिफ़ाइंड तेल",
+   "category": "fat",
+   "servings": [
+    {
+     "grams": 5,
+     "label": "1 tsp"
+    },
+    {
+     "grams": 2.5,
+     "label": "½ tsp"
+    },
+    {
+     "grams": 15,
+     "label": "1 tbsp"
+    }
+   ],
+   "default_serving": "1 tsp",
+   "sort": 20,
+   "icon": "drop",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/refined-oil.jpg?v=mufmjb97"
+  },
+  {
+   "id": "rice",
+   "food_id": "dish-boiled-rice",
+   "label": "Rice (cooked)",
+   "label_hi": "चावल",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "1 plate"
+    },
+    {
+     "grams": 60,
+     "label": "1 ladle"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 30,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/rice.jpg?v=mufmg7f8"
+  },
+  {
+   "id": "roti",
+   "food_id": "roti",
+   "label": "Roti / chapati",
+   "label_hi": "रोटी",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 40,
+     "label": "1 roti"
+    },
+    {
+     "grams": 80,
+     "label": "2 roti"
+    },
+    {
+     "grams": 120,
+     "label": "3 roti"
+    }
+   ],
+   "default_serving": "1 roti",
+   "sort": 10,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/roti-chapati.jpg?v=mufmg5ae"
+  },
+  {
+   "id": "sabudana-khichdi",
+   "food_id": "dish-sago-khitchdi",
+   "label": "Sabudana khichdi",
+   "label_hi": "साबूदाना खिचड़ी",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 271,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 170,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/sabudana-khichdi.jpg?v=mufmfzl5"
+  },
+  {
+   "id": "sambar",
+   "food_id": "dish-sambar",
+   "label": "Sambar",
+   "label_hi": "सांभर",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 257,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 60,
+     "label": "1 ladle"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 90,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/sambar.jpg?v=mufmgkgh"
+  },
+  {
+   "id": "samosa",
+   "food_id": "samosa",
+   "label": "Samosa",
+   "label_hi": "समोसा",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 samosa"
+    },
+    {
+     "grams": 200,
+     "label": "2 samosa"
+    }
+   ],
+   "default_serving": "1 samosa",
+   "sort": 10,
+   "icon": "flame",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/samosa.jpg?v=mufmhxp0"
+  },
+  {
+   "id": "sarson-saag",
+   "food_id": "dish-sarson-ka-saag",
+   "label": "Sarson ka saag",
+   "label_hi": "सरसों का साग",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 142,
+     "label": "1 katori"
+    },
+    {
+     "grams": 283,
+     "label": "2 katori"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 180,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/sarson-ka-saag.jpg?v=mufmh4he"
+  },
+  {
+   "id": "sev-namkeen",
+   "food_id": "dish-sev",
+   "label": "Sev / bhujia namkeen",
+   "label_hi": "सेव नमकीन",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 25,
+     "label": "1 handful"
+    },
+    {
+     "grams": 50,
+     "label": "1 small bowl"
+    }
+   ],
+   "default_serving": "1 handful",
+   "sort": 90,
+   "icon": "flame",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/sev-bhujia-namkeen.jpg?v=mufmi3v8"
+  },
+  {
+   "id": "soya-chunks",
+   "food_id": "soya-chunks",
+   "label": "Soya chunks (cooked)",
+   "label_hi": "सोया चंक्स",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 katori"
+    },
+    {
+     "grams": 150,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 170,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/soya-chunks.jpg?v=mufmhsda"
+  },
+  {
+   "id": "sprout-salad",
+   "food_id": "dish-sprouted-moong-salad",
+   "label": "Sprout salad",
+   "label_hi": "अंकुरित मूंग सलाद",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 katori"
+    },
+    {
+     "grams": 204,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 160,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/sprout-salad.jpg?v=mufmiehw"
+  },
+  {
+   "id": "sprouts",
+   "food_id": "sprouts",
+   "label": "Moong sprouts",
+   "label_hi": "अंकुरित मूंग",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 katori"
+    },
+    {
+     "grams": 150,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 160,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/moong-sprouts.jpg?v=mufmhrf1"
+  },
+  {
+   "id": "sugar",
+   "food_id": "sugar",
+   "label": "Sugar",
+   "label_hi": "चीनी",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 4,
+     "label": "1 tsp"
+    },
+    {
+     "grams": 8,
+     "label": "2 tsp"
+    },
+    {
+     "grams": 15,
+     "label": "1 tbsp"
+    }
+   ],
+   "default_serving": "1 tsp",
+   "sort": 130,
+   "icon": "spoon",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/sugar.jpg?v=mufmngek"
+  },
+  {
+   "id": "sugarcane-juice",
+   "food_id": "ifct-sugarcane-juice",
+   "label": "Sugarcane juice",
+   "label_hi": "गन्ने का रस",
+   "category": "drink",
+   "servings": [
+    {
+     "grams": 250,
+     "label": "1 glass"
+    },
+    {
+     "grams": 150,
+     "label": "1 small glass"
+    }
+   ],
+   "default_serving": "1 glass",
+   "sort": 120,
+   "icon": "glass",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/sugarcane-juice.jpg?v=mufmilb1"
+  },
+  {
+   "id": "suji-halwa",
+   "food_id": "dish-semolina-halwa",
+   "label": "Suji halwa",
+   "label_hi": "सूजी का हलवा",
+   "category": "sweet",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "1 katori"
+    },
+    {
+     "grams": 160,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 40,
+   "icon": "sweet",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/suji-halwa.jpg?v=mufmir0h"
+  },
+  {
+   "id": "tandoori-chicken",
+   "food_id": "dish-tandoori-chicken",
+   "label": "Tandoori chicken / tikka",
+   "label_hi": "तंदूरी चिकन",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "5-6 pieces"
+    },
+    {
+     "grams": 360,
+     "label": "¼ chicken"
+    },
+    {
+     "grams": 720,
+     "label": "½ chicken"
+    }
+   ],
+   "default_serving": "5-6 pieces",
+   "sort": 70,
+   "icon": "flame",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/tandoori-chicken-tikka.jpg?v=mufmhe83"
+  },
+  {
+   "id": "thepla",
+   "food_id": "dish-methi-thepla",
+   "label": "Methi thepla",
+   "label_hi": "मेथी थेपला",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 36,
+     "label": "1 thepla"
+    },
+    {
+     "grams": 73,
+     "label": "2 thepla"
+    },
+    {
+     "grams": 109,
+     "label": "3 thepla"
+    }
+   ],
+   "default_serving": "1 thepla",
+   "sort": 180,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/methi-thepla.jpg?v=mufmg0p1"
+  },
+  {
+   "id": "tinda",
+   "food_id": "dish-stuffed-round-gourd",
+   "label": "Tinda sabzi",
+   "label_hi": "टिंडा",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 248,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 150,
+   "icon": "leaf",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/tinda-sabzi.jpg?v=mufmh15l"
+  },
+  {
+   "id": "tofu",
+   "food_id": "tofu",
+   "label": "Tofu",
+   "label_hi": "टोफू",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 100,
+     "label": "100 g"
+    },
+    {
+     "grams": 150,
+     "label": "150 g"
+    },
+    {
+     "grams": 200,
+     "label": "200 g pack"
+    }
+   ],
+   "default_serving": "100 g",
+   "sort": 180,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/tofu.jpg?v=mufmhsf8"
+  },
+  {
+   "id": "toor-dal",
+   "food_id": "dal-cooked",
+   "label": "Toor / arhar dal",
+   "label_hi": "अरहर / तूर दाल",
+   "category": "dal",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 300,
+     "label": "2 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 20,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/toor-arhar-dal.jpg?v=mufmgfea"
+  },
+  {
+   "id": "upma",
+   "food_id": "dish-semolina-upma",
+   "label": "Upma / khara bath",
+   "label_hi": "उपमा",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 plate"
+    },
+    {
+     "grams": 106,
+     "label": "1 small bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 20,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/upma-khara-bath.jpg?v=mufmfp0w"
+  },
+  {
+   "id": "uttapam",
+   "food_id": "dish-uttapam",
+   "label": "Uttapam",
+   "label_hi": "उत्तपम",
+   "category": "breakfast",
+   "servings": [
+    {
+     "grams": 68,
+     "label": "1 uttapam"
+    },
+    {
+     "grams": 136,
+     "label": "2 uttapam"
+    }
+   ],
+   "default_serving": "1 uttapam",
+   "sort": 160,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/uttapam.jpg?v=mufmfyje"
+  },
+  {
+   "id": "veg-biryani",
+   "food_id": "dish-vegetable-biryani",
+   "label": "Veg biryani",
+   "label_hi": "वेज बिरयानी",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 302,
+     "label": "1 plate"
+    },
+    {
+     "grams": 150,
+     "label": "1 katori"
+    }
+   ],
+   "default_serving": "1 plate",
+   "sort": 80,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/veg-biryani.jpg?v=mufmgac0"
+  },
+  {
+   "id": "veg-kurma",
+   "food_id": "dish-vegetable-curry-with-coconut",
+   "label": "Veg kurma (coconut)",
+   "label_hi": "वेज कुरमा",
+   "category": "sabzi",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 372,
+     "label": "1 bowl"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 200,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/veg-kurma.jpg?v=mufmh5km"
+  },
+  {
+   "id": "veg-pulao",
+   "food_id": "dish-mixed-vegetable-pulao",
+   "label": "Veg pulao",
+   "label_hi": "वेज पुलाव",
+   "category": "staple",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 katori"
+    },
+    {
+     "grams": 200,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 438,
+     "label": "1 full plate"
+    }
+   ],
+   "default_serving": "1 katori",
+   "sort": 70,
+   "icon": "bowl",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/veg-pulao.jpg?v=mufmg9nm"
+  },
+  {
+   "id": "veg-sandwich",
+   "food_id": "dish-tomato-and-cucumber-sandwich",
+   "label": "Veg sandwich",
+   "label_hi": "वेज सैंडविच",
+   "category": "snack",
+   "servings": [
+    {
+     "grams": 79,
+     "label": "1 sandwich"
+    },
+    {
+     "grams": 158,
+     "label": "2 sandwiches"
+    }
+   ],
+   "default_serving": "1 sandwich",
+   "sort": 120,
+   "icon": "roti",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/veg-sandwich.jpg?v=mufmi904"
+  },
+  {
+   "id": "watermelon",
+   "food_id": "ifct-water-melon-dark-green-sugar-baby",
+   "label": "Watermelon",
+   "label_hi": "तरबूज़",
+   "category": "fruit",
+   "servings": [
+    {
+     "grams": 150,
+     "label": "1 bowl"
+    },
+    {
+     "grams": 300,
+     "label": "2 bowls"
+    }
+   ],
+   "default_serving": "1 bowl",
+   "sort": 90,
+   "icon": "fruit",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/watermelon.jpg?v=mufmj48e"
+  },
+  {
+   "id": "whey",
+   "food_id": "whey",
+   "label": "Whey protein",
+   "label_hi": "व्हे प्रोटीन",
+   "category": "protein",
+   "servings": [
+    {
+     "grams": 30,
+     "label": "1 scoop"
+    },
+    {
+     "grams": 15,
+     "label": "½ scoop"
+    },
+    {
+     "grams": 60,
+     "label": "2 scoops"
+    }
+   ],
+   "default_serving": "1 scoop",
+   "sort": 40,
+   "icon": "spoon",
+   "image_url": "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/food-images/whey-protein.jpg?v=mufmn597"
+  }
+ ]
+}

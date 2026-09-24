@@ -28,4 +28,5 @@ export const TASKS: Record<TaskId, TaskDef> = {
   barcode_digits: { defaultProvider: "anthropic", defaultModel: DEFAULT_VISION_MODEL, maxTokens: 60, images: true, plannedAlternative: "gemini:gemini-flash" },
   meal_text_parse: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 1800, images: false, plannedAlternative: "qwen:qwen-plus or gemini:gemini-flash" },
   exercise_parse: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 1500, images: false, plannedAlternative: "qwen:qwen-plus or gemini:gemini-flash" },
+  food_lookup: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 300, images: false, plannedAlternative: "qwen:qwen-plus or openai-compatible (was LIVE_FOOD_PROVIDER)" },
 };

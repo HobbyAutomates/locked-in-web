@@ -7,6 +7,7 @@ import { ageFrom, type Profile } from "@/lib/types";
 import { APP_VERSION, CHANGELOG, compareVersions } from "@/lib/version";
 import { displayName, weightText } from "@/lib/display";
 import { AvatarPicker } from "./Avatar";
+import GraffitiWall from "./GraffitiWall";
 import ProfileSetupSheet from "./ProfileSetupSheet";
 import { Flame, Gear, Mail, Medal, Pencil, Person, Phone, Refresh, Scale, Share, Sparkle, Target } from "./icons";
 import { BottomSheet, Card, Chevron, ErrorNote, GroupLabel, Hair, Rise, SettingRow } from "./ui";
@@ -89,6 +90,8 @@ export default function ProfileScreen({ profile, email, userId }: { profile: Pro
       </Rise>
 
       <ProfileSetupSheet open={setup !== null} photo={setup === "full"} onClose={() => setSetup(null)} userId={userId} name={shownName} username={profile.username} avatarPath={profile.avatar_path} />
+
+      <GraffitiWall />
 
       {/* ---- You ---- */}
       <Rise index={1}>
