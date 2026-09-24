@@ -1,13 +1,14 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, after } from "next/server";
 import { apiUser } from "@/lib/apiAuth";
+import { run } from "@/lib/ai/router";
+import type { JsonSchema } from "@/lib/ai/types";
 import { aliasMap, chunksOf, describeHit, foodById, hasDevanagari, hindiToLatin, microsFor, normAlias, searchFoods, type FoodHit } from "@/lib/foodSearch";
 import { matchFood } from "@/lib/foods";
 import { countStep } from "@/lib/quantity";
 import { foodKey } from "@/lib/foodKey";
 import { cachedFoodImages, resolveFoodImage } from "@/lib/foodImage";
 import type { ParseResult, ParsedItem } from "@/lib/types";
-import { logUsage } from "@/lib/usage";
 
 export const runtime = "nodejs";
 
@@ -208,20 +209,18 @@ export async function POST(req: Request) {
     ? `Original description:\n${text.slice(0, 2000)}\n\nMy previous parse (JSON):\n${JSON.stringify(previous ?? []).slice(0, 4000)}\n\nThe user says this is wrong: "${String(correction).slice(0, 500)}"\nProduce the corrected full item list.\n\n${candidateBlock}`
     : `${text.slice(0, 2000)}\n\n${candidateBlock}`;
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1800,
-    system: SYSTEM,
-    tools: [TOOL],
-    tool_choice: { type: "tool", name: "log_food_items" },
-    messages: [{ role: "user", content: userContent }],
-  });
-  logUsage("parse-meal", "claude-haiku-4-5-20251001", msg.usage);
-
-  const block = msg.content.find((b) => b.type === "tool_use");
-  if (!block || block.type !== "tool_use") return NextResponse.json({ error: "Parser returned nothing" }, { status: 502 });
-  const raw = block.input as { items?: HaikuItem[]; assumptions?: string[]; unparsed?: string[] };
+  const isParsed = (v: unknown): v is { items?: HaikuItem[]; assumptions?: string[]; unparsed?: string[] } => !!v && typeof v === "object";
+  let raw: { items?: HaikuItem[]; assumptions?: string[]; unparsed?: string[] };
+  try {
+    const result = await run<{ items?: HaikuItem[]; assumptions?: string[]; unparsed?: string[] }>(
+      "meal_text_parse",
+      { kind: "json", system: SYSTEM, text: userContent, maxTokens: 1800, schema: TOOL.input_schema as unknown as JsonSchema, schemaName: TOOL.name },
+      isParsed,
+    );
+    raw = result.data;
+  } catch {
+    return NextResponse.json({ error: "Parser returned nothing" }, { status: 502 });
+  }
 
   const items: ParsedItem[] = [];
   for (const it of raw.items ?? []) {

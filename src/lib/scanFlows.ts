@@ -1,6 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "node:crypto";
 import type { AdminClient } from "@/lib/apiAuth";
+import { escalateBelow } from "@/lib/ai/config";
+import { run } from "@/lib/ai/router";
+import type { JsonSchema } from "@/lib/ai/types";
+import { validateLabel, type LabelNumbers } from "@/lib/ai/validate/label";
 import { microsFor, searchFoods, sourceBonus, type FoodHit } from "@/lib/foodSearch";
 import {
   TRANSCRIBE,
@@ -19,7 +23,7 @@ import {
 import { RESTAURANT_MULTIPLIER, RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
 import { scanName } from "@/lib/scanNames";
 import type { ItemMicros, PlateEstimate, PlateItem } from "@/lib/types";
-import { logUsage, type UsageEntry } from "@/lib/usage";
+import { toUsageEntry, type UsageEntry } from "@/lib/usage";
 
 /**
  * The three scan pipelines (label, barcode, plate photo) as plain functions, so the original
@@ -70,12 +74,27 @@ export async function attachThumb(admin: AdminClient, userId: string, scanId: st
 }
 export const mediaType = (mt?: string | null): MediaType => (mt === "image/png" || mt === "image/webp" ? mt : "image/jpeg");
 
-function anthropic() {
-  if (!process.env.ANTHROPIC_API_KEY) throw new FlowError("ANTHROPIC_API_KEY is not set", 500);
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+/** Deterministic sanity checks (kJ-as-kcal, decimal slips, …) on a structured label_report's numbers.
+ *  Never blocks the scan — the flags just ride along as `report.validation`. */
+function attachValidation(report: Record<string, unknown>): void {
+  const per100 = (report.per_100g ?? {}) as Record<string, unknown>;
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const numbers: LabelNumbers = {
+    calories: num(per100.calories),
+    protein_g: num(per100.protein_g),
+    carbs_g: num(per100.carbs_g),
+    fat_g: num(per100.fat_g),
+    sugar_g: num(per100.sugar_g),
+    fiber_g: num(per100.fiber_g),
+    sodium_mg: num(per100.sodium_mg),
+    serving_g: num(report.serving_g),
+  };
+  report.validation = validateLabel(numbers);
 }
 
-/** The vision model every scan route uses (transcription, barcode digits, plate estimates, the classifier). */
+/** The vision model every scan route uses by default (transcription, barcode digits, plate estimates,
+ *  the classifier) — resolved through the model router (src/lib/ai/router.ts), so an `AI_ROUTE_*` env
+ *  var can point any of these at a different provider without touching this file. */
 export const VISION_MODEL = "claude-sonnet-5";
 
 // ---------------------------------------------------------------------------------------------
@@ -106,34 +125,25 @@ export async function labelFlow(input: {
   const mt = mediaType(input.mediaType);
   const profile = await loadScanProfile(input.admin, input.userId);
   const lens = lensFor(profile.goal_type, input.lens, profile.lens_default);
-  const client = anthropic();
   const usage: UsageEntry[] = [...(input.extraUsage ?? [])];
 
   // 1. Transcribe. The phone's own OCR wins when it read enough, then a transcript the classifier
-  //    already made; otherwise Sonnet looks at the photo.
+  //    already made; otherwise Sonnet (or whatever `label_ocr` is routed to) looks at the photo.
   const fromPhone = ocrText.length >= OCR_MIN_CHARS;
   let transcript = fromPhone ? ocrText : (input.transcript ?? "").trim();
   if (!transcript) {
     if (!input.image) throw new FlowError("Couldn't read enough text — retake the photo.", 400);
-    const t = await client.messages.create({
-      model: VISION_MODEL,
-      max_tokens: 2000,
-      system: TRANSCRIBE,
-      messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: input.image } }, { type: "text", text: "Transcribe this label." }] }],
-    });
-    usage.push(logUsage("scan-label:transcribe", VISION_MODEL, t.usage));
-    transcript = t.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as Anthropic.TextBlock).text)
-      .join("\n")
-      .trim();
+    const t = await run<string>("label_ocr", { kind: "text", system: TRANSCRIBE, images: [{ mediaType: mt, base64: input.image }], text: "Transcribe this label.", maxTokens: 2000 });
+    usage.push(toUsageEntry("label_ocr", t.model, t.usage));
+    transcript = t.data.trim();
   }
   if (!transcript || transcript.startsWith("NOT_A_LABEL")) {
     return unreadableReport(transcript.replace("NOT_A_LABEL", "").trim() || "Couldn't read a food label in that photo.", transcript);
   }
 
-  const { report, analysis, usage: analyseUsage } = await analyseTranscript({ client, transcript, note: input.note ?? undefined, lens, profile, fromPhoneOcr: fromPhone, kind: "label" });
+  const { report, analysis, usage: analyseUsage } = await analyseTranscript({ transcript, note: input.note ?? undefined, lens, profile, fromPhoneOcr: fromPhone, kind: "label" });
   usage.push(...analyseUsage);
+  attachValidation(report);
   // Never store "<UNKNOWN>" or a blank name: the model's name, else the first ingredient, else "Unnamed label".
   const product = scanName("label", { model: report.product, ingredients: transcript });
   const full = { ...report, product, kind: "label", lens, transcript, analysis, usage };
@@ -157,19 +167,14 @@ const CACHE_DAYS = 30;
 
 /** The digits printed under a barcode, read by the vision model. "" when none are legible. */
 export async function readBarcodeDigits(image: string, mt: MediaType): Promise<{ digits: string; usage: UsageEntry }> {
-  const m = await anthropic().messages.create({
-    model: VISION_MODEL,
-    max_tokens: 60,
+  const r = await run<string>("barcode_digits", {
+    kind: "text",
     system: "You read retail barcodes. Reply with ONLY the digits printed under the barcode (EAN-13, EAN-8 or UPC), no spaces. If no barcode digits are legible, reply NONE.",
-    messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: image } }, { type: "text", text: "Digits?" }] }],
+    images: [{ mediaType: mt, base64: image }],
+    text: "Digits?",
+    maxTokens: 60,
   });
-  const usage = logUsage("scan-barcode:digits", VISION_MODEL, m.usage);
-  const digits = m.content
-    .filter((b) => b.type === "text")
-    .map((b) => (b as Anthropic.TextBlock).text)
-    .join("")
-    .replace(/\D/g, "");
-  return { digits, usage };
+  return { digits: r.data.replace(/\D/g, ""), usage: toUsageEntry("barcode_digits", r.model, r.usage) };
 }
 
 export async function barcodeFlow(input: {
@@ -231,13 +236,14 @@ export async function barcodeFlow(input: {
     report = hit.report;
     analysis = hit.analysis;
   } else {
-    const r = await analyseTranscript({ client: anthropic(), transcript, note: input.note ?? undefined, lens, profile, kind: "barcode", maxSearches: offComplete(product) ? 1 : 2 });
+    const r = await analyseTranscript({ transcript, note: input.note ?? undefined, lens, profile, kind: "barcode", maxSearches: offComplete(product) ? 1 : 2 });
     report = r.report;
     analysis = r.analysis;
     usage.push(...r.usage);
     product = { ...product, __reports: { ...(product.__reports ?? {}), [key]: { report, analysis, cachedAt: new Date().toISOString() } } };
     needsWrite = true;
   }
+  attachValidation(report);
   if (needsWrite) {
     try {
       await input.admin.from("barcode_cache").upsert({ barcode, product, fetched_at: fresh && cachedRow ? cachedRow.fetched_at : new Date().toISOString() });
@@ -331,33 +337,54 @@ function n(v: unknown, fallback = 0) {
 export type PlateInput = { admin: AdminClient; userId: string; image: string; mediaType?: string | null; note?: string | null; thumb?: string | null };
 type PlateRaw = { items?: Record<string, unknown>[]; notes?: string[]; plate_note?: string; is_food?: boolean };
 
+/** Loose runtime shape check on `plate_estimate` output — every provider's structured JSON gets this,
+ *  not just Anthropic's (which is schema-forced already, so this mostly matters for the others). */
+function isPlateRaw(v: unknown): v is PlateRaw {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  if ("items" in o && o.items !== undefined && !Array.isArray(o.items)) return false;
+  if ("notes" in o && o.notes !== undefined && !Array.isArray(o.notes)) return false;
+  if ("is_food" in o && o.is_food !== undefined && typeof o.is_food !== "boolean") return false;
+  return true;
+}
+
+const CONF_RANK: Record<string, number> = { low: 0, medium: 1, high: 2 };
+
+/** True when any item's confidence is at or below `threshold` — triggers the meal_vision_hard escalation. */
+function hasLowConfidence(raw: PlateRaw, threshold: "low" | "medium"): boolean {
+  const limit = CONF_RANK[threshold];
+  return (raw.items ?? []).some((it) => {
+    const rank = CONF_RANK[String((it as Record<string, unknown>).confidence)];
+    return rank !== undefined && rank <= limit;
+  });
+}
+
 export async function plateFlow(input: PlateInput & { extraUsage?: UsageEntry[] }): Promise<PlateEstimate & { thumb_path?: string | null }> {
   const image = (input.image ?? "").trim();
   if (!image) throw new FlowError("No image", 400);
   const mt = mediaType(input.mediaType);
   const note = input.note ?? undefined;
-  const client = anthropic();
-  // 1. Sonnet vision, forced tool.
-  const msg = await client.messages.create({
-    model: VISION_MODEL,
-    max_tokens: 2500,
+  const request = {
+    kind: "json" as const,
     system: PLATE_SYSTEM,
-    tools: [PLATE_TOOL],
-    tool_choice: { type: "tool", name: "plate_estimate" },
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: mt, data: image } },
-          { type: "text", text: `Estimate this plate.${note ? ` The user says: "${String(note).slice(0, 300)}"` : ""}` },
-        ],
-      },
-    ],
-  });
-  const usage = [...(input.extraUsage ?? []), logUsage("photo-meal:vision", VISION_MODEL, msg.usage)];
-  const block = msg.content.find((b) => b.type === "tool_use");
-  if (!block || block.type !== "tool_use") throw new FlowError("Could not read that plate", 502);
-  const raw = block.input as PlateRaw;
+    images: [{ mediaType: mt, base64: image }],
+    text: `Estimate this plate.${note ? ` The user says: "${String(note).slice(0, 300)}"` : ""}`,
+    maxTokens: 2500,
+    schema: PLATE_TOOL.input_schema as unknown as JsonSchema,
+    schemaName: "plate_estimate",
+  };
+  // 1. Vision, forced structured output (Sonnet by default).
+  const first = await run<PlateRaw>("meal_vision", request, isPlateRaw);
+  const usage = [...(input.extraUsage ?? []), toUsageEntry("meal_vision", first.model, first.usage)];
+  let raw = first.data;
+  // Escalation (off by default — AI_ESCALATE_BELOW): a low-confidence routine-model estimate gets a
+  // second look from meal_vision_hard.
+  const threshold = escalateBelow();
+  if (threshold && hasLowConfidence(raw, threshold)) {
+    const hard = await run<PlateRaw>("meal_vision_hard", request, isPlateRaw);
+    usage.push(toUsageEntry("meal_vision_hard", hard.model, hard.usage));
+    raw = hard.data;
+  }
   return plateFromEstimate(input, raw, usage);
 }
 
@@ -534,15 +561,23 @@ ${PLATE_SYSTEM}
  * a full plate estimate when it's a meal, so the plate path needs no second vision call either.
  */
 export async function classifyScan(image: string, mt: MediaType): Promise<Classified> {
-  const m = await anthropic().messages.create({
-    model: VISION_MODEL,
-    max_tokens: 2500,
-    system: CLASSIFY_SYSTEM,
-    tools: [CLASSIFY_TOOL, PLATE_TOOL],
-    tool_choice: { type: "any" },
-    messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: image } }, { type: "text", text: "What is this?" }] }],
+  // Anthropic-only: the fused scan_kind/plate_estimate tool_choice {type:"any"} isn't something a
+  // generic provider adapter can express, so this task always runs on Claude (see tasks.ts) — but
+  // still goes through router.run, which owns timing + the usage log line.
+  const result = await run<Anthropic.Message>("scan_classify", {
+    kind: "anthropic_native",
+    build: (client) =>
+      client.messages.create({
+        model: VISION_MODEL,
+        max_tokens: 2500,
+        system: CLASSIFY_SYSTEM,
+        tools: [CLASSIFY_TOOL, PLATE_TOOL],
+        tool_choice: { type: "any" },
+        messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: mt, data: image } }, { type: "text", text: "What is this?" }] }],
+      }),
   });
-  const usage = logUsage("scan:classify", VISION_MODEL, m.usage);
+  const m = result.data;
+  const usage = toUsageEntry("scan_classify", result.model, result.usage);
   const block = m.content.find((b) => b.type === "tool_use");
   if (block && block.type === "tool_use" && block.name === "plate_estimate") {
     return { kind: "plate", barcode: "", hasLabel: false, transcript: "", summary: "", plateRaw: block.input as PlateRaw, usage };
