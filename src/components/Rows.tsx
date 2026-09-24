@@ -70,8 +70,8 @@ function DeleteButton({ label, busy, onClick }: { label: string; busy: boolean; 
   );
 }
 
-/** Optimistic delete: the row hides now, "Deleted · Undo" shows for ~5s, and the real delete only
- * happens if Undo isn't tapped in time. */
+/** Optimistic delete: the row hides now, "Deleted" (with an Undo button beside it) shows for ~5s,
+ * and the real delete only happens if Undo isn't tapped in time. */
 function useUndoDelete(action: () => Promise<void>) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -97,7 +97,7 @@ function useUndoDelete(action: () => Promise<void>) {
 function UndoRow({ onUndo }: { onUndo: () => void }) {
   return (
     <div className="card flex min-h-[56px] items-center justify-between gap-3" style={{ padding: "8px 16px" }}>
-      <span className="text-[14px] font-semibold muted">Deleted · Undo</span>
+      <span className="text-[14px] font-semibold muted">Deleted</span>
       <button type="button" className="hit press text-[13px] font-bold" style={{ color: "var(--btn)", background: "none", border: 0 }} onClick={onUndo}>
         Undo
       </button>

@@ -112,7 +112,7 @@ export default function WorkoutForm({
     }
   }
 
-  /** Undoable delete: the confirm button turns into "Deleted · Undo" for ~5s; only then does the
+  /** Undoable delete: the confirm button turns into "Deleted" with an Undo button for ~5s; only then does the
    * real delete happen and the editor close. */
   function remove() {
     if (!existing) return;
@@ -219,7 +219,7 @@ function Footer({ existing, busy, error, target, remove, pendingDelete, undoRemo
         {existing ? (
           pendingDelete ? (
             <div className="flex items-center justify-between gap-2 py-1">
-              <span className="text-[15px] font-semibold muted">Deleted · Undo</span>
+              <span className="text-[15px] font-semibold muted">Deleted</span>
               <button type="button" onClick={undoRemove} className="press text-[15px] font-bold" style={{ color: "var(--btn)", background: "none", border: 0 }}>
                 Undo
               </button>
