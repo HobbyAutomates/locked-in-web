@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarIcon, Chart, Home, Person, Plus, Scan } from "./icons";
+import { CalendarIcon, Chart, Home, People, Person, Plus, Scan } from "./icons";
 import { today } from "@/lib/dates";
 
 const TABS = [
   { href: "/", label: "Home", Icon: Home },
+  { href: "/squad", label: "Squad", Icon: People },
   { href: "/calendar", label: "Calendar", Icon: CalendarIcon },
   { href: "/scan", label: "Scan", Icon: Scan },
   { href: "/progress", label: "Progress", Icon: Chart },

@@ -12,7 +12,7 @@ import { APP_VERSION, CHANGELOG, compareVersions } from "@/lib/version";
 import { Bell, Exit, Flame, Mail, Moon, Palette, Pencil, Person, Refresh, Scale, Scan, Share, Sparkle, Target, Tune } from "./icons";
 import { Card, Chevron, ErrorNote, GroupLabel, Hair, PillButton, PillSwitch, Rise, SettingRow, Toggle, fmt } from "./ui";
 
-const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-11.apk";
+const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-12.apk";
 const WEB_URL = "https://web-production-ff1cf.up.railway.app";
 const INVITE_TEXT = `Locked In — workouts, meals by voice, label scanner. Android: ${APK_URL} · iPhone: ${WEB_URL} (Safari → Add to Home Screen)`;
 
@@ -158,7 +158,7 @@ export default function ProfileScreen({ profile, email }: { profile: Profile; em
               </div>
             </div>
             <Hair />
-            <SettingRow icon={<Share size={20} />} label="Share with groups" subtitle={`${shareStats ? "Streaks + protein & calories" : "Streaks only"} · Groups are coming next`}>
+            <SettingRow icon={<Share size={20} />} label="Share with squads" subtitle={`${shareStats ? "Streaks + protein & calories" : "Streaks only"} · what squad-mates see`}>
               <Toggle
                 on={shareStats}
                 onChange={(v) => {

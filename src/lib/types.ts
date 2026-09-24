@@ -56,7 +56,7 @@ export const LENS_DEFAULTS: { key: LensDefault; label: string }[] = [
 
 /** A one-tap Indian food preset (bandlog.food_presets) joined to its foods row. Per-100 g numbers come from the food. */
 export type PresetServing = { label: string; grams: number };
-export type PresetCategory = "breakfast" | "staple" | "dal" | "sabzi" | "protein" | "snack" | "drink" | "sweet" | "fruit" | "fat";
+export type PresetCategory = "breakfast" | "staple" | "dal" | "sabzi" | "protein" | "snack" | "drink" | "sweet" | "fruit" | "fat" | "restaurant";
 export type FoodPreset = {
   id: string;
   food_id: string;
@@ -115,7 +115,7 @@ export type Profile = {
   reminders: Record<string, ReminderPref>;
   /** v1.9: the lens a scan report opens on. */
   lens_default: LensDefault;
-  /** v1.9: Groups (coming next) — share protein & calories, or streaks only. */
+  /** Squads: share protein & calories with squad-mates, or streaks only. */
   share_stats: boolean;
 };
 
@@ -255,6 +255,8 @@ export type PlateItem = {
   micros: ItemMicros;
   source: "table" | "estimated";
   food_id: string | null;
+  /** v2.0: "restaurant" when the portion was scaled up and the hidden oil added. */
+  cooked_in?: string | null;
 };
 
 export type PlateEstimate = {
@@ -265,6 +267,54 @@ export type PlateEstimate = {
   notes: string[];
   plate_note: string;
   photo_path?: string | null;
+  /** v2.0: "restaurant" when the note or the plate description said it was eaten out. */
+  portion_hint?: "restaurant" | null;
+};
+
+// ---- v2.0: squads ----
+
+/** A squad the signed-in user belongs to. */
+export type Squad = { id: string; name: string; code: string; owner_id: string; created_at: string };
+
+/** One day of a member's rollup (bandlog.daily_stats); numbers are null when they share streaks only. */
+export type SquadDay = {
+  date: string;
+  trained: boolean;
+  week_streak: number;
+  protein_g: number | null;
+  calories: number | null;
+  burned: number | null;
+  meals: number | null;
+};
+
+/** One row of `bandlog.squad_board(g)`. */
+export type SquadMember = {
+  user_id: string;
+  name: string;
+  share_stats: boolean;
+  is_owner: boolean;
+  joined_at: string;
+  days: SquadDay[];
+};
+
+/** A nudge sent to the signed-in user in the last 24 h (`bandlog.my_nudges()`). */
+export type Nudge = { id: string; group_id: string; group_name: string; from_user: string; from_name: string; kind: string; created_at: string };
+
+/** The 9 pm daily wrap (see lib/wrap.ts and Android's util/Wrap.kt). */
+export type Wrap = {
+  date: string;
+  protein: number;
+  proteinTarget: number;
+  proteinHit: boolean;
+  calories: number;
+  calorieBudget: number;
+  burned: number;
+  sessions: number;
+  sessionTarget: number;
+  tomorrow: string;
+  bestMeal: { name: string; protein: number } | null;
+  /** One line, the same as the Android notification. */
+  line: string;
 };
 
 /** A row of the Scan tab's History list. */

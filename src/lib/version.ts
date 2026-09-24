@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "1.9";
+export const APP_VERSION = "2.0";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.0",
+    date: "2026-09-24",
+    lines: [
+      "Squads: create a squad and share its 6-letter code, see who's locked in today, this week's dots and everyone's streak — plus protein and calories for friends who share them. Nudge anyone who hasn't trained yet.",
+      "The 9 pm daily wrap: protein, calories, sessions this week and tomorrow's session, on Home from 9 pm (and as a notification on Android).",
+      "Restaurant portions: one toggle in the quantity sheet scales the serving ×1.4 and adds the hidden oil; a Restaurant row in Snacks and Protein, and photo estimates notice when you ate out.",
+    ],
+  },
   {
     version: "1.9",
     date: "2026-09-24",

@@ -432,3 +432,48 @@ export function Sparkle(p: P) {
     </Stroke>
   );
 }
+
+/** Two people: the Squad tab. */
+export function People(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 19.5a5.5 5.5 0 0 1 11 0M15.5 5.2a3 3 0 0 1 0 5.6M17.5 13.8a5.5 5.5 0 0 1 3 5.7" />
+    </Stroke>
+  );
+}
+
+/** A raised fist: the nudge. */
+export function Fist(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M7 11V8.5a1.5 1.5 0 0 1 3 0V11M10 10V7.5a1.5 1.5 0 0 1 3 0V10M13 10V8a1.5 1.5 0 0 1 3 0v3M16 10.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1.5A5.5 5.5 0 0 1 6 14.5V12a1.5 1.5 0 0 1 3 0" />
+    </Stroke>
+  );
+}
+
+export function Close(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </Stroke>
+  );
+}
+
+export function Copy(p: P) {
+  return (
+    <Stroke {...p}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h8" />
+    </Stroke>
+  );
+}
+
+/** Moon + stars for the 9 pm wrap. */
+export function MoonStar(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5zM17 3v4M15 5h4" />
+    </Stroke>
+  );
+}

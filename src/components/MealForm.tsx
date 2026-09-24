@@ -71,6 +71,7 @@ function presetFood(p: FoodPreset): QuantityFood {
     servings: p.servings,
     defaultServing: p.default_serving,
     source: "table",
+    category: p.category,
   };
 }
 
@@ -100,7 +101,7 @@ export default function MealForm({ date, savedMeals, presets, onClose }: { date:
   const [showSaveAs, setShowSaveAs] = useState(false);
   const [savedName, setSavedName] = useState("");
   // The Quantity sheet: which food, and (for a review-row edit) which index it replaces.
-  const [sheet, setSheet] = useState<{ food: QuantityFood; initial?: Quantity; replace?: number; cookedFor?: number } | null>(null);
+  const [sheet, setSheet] = useState<{ food: QuantityFood; initial?: Quantity; replace?: number; cookedFor?: number; restaurant?: boolean } | null>(null);
   const added = useRef<string[]>([]);
 
   const totalKcal = items.reduce((a, i) => a + Number(i.calories), 0);
@@ -242,6 +243,7 @@ export default function MealForm({ date, savedMeals, presets, onClose }: { date:
               if (q) addItem(priceItem(f, q), p.label);
               else setSheet({ food: f });
             }}
+            onRestaurant={(p) => setSheet({ food: presetFood(p), restaurant: true })}
           />
         ) : null}
         {tab === "photo" ? (
@@ -350,12 +352,13 @@ export default function MealForm({ date, savedMeals, presets, onClose }: { date:
         initial={sheet?.initial}
         title={sheet?.replace != null ? "Change the amount" : "How much?"}
         cta={sheet?.replace != null ? "Update" : "Add"}
+        restaurant={sheet?.restaurant ?? false}
         onClose={() => setSheet(null)}
         onDone={(item) => {
           const s = sheet;
           setSheet(null);
           if (!s) return;
-          if (s.replace != null) setItems((cur) => cur.map((x, i) => (i === s.replace ? { ...item, cooked_in: x.cooked_in ?? null, source: x.source, food_id: x.food_id } : x)));
+          if (s.replace != null) setItems((cur) => cur.map((x, i) => (i === s.replace ? { ...item, cooked_in: item.cooked_in ?? x.cooked_in ?? null, source: x.source, food_id: x.food_id } : x)));
           else addItem(item, item.name);
         }}
       />
@@ -486,10 +489,12 @@ function SearchCard({ onPick }: { onPick: (h: FoodSearchHit) => void }) {
 
 // ---- Presets ----
 
-function PresetsCard({ presets, onPick }: { presets: FoodPreset[]; onPick: (p: FoodPreset, q: Quantity | null) => void }) {
+function PresetsCard({ presets, onPick, onRestaurant }: { presets: FoodPreset[]; onPick: (p: FoodPreset, q: Quantity | null) => void; onRestaurant: (p: FoodPreset) => void }) {
   const [cat, setCat] = useState<PresetCategory>("breakfast");
   const [open, setOpen] = useState<string | null>(null);
   const list = useMemo(() => presets.filter((p) => p.category === cat).sort((a, b) => a.sort - b.sort), [presets, cat]);
+  // v2.0: common outside dishes, shown at the top of Snacks and Protein; each opens as a restaurant portion.
+  const outside = useMemo(() => presets.filter((p) => p.category === "restaurant").sort((a, b) => a.sort - b.sort), [presets]);
   if (!presets.length) {
     return (
       <Rise index={1}>
@@ -511,6 +516,20 @@ function PresetsCard({ presets, onPick }: { presets: FoodPreset[]; onPick: (p: F
           ))}
         </div>
       </div>
+      {(cat === "snack" || cat === "protein") && outside.length ? (
+        <div className="mt-2.5">
+          <p className="px-1 text-[12px] font-bold muted">Restaurant</p>
+          <div className="-mx-4 mt-1.5 overflow-x-auto px-4" style={{ scrollbarWidth: "none" }}>
+            <div className="flex w-max gap-1.5 pb-1">
+              {outside.map((p) => (
+                <button key={p.id} type="button" className="chip press" style={{ height: 34, border: "1.5px solid var(--hair)", background: "var(--card)" }} onClick={() => onRestaurant(p)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="mt-2.5 grid grid-cols-2 gap-2">
         {list.map((p) => {
           const isOpen = open === p.id;
@@ -650,7 +669,7 @@ function ReviewRow({
               ))}
             </span>
           ) : null}
-          {item.cooked_in ? <span className="text-[11px] muted">Cooked in {fats.find((f) => f.id === item.cooked_in)?.label ?? item.cooked_in}</span> : null}
+          {item.cooked_in ? <span className="text-[11px] muted">{item.cooked_in === "restaurant" ? "Restaurant portion · oil included" : `Cooked in ${fats.find((f) => f.id === item.cooked_in)?.label ?? item.cooked_in}`}</span> : null}
         </div>
         <AnimatePresence>
           {delta !== null ? (

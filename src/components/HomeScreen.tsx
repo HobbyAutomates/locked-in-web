@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { addDays, longDate, shortDate } from "@/lib/dates";
+import { dismiss, useDismissed } from "@/lib/dismiss";
 import { useBurnedBack } from "@/lib/prefs";
 import { totalsFor } from "@/lib/totals";
-import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Profile, type Workout } from "@/lib/types";
-import { ChevronRight, Flame, Lock } from "./icons";
+import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Nudge, type Profile, type Workout, type Wrap } from "@/lib/types";
+import { Check, ChevronRight, Close, Fist, Flame, Lock, MoonStar, Share } from "./icons";
 import { ExerciseRow, MealRow, PendingMealRow, WorkoutRow } from "./Rows";
 import { usePendingMeals } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
@@ -21,9 +22,13 @@ type Props = {
   weekStreak: number;
   thisWeek: number;
   celebrate: boolean;
+  /** The 9 pm wrap (21:00–04:00 IST only), else null. */
+  wrap: Wrap | null;
+  /** Nudges from squad-mates in the last 24 h. */
+  nudges: Nudge[];
 };
 
-export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, thisWeek, celebrate }: Props) {
+export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, thisWeek, celebrate, wrap, nudges }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(today);
   const { pending, savedCount, error } = usePendingMeals();
@@ -31,6 +36,17 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   useEffect(() => {
     if (savedCount > 0) router.refresh();
   }, [savedCount, router]);
+  // Squad rollup: refresh today's daily_stats on every open (and yesterday's on the first open of a session).
+  useEffect(() => {
+    let first = true;
+    try {
+      first = window.sessionStorage.getItem("lockedin-rollup") !== today;
+      window.sessionStorage.setItem("lockedin-rollup", today);
+    } catch {
+      // No session storage: just include yesterday every time.
+    }
+    void fetch("/api/rollup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ yesterday: first }) }).catch(() => {});
+  }, [today, savedCount]);
   const isToday = selected === today;
   const totals = totalsFor(meals, selected);
   const dayWorkouts = workouts.filter((w) => w.date === selected);
@@ -67,6 +83,9 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         </div>
         {error ? <div className="mt-2"><ErrorNote text={error} /></div> : null}
       </Rise>
+
+      {nudges.length ? <NudgeBanner nudges={nudges} /> : null}
+      {wrap ? <WrapCard wrap={wrap} /> : null}
 
       <Rise index={1}>
         <WeekStrip today={today} selected={selected} trained={trained} onSelect={setSelected} />
@@ -161,6 +180,100 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       <AnimatePresence>
         {celebrate ? <Celebration thisWeek={thisWeek} target={profile.weekly_workout_target} streakWeeks={weekStreak} /> : null}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** "Sohum nudged you" — squad-mates poking you to train, dismissible per nudge. */
+function NudgeBanner({ nudges }: { nudges: Nudge[] }) {
+  const latest = nudges[0];
+  const hidden = useDismissed(`nudge:${latest.id}`);
+  if (hidden) return null;
+  const names = [...new Set(nudges.map((n) => n.from_name))];
+  const who = names.length === 1 ? names[0] : names.length === 2 ? `${names[0]} and ${names[1]}` : `${names[0]} and ${names.length - 1} others`;
+  return (
+    <Rise index={1}>
+      <div className="flex items-center gap-3 rounded-[20px] px-4 py-3" style={{ background: "var(--btn)", color: "var(--btn-ink)" }} role="status">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ background: "rgba(255,255,255,0.14)" }}>
+          <Fist size={18} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[15px] font-bold">{who} nudged you</span>
+          <span className="truncate text-xs" style={{ opacity: 0.72 }}>
+            {latest.group_name} · get a session in today
+          </span>
+        </span>
+        <button type="button" aria-label="Dismiss" className="press grid h-8 w-8 place-items-center rounded-full" style={{ color: "inherit" }} onClick={() => dismiss(`nudge:${latest.id}`)}>
+          <Close size={16} />
+        </button>
+      </div>
+    </Rise>
+  );
+}
+
+/** The 9 pm daily wrap: protein, calories vs budget, sessions this week, tomorrow's session, best meal. */
+function WrapCard({ wrap }: { wrap: Wrap }) {
+  const hidden = useDismissed(`wrap:${wrap.date}`);
+  if (hidden) return null;
+  const pct = Math.min(1, wrap.protein / Math.max(1, wrap.proteinTarget));
+  async function share() {
+    const text = `Locked In · ${wrap.line}`;
+    try {
+      if (navigator.share) await navigator.share({ text });
+      else await navigator.clipboard.writeText(text);
+    } catch {
+      // Cancelled share sheet: nothing to do.
+    }
+  }
+  return (
+    <Rise index={1}>
+      <Card padding={18}>
+        <div className="flex items-center justify-between">
+          <p className="flex items-center gap-2 text-[13px] font-bold muted">
+            <MoonStar size={16} />
+            {wrap.line.startsWith("Yesterday") ? "Yesterday's wrap" : "Today's wrap"}
+          </p>
+          <button type="button" aria-label="Dismiss the wrap" className="press grid h-8 w-8 place-items-center rounded-full" style={{ background: "var(--card2)", color: "var(--muted)" }} onClick={() => dismiss(`wrap:${wrap.date}`)}>
+            <Close size={14} />
+          </button>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <WrapStat value={`${wrap.protein} g`} label={wrap.proteinHit ? "protein, hit" : `protein · ${Math.max(0, wrap.proteinTarget - wrap.protein)} short`} color={wrap.proteinHit ? "var(--green)" : "var(--red)"} icon={wrap.proteinHit ? <Check size={13} /> : null} />
+          <WrapStat value={wrap.calories.toLocaleString("en-IN")} label={`of ${wrap.calorieBudget.toLocaleString("en-IN")} kcal`} />
+          <WrapStat value={`${wrap.sessions}/${wrap.sessionTarget}`} label="sessions this week" />
+        </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
+          <div className="h-full rounded-full" style={{ width: `${Math.round(pct * 100)}%`, background: wrap.proteinHit ? "var(--green)" : "var(--red)" }} />
+        </div>
+        <p className="mt-3 text-sm">
+          <span className="muted">Tomorrow:</span> <span className="font-bold">{wrap.tomorrow}</span>
+        </p>
+        {wrap.bestMeal ? (
+          <p className="mt-1 truncate text-[13px] muted">
+            Best meal: {wrap.bestMeal.name} · {wrap.bestMeal.protein} g protein
+          </p>
+        ) : null}
+        <div className="mt-3">
+          <PillButton soft height={42} onClick={share}>
+            <span className="inline-flex items-center gap-2">
+              <Share size={16} />
+              Share my day
+            </span>
+          </PillButton>
+        </div>
+      </Card>
+    </Rise>
+  );
+}
+
+function WrapStat({ value, label, color, icon }: { value: string; label: string; color?: string; icon?: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl px-3 py-2.5" style={{ background: "var(--card2)" }}>
+      <p className="num flex items-center gap-1 text-lg font-extrabold leading-tight" style={{ color: color ?? "var(--ink)" }}>
+        {value}
+        {icon}
+      </p>
+      <p className="text-[11px] leading-tight muted">{label}</p>
     </div>
   );
 }

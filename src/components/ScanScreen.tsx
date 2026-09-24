@@ -691,6 +691,11 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
         <Card>
           <p className="text-[15px] font-bold">{plate.plate_note || "Your plate"}</p>
           <p className="mt-0.5 text-xs muted">This is an estimate — edit anything.</p>
+          {plate.portion_hint === "restaurant" ? (
+            <p className="mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: "var(--orange-bg)", color: "var(--orange)" }}>
+              Restaurant portion · ×1.4 + hidden oil
+            </p>
+          ) : null}
         </Card>
       </Rise>
       <Rise index={4}>
@@ -784,7 +789,7 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                       date: today(),
                       raw_text: plate.plate_note || items.map((i) => i.name).join(", "),
                       photo_path: plate.photo_path ?? null,
-                      items: items.map((i) => ({ food_id: i.food_id, name: i.name, grams: i.grams, calories: i.calories, protein_g: i.protein_g, carbs_g: i.carbs_g, fat_g: i.fat_g, source: i.source, confidence: i.confidence === "high" ? 0.9 : i.confidence === "medium" ? 0.6 : 0.3, micros: i.micros })),
+                      items: items.map((i) => ({ food_id: i.food_id, name: i.name, grams: i.grams, calories: i.calories, protein_g: i.protein_g, carbs_g: i.carbs_g, fat_g: i.fat_g, source: i.source, confidence: i.confidence === "high" ? 0.9 : i.confidence === "medium" ? 0.6 : 0.3, micros: i.micros, cooked_in: i.cooked_in ?? null })),
                     });
                     onSaved?.();
                     router.push("/");

@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { UNITS, priceItem, quickChips, servingGrams, toGrams, type Quantity, type QuantityFood, type QuantityUnit } from "@/lib/quantity";
+import { RESTAURANT_MULTIPLIER, UNITS, applyRestaurant, canBeRestaurant, priceItem, quickChips, restaurantOil, servingGrams, toGrams, type Quantity, type QuantityFood, type QuantityUnit } from "@/lib/quantity";
 import type { MealItem } from "@/lib/types";
-import { MacroDot, PillButton, fmt } from "./ui";
+import { MacroDot, PillButton, Toggle, fmt } from "./ui";
 
 /**
  * The shared Quantity sheet: g · ml · kg · serving, a number, a 0.5-step servings stepper when a
@@ -16,6 +16,7 @@ export default function QuantitySheet({
   initial,
   title = "How much?",
   cta = "Add",
+  restaurant = false,
   onDone,
   onClose,
 }: {
@@ -23,20 +24,29 @@ export default function QuantitySheet({
   initial?: Quantity;
   title?: string;
   cta?: string;
+  /** Open with "Restaurant portion" already on (the Restaurant preset row). */
+  restaurant?: boolean;
   onDone: (item: MealItem, q: Quantity) => void;
   onClose: () => void;
 }) {
-  return <AnimatePresence>{food ? <Sheet key={food.name + food.food_id} food={food} initial={initial} title={title} cta={cta} onDone={onDone} onClose={onClose} /> : null}</AnimatePresence>;
+  return <AnimatePresence>{food ? <Sheet key={food.name + food.food_id} food={food} initial={initial} title={title} cta={cta} restaurantStart={restaurant} onDone={onDone} onClose={onClose} /> : null}</AnimatePresence>;
 }
 
-function Sheet({ food, initial, title, cta, onDone, onClose }: { food: QuantityFood; initial?: Quantity; title: string; cta: string; onDone: (item: MealItem, q: Quantity) => void; onClose: () => void }) {
+function Sheet({ food, initial, title, cta, restaurantStart, onDone, onClose }: { food: QuantityFood; initial?: Quantity; title: string; cta: string; restaurantStart: boolean; onDone: (item: MealItem, q: Quantity) => void; onClose: () => void }) {
   const sg = servingGrams(food);
   const startQ: Quantity = initial ?? (sg ? { unit: "serving", value: 1 } : { unit: "g", value: 100 });
   const [unit, setUnit] = useState<QuantityUnit>(startQ.unit);
   const [text, setText] = useState(String(startQ.value));
   const value = Number(text) || 0;
   const q: Quantity = useMemo(() => ({ unit, value }), [unit, value]);
-  const item = useMemo(() => priceItem(food, q), [food, q]);
+  const allowRestaurant = canBeRestaurant(food);
+  const [restaurant, setRestaurant] = useState(restaurantStart && allowRestaurant);
+  const oily = restaurantOil(food.name, food.category);
+  // "Restaurant portion": ×1.4 the amount and, for dal / sabzi / protein dishes, a hidden teaspoon of oil.
+  const item = useMemo(() => {
+    const base = priceItem(food, q);
+    return restaurant ? applyRestaurant(base, oily) : base;
+  }, [food, q, restaurant, oily]);
   const grams = toGrams(food, q);
   const chips = useMemo(() => quickChips(food), [food]);
   const servingLabel = (food.servings.find((s) => s.label === food.defaultServing) ?? food.servings[0])?.label;
@@ -138,10 +148,22 @@ function Sheet({ food, initial, title, cta, onDone, onClose }: { food: QuantityF
           })}
         </div>
 
+        {allowRestaurant ? (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl px-3.5 py-2.5" style={{ border: "1.5px solid var(--hair)" }}>
+            <span className="flex min-w-0 flex-col">
+              <span className="text-[14px] font-semibold">Restaurant portion</span>
+              <span className="text-[11px] muted">
+                ×{RESTAURANT_MULTIPLIER} the amount{oily ? " + 1 tsp hidden oil" : ""} — outside kitchens serve bigger and oilier
+              </span>
+            </span>
+            <Toggle on={restaurant} onChange={setRestaurant} label="Restaurant portion" />
+          </div>
+        ) : null}
+
         <div className="mt-4 flex items-center justify-between rounded-2xl px-3.5 py-3" style={{ background: "var(--card2)" }}>
           <div>
             <p className="num text-[22px] font-extrabold leading-tight">{Math.round(item.calories)} kcal</p>
-            <p className="text-xs muted">{fmt(Math.round(grams * 10) / 10)} g total</p>
+            <p className="text-xs muted">{fmt(Math.round(item.grams * 10) / 10)} g total{restaurant ? " · restaurant" : ""}</p>
           </div>
           <div className="flex gap-2.5">
             <MacroDot value={`${fmt(item.protein_g)}g`} color="var(--red)" />

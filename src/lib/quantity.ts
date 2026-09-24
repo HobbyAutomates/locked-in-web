@@ -25,6 +25,8 @@ export type QuantityFood = {
   /** Whole-pack weight, when known (barcode / label scans). */
   packGrams?: number | null;
   source: MealItem["source"];
+  /** v2.0: the preset category (dal / sabzi / protein / restaurant …) — decides the restaurant oil. */
+  category?: string | null;
 };
 
 export type Quantity = { unit: QuantityUnit; value: number };
@@ -118,4 +120,51 @@ export const COOKED_IN_CATEGORIES = new Set(["dal", "sabzi", "breakfast", "prote
 export function wantsCookedIn(name: string, category?: string | null): boolean {
   if (category && (category === "dal" || category === "sabzi")) return true;
   return /\b(dal|daal|dhal|sambar|rajma|chole|chana|sabzi|sabji|bhindi|gobi|paneer|bharta|paratha|omelette|omelet|egg|anda|bhurji|curry|matar|aloo|palak|khichdi|poha|upma|pulao|biryani)\b/i.test(name);
+}
+
+// ---- v2.0: restaurant portions ----
+
+/** Outside kitchens serve bigger portions than a home katori: the "Restaurant portion" toggle scales by this. */
+export const RESTAURANT_MULTIPLIER = 1.4;
+/** The hidden oil a restaurant curry carries on top of the home recipe: 1 tsp (5 g) of oil. */
+export const RESTAURANT_OIL_G = 5;
+const OIL_KCAL_PER_G = 8.84;
+const FAST_FOOD = /\b(pizza|burger|fries|momo|momos|sandwich)\b/i;
+
+/** Whether the restaurant toggle also adds the hidden teaspoon of oil (dal / sabzi / protein dishes and curries). */
+export function restaurantOil(name: string, category?: string | null): boolean {
+  if (category === "dal" || category === "sabzi" || category === "protein") return true;
+  if (category === "restaurant") return !FAST_FOOD.test(name);
+  if (category) return false;
+  return wantsCookedIn(name);
+}
+
+/** Packaged scans have a printed serving; everything else can be a restaurant portion. */
+export function canBeRestaurant(f: QuantityFood): boolean {
+  return f.source !== "scan";
+}
+
+/** A restaurant portion of a priced item: ×1.4 the amount, +1 tsp oil for oily dishes, "(restaurant)" on the name. */
+export function applyRestaurant(item: MealItem, oily: boolean): MealItem {
+  const k = RESTAURANT_MULTIPLIER;
+  const micros: ItemMicros = {};
+  for (const [key, v] of Object.entries(item.micros ?? {})) if (v != null) micros[key as keyof ItemMicros] = Math.round(v * k * 10) / 10;
+  const fatAdd = oily ? RESTAURANT_OIL_G : 0;
+  return {
+    ...item,
+    name: /\(restaurant\)$/i.test(item.name) ? item.name : `${item.name} (restaurant)`,
+    grams: Math.round(item.grams * k * 10) / 10,
+    calories: Math.round(item.calories * k + fatAdd * OIL_KCAL_PER_G),
+    protein_g: Math.round(item.protein_g * k * 10) / 10,
+    carbs_g: Math.round(item.carbs_g * k * 10) / 10,
+    fat_g: Math.round((item.fat_g * k + fatAdd) * 10) / 10,
+    micros,
+    servings: item.servings != null ? Math.round(item.servings * k * 100) / 100 : item.servings,
+    cooked_in: "restaurant",
+  };
+}
+
+/** Restaurant words in a note or the model's plate description. */
+export function mentionsRestaurant(text: string): boolean {
+  return /\b(restaurant|restaurants|dhaba|hotel|mess|canteen|cafe|café|takeaway|take-away|zomato|swiggy|eating out|ate out)\b/i.test(text);
 }

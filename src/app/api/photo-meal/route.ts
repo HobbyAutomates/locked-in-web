@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { apiUser } from "@/lib/apiAuth";
 import { microsFor, searchFoods, sourceBonus, type FoodHit } from "@/lib/foodSearch";
 import { saveScan } from "@/lib/labelAnalysis";
+import { RESTAURANT_MULTIPLIER, RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
 import type { ItemMicros, PlateEstimate, PlateItem } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -154,6 +155,29 @@ export async function POST(req: Request) {
       }),
     );
 
+    // 2b. Eaten out? Restaurant words in the note or the model's own description scale every portion
+    //     ×1.4 and add the hidden teaspoon of oil to curries / dal / sabzi — same rule as the Quantity sheet.
+    const noteText = String(body.note ?? "");
+    const restaurant = mentionsRestaurant(`${noteText} ${String(raw.plate_note ?? "")}`);
+    const finalItems: PlateItem[] = restaurant
+      ? items.map((it) => {
+          const k = RESTAURANT_MULTIPLIER;
+          const oil = restaurantOil(it.name, null) ? RESTAURANT_OIL_G : 0;
+          const micros: ItemMicros = {};
+          for (const [key, v] of Object.entries(it.micros ?? {})) if (v != null) micros[key as keyof ItemMicros] = Math.round(v * k * 10) / 10;
+          return {
+            ...it,
+            grams: Math.round(it.grams * k),
+            calories: Math.round(it.calories * k + oil * 8.84),
+            protein_g: Math.round(it.protein_g * k * 10) / 10,
+            carbs_g: Math.round(it.carbs_g * k * 10) / 10,
+            fat_g: Math.round((it.fat_g * k + oil) * 10) / 10,
+            micros,
+            cooked_in: "restaurant",
+          };
+        })
+      : items;
+
     // 3. Store the photo and the estimate.
     let photo_path: string | null = null;
     try {
@@ -164,18 +188,20 @@ export async function POST(req: Request) {
       // A failed upload never blocks the estimate.
     }
     const notes = (raw.notes ?? []).map(String);
+    if (restaurant) notes.unshift(`Restaurant portion: amounts ×${RESTAURANT_MULTIPLIER}, plus 1 tsp hidden oil on curries, dal and sabzi.`);
     const plate_note = String(raw.plate_note ?? "");
-    const report = { kind: "photo", items, raw: { items: rawItems }, notes, plate_note, photo_path };
+    const portion_hint = restaurant ? ("restaurant" as const) : null;
+    const report = { kind: "photo", items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint };
     const id = await saveScan(admin, {
       userId: user.id,
       kind: "photo",
       lens: "protein",
-      product: plate_note || items.map((i) => i.name).join(", "),
+      product: plate_note || finalItems.map((i) => i.name).join(", "),
       verdict: "",
       report,
       imagePath: photo_path,
     });
-    const result: PlateEstimate = { id, items, raw: { items: rawItems }, notes, plate_note, photo_path };
+    const result: PlateEstimate = { id, items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint };
     return NextResponse.json(result);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Photo estimate failed";

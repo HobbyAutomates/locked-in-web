@@ -1,7 +1,7 @@
 import type { ReminderPref } from "./types";
 
 /** The five meal reminders; the source of truth is `profiles.reminders` (Android's util/Reminders.kt). */
-export type Slot = { key: string; label: string; defaultTime: string; prompt: string };
+export type Slot = { key: string; label: string; defaultTime: string; prompt: string; defaultOn?: boolean };
 
 export const SLOTS: Slot[] = [
   { key: "breakfast", label: "Breakfast", defaultTime: "08:30", prompt: "log your breakfast?" },
@@ -9,6 +9,8 @@ export const SLOTS: Slot[] = [
   { key: "snack", label: "Snack", defaultTime: "15:00", prompt: "log your snack?" },
   { key: "dinner", label: "Dinner", defaultTime: "19:00", prompt: "log your dinner?" },
   { key: "endofday", label: "End of day", defaultTime: "21:00", prompt: "anything left to log today?" },
+  // v2.0: the 9 pm daily wrap (Android notification; on the web it is the Wrap card on Home). On by default.
+  { key: "wrap", label: "Daily wrap", defaultTime: "21:00", prompt: "your day, wrapped", defaultOn: true },
 ];
 
 /** Normalises whatever is stored so every slot has an `on` and a valid `time`. */
@@ -18,7 +20,7 @@ export function parse(raw: unknown): Record<string, ReminderPref> {
     SLOTS.map((s) => {
       const row = o[s.key];
       const time = typeof row?.time === "string" && /^\d{1,2}:\d{2}$/.test(row.time) ? row.time : s.defaultTime;
-      return [s.key, { on: row?.on === true, time }];
+      return [s.key, { on: typeof row?.on === "boolean" ? row.on : s.defaultOn === true, time }];
     }),
   );
 }

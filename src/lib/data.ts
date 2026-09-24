@@ -1,6 +1,6 @@
 import { addDays, today } from "./dates";
 import { createClient } from "./supabase/server";
-import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Profile, type ScanHistoryItem, type WeightEntry, type Workout } from "./types";
+import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Nudge, type Profile, type ScanHistoryItem, type Squad, type SquadMember, type WeightEntry, type Workout } from "./types";
 import { parse as parseReminders } from "./reminders";
 import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 
@@ -207,6 +207,61 @@ export async function getScan(id: string): Promise<Record<string, unknown> | nul
     if (s?.signedUrl) report.photo_url = s.signedUrl;
   }
   return report;
+}
+
+// ---- v2.0: squads ----
+
+/** Every squad the signed-in user is in, oldest first. */
+export async function getMySquads(): Promise<Squad[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data: mine } = await supabase.from("group_members").select("group_id, joined_at").eq("user_id", user.id).order("joined_at", { ascending: true });
+  const ids = (mine ?? []).map((m) => m.group_id as string);
+  if (!ids.length) return [];
+  const { data } = await supabase.from("groups").select("id, name, code, owner_id, created_at").in("id", ids);
+  const byId = new Map(((data ?? []) as Squad[]).map((g) => [g.id, g]));
+  return ids.map((id) => byId.get(id)).filter((g): g is Squad => !!g);
+}
+
+/** The squad board: members with name, share preference and their last 7 days of rollups. */
+export async function getSquadBoard(groupId: string): Promise<SquadMember[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("squad_board", { g: groupId });
+  if (error) return [];
+  return ((data ?? []) as SquadMember[]).map((m) => ({
+    ...m,
+    days: (m.days ?? []).map((d) => ({
+      ...d,
+      protein_g: d.protein_g == null ? null : Number(d.protein_g),
+      calories: d.calories == null ? null : Number(d.calories),
+      burned: d.burned == null ? null : Number(d.burned),
+      meals: d.meals == null ? null : Number(d.meals),
+      week_streak: Number(d.week_streak ?? 0),
+    })),
+  }));
+}
+
+/** Nudges sent to me in the last 24 h (Home shows them as a banner). */
+export async function getMyNudges(): Promise<Nudge[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("my_nudges");
+  if (error) return [];
+  return (data ?? []) as Nudge[];
+}
+
+/** Who I've already nudged in the last 20 h, so the board can show "Nudged". */
+export async function getSentNudges(): Promise<string[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const since = new Date(Date.now() - 20 * 3600 * 1000).toISOString();
+  const { data } = await supabase.from("nudges").select("to_user").eq("from_user", user.id).gte("created_at", since);
+  return [...new Set((data ?? []).map((r) => r.to_user as string))];
 }
 
 export { totalsFor } from "./totals";
