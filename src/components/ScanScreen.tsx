@@ -768,9 +768,37 @@ function scaleItem(it: PlateItem, grams: number): PlateItem {
   return { ...it, grams, calories: Math.round(it.calories * k), protein_g: Math.round(it.protein_g * k * 10) / 10, carbs_g: Math.round(it.carbs_g * k * 10) / 10, fat_g: Math.round(it.fat_g * k * 10) / 10, micros };
 }
 
+/**
+ * The grams field for an item on the plate. Keeps its own text so a cleared or in-progress value
+ * ("0" on the way to "0.5") doesn't get forced back to the last grams — and always scales from the
+ * ORIGINAL estimate, never the already-scaled item, so repeated edits can't drift macros to 0.
+ */
+function GramsInput({ original, current, onScale }: { original: PlateItem; current: PlateItem; onScale: (next: PlateItem) => void }) {
+  const [text, setText] = useState(() => String(current.grams));
+  return (
+    <input
+      className="field num text-right"
+      style={{ width: 76, flex: "none", padding: "10px 10px" }}
+      inputMode="decimal"
+      aria-label={`${current.name} grams`}
+      value={text}
+      onChange={(e) => {
+        const v = e.target.value.replace(/[^\d.]/g, "");
+        setText(v);
+        const g = Number(v);
+        // Ignore empty / unparsable / ≤0 input — the previous value stays until a real number lands.
+        if (v !== "" && Number.isFinite(g) && g > 0) onScale(scaleItem(original, g));
+      }}
+    />
+  );
+}
+
 export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate; onSaved?: () => void; readOnly?: boolean }) {
   const router = useRouter();
   const [items, setItems] = useState<PlateItem[]>(plate.items);
+  // The un-scaled estimate for each row, kept in lockstep with `items` (including removals) so a
+  // gram edit always scales from the ORIGINAL, never from an already-scaled value.
+  const [originals, setOriginals] = useState<PlateItem[]>(plate.items);
   const [open, setOpen] = useState<number | null>(null);
   const [saving, startSave] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -844,19 +872,23 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                     </div>
                     {!readOnly ? (
                       <>
-                        <input
-                          className="field num text-right"
-                          style={{ width: 76, flex: "none", padding: "10px 10px" }}
-                          inputMode="decimal"
-                          aria-label={`${it.name} grams`}
-                          value={it.grams}
-                          onChange={(e) => {
-                            const g = Number(e.target.value.replace(/[^\d.]/g, ""));
-                            if (Number.isFinite(g)) setItems(items.map((x, i) => (i === idx ? scaleItem(x, g) : x)));
-                          }}
+                        <GramsInput
+                          key={`${idx}-${items.length}`}
+                          original={originals[idx]}
+                          current={it}
+                          onScale={(next) => setItems(items.map((x, i) => (i === idx ? next : x)))}
                         />
                         <span className="text-xs muted">g</span>
-                        <button type="button" aria-label={`Remove ${it.name}`} className="hit press grid h-8 w-8 place-items-center rounded-full" style={{ color: "var(--muted)" }} onClick={() => setItems(items.filter((_, i) => i !== idx))}>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${it.name}`}
+                          className="hit press grid h-8 w-8 place-items-center rounded-full"
+                          style={{ color: "var(--muted)" }}
+                          onClick={() => {
+                            setItems(items.filter((_, i) => i !== idx));
+                            setOriginals(originals.filter((_, i) => i !== idx));
+                          }}
+                        >
                           <Trash size={16} />
                         </button>
                       </>

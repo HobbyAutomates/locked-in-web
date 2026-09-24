@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { deleteExercise, deleteMeal } from "@/lib/actions";
@@ -70,6 +70,41 @@ function DeleteButton({ label, busy, onClick }: { label: string; busy: boolean; 
   );
 }
 
+/** Optimistic delete: the row hides now, "Deleted" (with an Undo button beside it) shows for ~5s,
+ * and the real delete only happens if Undo isn't tapped in time. */
+function useUndoDelete(action: () => Promise<void>) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function start() {
+    setPending(true);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      void action()
+        .then(() => router.refresh())
+        .catch((e) => console.error("[useUndoDelete] delete failed:", e));
+    }, 5000);
+  }
+  function undo() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    setPending(false);
+  }
+  return { pending, start, undo };
+}
+
+function UndoRow({ onUndo }: { onUndo: () => void }) {
+  return (
+    <div className="card flex min-h-[56px] items-center justify-between gap-3" style={{ padding: "8px 16px" }}>
+      <span className="text-[14px] font-semibold muted">Deleted</span>
+      <button type="button" className="hit press text-[13px] font-bold" style={{ color: "var(--btn)", background: "none", border: 0 }} onClick={onUndo}>
+        Undo
+      </button>
+    </div>
+  );
+}
+
 export function WorkoutRow({ workout, onOpen, burnKcal }: { workout: Workout; onOpen: () => void; burnKcal?: number | null }) {
   const w = workout;
   return (
@@ -88,10 +123,9 @@ export function WorkoutRow({ workout, onOpen, burnKcal }: { workout: Workout; on
 }
 
 export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: string | null }; feedback?: boolean }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [voted, setVoted] = useState<"up" | "down" | null>(null);
-  const [busy, startDelete] = useTransition();
+  const del = useUndoDelete(() => deleteMeal(meal.id));
   const calories = meal.items.reduce((a, i) => a + Number(i.calories), 0);
   const protein = meal.items.reduce((a, i) => a + Number(i.protein_g), 0);
   const carbs = meal.items.reduce((a, i) => a + Number(i.carbs_g), 0);
@@ -110,6 +144,8 @@ export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: 
       // Feedback is best-effort; never block the row on it.
     });
   }
+
+  if (del.pending) return <UndoRow onUndo={del.undo} />;
 
   return (
     <div className="card" style={{ padding: 0 }}>
@@ -177,16 +213,7 @@ export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: 
           ) : (
             <span />
           )}
-          <DeleteButton
-            label="Delete meal"
-            busy={busy}
-            onClick={() =>
-              startDelete(async () => {
-                await deleteMeal(meal.id);
-                router.refresh();
-              })
-            }
-          />
+          <DeleteButton label="Delete meal" busy={false} onClick={del.start} />
         </div>
       </Expand>
     </div>
@@ -195,15 +222,15 @@ export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: 
 
 /** A logged burn (run / activity / described / manual). */
 export function ExerciseRow({ entry }: { entry: ExerciseEntry }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [busy, startDelete] = useTransition();
+  const del = useUndoDelete(() => deleteExercise(entry.id));
   const e = entry;
   const lower = e.name.toLowerCase();
   const isRun = e.activity_code === RUN_CODE || lower.includes("run") || lower.includes("jog");
   const isBands = (e.activity_code ?? "").startsWith("LI-BAND") || lower.includes("lifting") || lower.includes("band");
   const neutral = isRun || isBands;
   const title = e.name.charAt(0).toUpperCase() + e.name.slice(1);
+  if (del.pending) return <UndoRow onUndo={del.undo} />;
   return (
     <div className="card" style={{ padding: 0 }}>
       <Summary
@@ -225,16 +252,7 @@ export function ExerciseRow({ entry }: { entry: ExerciseEntry }) {
           <span className="text-[13px] muted">
             {e.source === "manual" && !e.activity_code ? "Entered by hand" : `Intensity: ${intensityLabel(e.intensity)}`} · {e.minutes} min
           </span>
-          <DeleteButton
-            label="Delete exercise"
-            busy={busy}
-            onClick={() =>
-              startDelete(async () => {
-                await deleteExercise(e.id);
-                router.refresh();
-              })
-            }
-          />
+          <DeleteButton label="Delete exercise" busy={false} onClick={del.start} />
         </div>
       </Expand>
     </div>
