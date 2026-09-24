@@ -38,24 +38,6 @@ export function Run(p: P) {
   );
 }
 
-/** Three text lines for the Describe option. */
-export function TextLines(p: P) {
-  return (
-    <Stroke {...p}>
-      <path d="M4 7h16M4 12h12M4 17h8" />
-    </Stroke>
-  );
-}
-
-/** Number keypad for the Manual option. */
-export function Keypad(p: P) {
-  return (
-    <Stroke {...p}>
-      <path d="M6 5h.1M12 5h.1M18 5h.1M6 11h.1M12 11h.1M18 11h.1M6 17h.1M12 17h.1M18 17h.1" />
-    </Stroke>
-  );
-}
-
 /** Filled flame — streak and calories. */
 export function Flame({ size = 24, className, style }: P) {
   return (
@@ -328,17 +310,6 @@ export function Person(p: P) {
   );
 }
 
-/** Sliders for the Preferences row. */
-export function Tune(p: P) {
-  return (
-    <Stroke {...p}>
-      <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
-      <circle cx="16" cy="7" r="2" />
-      <circle cx="10" cy="17" r="2" />
-    </Stroke>
-  );
-}
-
 export function Bell(p: P) {
   return (
     <Stroke {...p}>
@@ -381,15 +352,6 @@ export function Search(p: P) {
     <Stroke {...p}>
       <circle cx="11" cy="11" r="6.5" />
       <path d="M16 16l5 5" />
-    </Stroke>
-  );
-}
-
-/** Four tiles for the Presets tab. */
-export function Grid(p: P) {
-  return (
-    <Stroke {...p}>
-      <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
     </Stroke>
   );
 }
@@ -474,6 +436,35 @@ export function MoonStar(p: P) {
   return (
     <Stroke {...p}>
       <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5zM17 3v4M15 5h4" />
+    </Stroke>
+  );
+}
+
+/** Down chevron: expanders ("Details", a collapsed Home row). */
+export function ChevronDown(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M6 9l6 6 6-6" />
+    </Stroke>
+  );
+}
+
+/** A teaspoon, for the sugar-spoons row of a scan report. */
+export function Spoon(p: P) {
+  return (
+    <Stroke {...p}>
+      <ellipse cx="12" cy="7" rx="3.6" ry="4.4" />
+      <path d="M12 11.4V21" />
+    </Stroke>
+  );
+}
+
+/** A phone, for "Add to Home Screen". */
+export function Phone(p: P) {
+  return (
+    <Stroke {...p}>
+      <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+      <path d="M10.5 18.5h3" />
     </Stroke>
   );
 }

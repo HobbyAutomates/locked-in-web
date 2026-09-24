@@ -105,6 +105,32 @@ export async function getWorkout(id: string): Promise<Workout | null> {
   return (data as Workout) ?? null;
 }
 
+/** The most recent workout, for the Workout form's "Same as last time". */
+export async function getLatestWorkout(): Promise<Workout | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("workouts")
+    .select("id, date, muscles, band_level, resistance_kg, minutes, exercises, notes")
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as Workout) ?? null;
+}
+
+/**
+ * How often each food was eaten in the last `days` days (meal_items.food_id → count). Add food
+ * uses it to build "Yours" and to order categories and presets by what this person actually eats.
+ */
+export async function getFoodUsage(days = 60): Promise<Record<string, number>> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("meals").select("meal_items(food_id)").gte("date", addDays(today(), -days));
+  const out: Record<string, number> = {};
+  for (const m of (data ?? []) as { meal_items: { food_id: string | null }[] | null }[]) {
+    for (const i of m.meal_items ?? []) if (i.food_id) out[i.food_id] = (out[i.food_id] ?? 0) + 1;
+  }
+  return out;
+}
+
 /** Meals with items; `photo_path` becomes a 1-hour signed URL in `photo_url` when a photo exists. */
 export async function getMeals(from: string, to: string): Promise<(Meal & { photo_url?: string | null })[]> {
   const supabase = await createClient();

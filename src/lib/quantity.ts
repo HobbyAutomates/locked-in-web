@@ -85,7 +85,8 @@ export function priceItem(f: QuantityFood, q: Quantity): MealItem {
 export function quickChips(f: QuantityFood): { label: string; q: Quantity }[] {
   const out: { label: string; q: Quantity }[] = [];
   const sg = servingGrams(f);
-  const sl = (f.servings.find((x) => x.label === f.defaultServing) ?? f.servings[0])?.label ?? "serving";
+  // Serving labels read "1 katori": the chips put their own number in front.
+  const sl = ((f.servings.find((x) => x.label === f.defaultServing) ?? f.servings[0])?.label ?? "serving").replace(/^1\s+/, "");
   if (sg) {
     out.push({ label: `½ ${sl}`, q: { unit: "serving", value: 0.5 } });
     out.push({ label: `1 ${sl}`, q: { unit: "serving", value: 1 } });
@@ -167,4 +168,23 @@ export function applyRestaurant(item: MealItem, oily: boolean): MealItem {
 /** Restaurant words in a note or the model's plate description. */
 export function mentionsRestaurant(text: string): boolean {
   return /\b(restaurant|restaurants|dhaba|hotel|mess|canteen|cafe|café|takeaway|take-away|zomato|swiggy|eating out|ate out)\b/i.test(text);
+}
+
+/** A plate-photo item as a meal item (the confidence word becomes a number, like the Android app). */
+export function mealItemFromPlate(i: { food_id: string | null; name: string; grams: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; source: "table" | "estimated"; confidence: "high" | "medium" | "low"; micros: ItemMicros; cooked_in?: string | null }): MealItem {
+  return {
+    food_id: i.food_id,
+    name: i.name,
+    grams: i.grams,
+    calories: i.calories,
+    protein_g: i.protein_g,
+    carbs_g: i.carbs_g,
+    fat_g: i.fat_g,
+    source: i.source,
+    confidence: i.confidence === "high" ? 0.9 : i.confidence === "medium" ? 0.6 : 0.3,
+    micros: i.micros,
+    unit: "g",
+    servings: null,
+    cooked_in: i.cooked_in ?? null,
+  };
 }

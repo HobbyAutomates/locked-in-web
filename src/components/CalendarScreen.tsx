@@ -6,7 +6,7 @@ import { iso, longDate, today as todayIso } from "@/lib/dates";
 import type { Meal, Workout } from "@/lib/types";
 import { ChevronLeft, ChevronRight } from "./icons";
 import { MealRow, WorkoutRow } from "./Rows";
-import { Card, Rise } from "./ui";
+import { Card, PillButton, Rise } from "./ui";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -125,7 +125,16 @@ export default function CalendarScreen({ workouts, meals, weekStreak }: { workou
         </div>
       </Rise>
 
-      {dayWorkouts.length === 0 && dayMeals.length === 0 ? <p className="text-[13px] muted">Nothing logged.</p> : null}
+      {dayWorkouts.length === 0 && dayMeals.length === 0 ? (
+        <Rise index={3}>
+          <div className="card flex flex-col items-start gap-3">
+            <p className="text-[15px]">Nothing logged on this day.</p>
+            <PillButton soft height={44} onClick={() => router.push(`/log?date=${selected}`)}>
+              Log for this day
+            </PillButton>
+          </div>
+        </Rise>
+      ) : null}
       {dayWorkouts.map((w) => (
         <Rise key={w.id} index={3}>
           <WorkoutRow workout={w} onOpen={() => router.push(`/log?workout=${w.id}`)} />

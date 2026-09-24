@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { createSquad, joinSquad, leaveSquad, nudgeMember, renameSquad } from "@/lib/actions";
 import { addDays, weekStart } from "@/lib/dates";
 import type { Squad, SquadMember } from "@/lib/types";
-import { Check, Copy, Fist, People, Pencil, Plus, Share } from "./icons";
-import { BreathingFlame, Card, ErrorNote, PillButton, Rise } from "./ui";
+import { Check, Close, Copy, Fist, Pencil, Plus, Share } from "./icons";
+import { BreathingFlame, Card, ChipRow, ErrorNote, PillButton, Rise } from "./ui";
 
 const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-12.apk";
 const WEB_URL = "https://web-production-ff1cf.up.railway.app";
@@ -27,11 +27,12 @@ type Props = {
 };
 
 /**
- * The Squad tab: create a squad (server makes a 6-letter code) or join one with a code; once in,
- * the board — who's locked in today, this week's dots, streaks, protein & calories for members who
- * share them, and a nudge for anyone who hasn't trained yet.
+ * The Squad tab: the board — who's locked in today, this week's dots, streaks, protein & calories
+ * for members who share them, and a nudge pill for anyone who hasn't trained yet. Create / join
+ * lives behind the "+" in the header once you're in a squad.
  */
 export default function SquadScreen({ me, today, squads, selectedId, board, sentNudges, shareStats }: Props) {
+  const router = useRouter();
   const [adding, setAdding] = useState(false);
   const selected = squads.find((s) => s.id === selectedId) ?? null;
   return (
@@ -40,21 +41,25 @@ export default function SquadScreen({ me, today, squads, selectedId, board, sent
         <div className="flex items-center justify-between">
           <h1 className="screen-title">Squad</h1>
           {squads.length ? (
-            <button type="button" className="chip press" style={{ height: 34 }} aria-pressed={adding} onClick={() => setAdding((v) => !v)}>
-              <span className="inline-flex items-center gap-1.5">
-                <Plus size={15} />
-                {adding ? "Close" : "Add squad"}
-              </span>
+            <button
+              type="button"
+              aria-label={adding ? "Close create or join" : "Create or join a squad"}
+              aria-expanded={adding}
+              className="press grid h-11 w-11 place-items-center rounded-full"
+              style={{ background: adding ? "var(--card2)" : "var(--btn)", color: adding ? "var(--ink)" : "var(--btn-ink)", boxShadow: "var(--shadow-sm)" }}
+              onClick={() => setAdding((v) => !v)}
+            >
+              {adding ? <Close size={18} /> : <Plus size={20} />}
             </button>
           ) : null}
         </div>
       </Rise>
 
-      {!squads.length || adding ? <StartCards onDone={() => setAdding(false)} /> : null}
+      {!squads.length || adding ? <StartCards first={!squads.length} onDone={() => setAdding(false)} /> : null}
 
       {squads.length > 1 ? (
         <Rise index={1}>
-          <SquadSwitcher squads={squads} selectedId={selectedId} />
+          <ChipRow options={squads.map((s) => ({ key: s.id, label: s.name }))} value={selectedId ?? ""} onChange={(id) => router.push(`/squad?g=${id}`)} label="Your squads" />
         </Rise>
       ) : null}
 
@@ -63,24 +68,12 @@ export default function SquadScreen({ me, today, squads, selectedId, board, sent
   );
 }
 
-function SquadSwitcher({ squads, selectedId }: { squads: Squad[]; selectedId: string | null }) {
-  const router = useRouter();
-  return (
-    <div className="seg" role="tablist" aria-label="Your squads">
-      {squads.map((s) => (
-        <button key={s.id} type="button" role="tab" aria-selected={s.id === selectedId} className="press" onClick={() => router.push(`/squad?g=${s.id}`)}>
-          {s.name}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** "Create a squad" and "Join with a code". */
-function StartCards({ onDone }: { onDone: () => void }) {
+/** Create a squad (one field, one button); "Have a code?" reveals the join field. */
+function StartCards({ first, onDone }: { first: boolean; onDone: () => void }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [created, setCreated] = useState<{ id: string; code: string; name: string } | null>(null);
@@ -117,16 +110,11 @@ function StartCards({ onDone }: { onDone: () => void }) {
     return (
       <Rise index={1}>
         <Card padding={20}>
-          <p className="text-[13px] font-bold muted">{created.name} is live</p>
-          <p className="mt-1 text-[15px]">Send your friends this code:</p>
-          <CodeBlock code={created.code} big />
-          <div className="mt-3 flex gap-2">
-            <PillButton height={46} onClick={() => shareInvite(created.code)}>
-              <span className="inline-flex items-center gap-2">
-                <Share size={16} />
-                Invite
-              </span>
-            </PillButton>
+          <p className="text-[15px]">
+            <span className="font-bold">{created.name}</span> is live — send your friends the code.
+          </p>
+          <CodePill code={created.code} />
+          <div className="mt-3">
             <PillButton
               soft
               height={46}
@@ -145,38 +133,24 @@ function StartCards({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <>
-      <Rise index={1}>
-        <Card padding={18}>
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: "var(--btn)", color: "var(--btn-ink)" }}>
-              <People size={19} />
-            </span>
-            <span>
-              <span className="block text-[16px] font-bold">Create a squad</span>
-              <span className="block text-xs muted">Get a 6-letter code to share with friends</span>
-            </span>
-          </div>
+    <Rise index={1}>
+      <Card padding={18}>
+        <p className="text-[15px]">{first ? "Train with friends: make a squad and share its 6-letter code." : "Make another squad, or join one with a code."}</p>
+        <form
+          className="mt-3 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) create();
+          }}
+        >
+          <input className="field" placeholder="Squad name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} aria-label="Squad name" />
+          <PillButton type="submit" height={48} disabled={pending || !name.trim()} className="!w-auto shrink-0 !px-5">
+            Create
+          </PillButton>
+        </form>
+        {joining ? (
           <form
-            className="mt-3 flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (name.trim()) create();
-            }}
-          >
-            <input className="field" placeholder="Squad name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} aria-label="Squad name" />
-            <PillButton type="submit" height={46} disabled={pending || !name.trim()} className="!w-auto shrink-0 !px-5">
-              Create
-            </PillButton>
-          </form>
-        </Card>
-      </Rise>
-      <Rise index={2}>
-        <Card padding={18}>
-          <span className="block text-[16px] font-bold">Join with a code</span>
-          <span className="block text-xs muted">Ask a friend for their squad code</span>
-          <form
-            className="mt-3 flex gap-2"
+            className="mt-2.5 flex gap-2"
             onSubmit={(e) => {
               e.preventDefault();
               if (code.length === 6) join();
@@ -188,19 +162,28 @@ function StartCards({ onDone }: { onDone: () => void }) {
               placeholder="LOCK7Q"
               value={code}
               maxLength={6}
+              autoFocus
               autoCapitalize="characters"
               autoComplete="off"
               aria-label="Squad code"
               onChange={(e) => setCode(e.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 6))}
             />
-            <PillButton type="submit" height={46} disabled={pending || code.length !== 6} className="!w-auto shrink-0 !px-5">
+            <PillButton type="submit" height={48} disabled={pending || code.length !== 6} className="!w-auto shrink-0 !px-5">
               Join
             </PillButton>
           </form>
-        </Card>
-      </Rise>
-      {error ? <ErrorNote text={error} /> : null}
-    </>
+        ) : (
+          <button type="button" className="hit press mt-2.5 py-1 text-[13px] font-semibold muted" onClick={() => setJoining(true)}>
+            Have a code? Join a squad
+          </button>
+        )}
+        {error ? (
+          <div className="mt-2.5">
+            <ErrorNote text={error} />
+          </div>
+        ) : null}
+      </Card>
+    </Rise>
   );
 }
 
@@ -214,32 +197,38 @@ async function shareInvite(code: string) {
   }
 }
 
-function CodeBlock({ code, big }: { code: string; big?: boolean }) {
+/** The squad code as one big copyable pill, with the share / invite button beside it. */
+function CodePill({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
-      type="button"
-      className="press mt-2 flex w-full items-center justify-between rounded-2xl px-4 py-3"
-      style={{ background: "var(--card2)" }}
-      aria-label={`Copy code ${code}`}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(code);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          // Clipboard blocked; the code is on screen anyway.
-        }
-      }}
-    >
-      <span className="num font-extrabold" style={{ fontSize: big ? 34 : 22, letterSpacing: "0.18em" }}>
-        {code}
-      </span>
-      <span className="inline-flex items-center gap-1.5 text-xs font-semibold muted">
-        {copied ? <Check size={15} /> : <Copy size={15} />}
-        {copied ? "Copied" : "Copy"}
-      </span>
-    </button>
+    <div className="mt-3 flex items-center gap-2">
+      <button
+        type="button"
+        className="press flex min-h-[56px] flex-1 items-center justify-between rounded-full pl-5 pr-4"
+        style={{ background: "var(--card2)" }}
+        aria-label={`Copy squad code ${code}`}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          } catch {
+            // Clipboard blocked; the code is on screen anyway.
+          }
+        }}
+      >
+        <span className="num text-[26px] font-extrabold" style={{ letterSpacing: "0.2em" }}>
+          {code}
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: copied ? "var(--green)" : "var(--muted)" }}>
+          {copied ? <Check size={15} /> : <Copy size={15} />}
+          {copied ? "Copied" : "Copy"}
+        </span>
+      </button>
+      <button type="button" aria-label="Invite friends" className="press grid h-14 w-14 shrink-0 place-items-center rounded-full" style={{ background: "var(--btn)", color: "var(--btn-ink)" }} onClick={() => shareInvite(code)}>
+        <Share size={20} />
+      </button>
+    </div>
   );
 }
 
@@ -303,7 +292,7 @@ function Board({ me, today, squad, board, sentNudges, shareStats }: { me: string
               }}
             >
               <input className="field" value={newName} maxLength={40} onChange={(e) => setNewName(e.target.value)} aria-label="Squad name" autoFocus />
-              <PillButton type="submit" height={46} disabled={pending || !newName.trim()} className="!w-auto shrink-0 !px-5">
+              <PillButton type="submit" height={48} disabled={pending || !newName.trim()} className="!w-auto shrink-0 !px-5">
                 Save
               </PillButton>
             </form>
@@ -313,7 +302,7 @@ function Board({ me, today, squad, board, sentNudges, shareStats }: { me: string
                 {squad.name}
               </p>
               {isOwner ? (
-                <button type="button" aria-label="Rename squad" className="press grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)" }} onClick={() => setRenaming(true)}>
+                <button type="button" aria-label="Rename squad" className="hit press grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)" }} onClick={() => setRenaming(true)}>
                   <Pencil size={14} />
                 </button>
               ) : null}
@@ -322,15 +311,7 @@ function Board({ me, today, squad, board, sentNudges, shareStats }: { me: string
           <p className="mt-0.5 text-xs muted">
             {board.length} member{board.length === 1 ? "" : "s"} · tap the code to copy it
           </p>
-          <CodeBlock code={squad.code} />
-          <div className="mt-2.5">
-            <PillButton soft height={42} onClick={() => shareInvite(squad.code)}>
-              <span className="inline-flex items-center gap-2">
-                <Share size={16} />
-                Invite friends
-              </span>
-            </PillButton>
-          </div>
+          <CodePill code={squad.code} />
         </Card>
       </Rise>
 
@@ -342,6 +323,7 @@ function Board({ me, today, squad, board, sentNudges, shareStats }: { me: string
         const trainedDays = new Set(m.days.filter((d) => d.trained).map((d) => d.date));
         const isMe = m.user_id === me;
         const already = nudged.has(m.user_id);
+        const first = m.name.split(" ")[0] || "them";
         return (
           <Rise key={m.user_id} index={3 + i}>
             <Card padding={14}>
@@ -360,14 +342,27 @@ function Board({ me, today, squad, board, sentNudges, shareStats }: { me: string
                     {isMe ? <span className="font-medium muted"> · you</span> : null}
                     {m.is_owner ? <span className="text-[11px] font-semibold muted"> · owner</span> : null}
                   </span>
-                  <span className="text-xs" style={{ color: trainedToday ? "var(--green)" : "var(--muted)", fontWeight: trainedToday ? 700 : 500 }}>
+                  <span className="flex items-center gap-1.5 text-xs" style={{ color: trainedToday ? "var(--green)" : "var(--muted)", fontWeight: trainedToday ? 700 : 500 }}>
                     {trainedToday ? "Locked in today" : "Not yet today"}
+                    <span className="inline-flex items-center gap-0.5 font-extrabold" style={{ color: "var(--ink)" }} title={`${streakOf(m)}-week streak`}>
+                      · <BreathingFlame size={13} />
+                      <span className="num">{streakOf(m)}</span>
+                    </span>
                   </span>
                 </span>
-                <span className="flex items-center gap-1 text-[15px] font-extrabold" title={`${streakOf(m)}-week streak`}>
-                  <BreathingFlame size={18} />
-                  <span className="num">{streakOf(m)}</span>
-                </span>
+                {!isMe && !trainedToday ? (
+                  <button
+                    type="button"
+                    className="chip press shrink-0"
+                    style={{ height: 36, padding: "0 12px", gap: 6, background: already ? "var(--card2)" : "var(--btn)", color: already ? "var(--muted)" : "var(--btn-ink)", fontWeight: 700 }}
+                    disabled={already}
+                    aria-label={already ? `Nudged ${first}` : `Nudge ${first}`}
+                    onClick={() => nudge(m)}
+                  >
+                    {already ? <Check size={15} /> : <Fist size={15} />}
+                    {already ? "Nudged" : "Nudge"}
+                  </button>
+                ) : null}
               </div>
               <div className="mt-3 flex items-center justify-between gap-2">
                 <div className="flex gap-1.5" aria-label="This week">
@@ -396,22 +391,6 @@ function Board({ me, today, squad, board, sentNudges, shareStats }: { me: string
                   {m.share_stats ? `${Math.round(todayRow?.protein_g ?? 0)} g · ${Math.round(todayRow?.calories ?? 0).toLocaleString("en-IN")} kcal` : "streaks only"}
                 </span>
               </div>
-              {!isMe && !trainedToday ? (
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    className="chip press w-full"
-                    style={{ height: 36, background: already ? "var(--card2)" : "var(--btn)", color: already ? "var(--muted)" : "var(--btn-ink)", fontWeight: 700 }}
-                    disabled={already}
-                    onClick={() => nudge(m)}
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Fist size={16} />
-                      {already ? `Nudged ${m.name.split(" ")[0]}` : `Nudge ${m.name.split(" ")[0]}`}
-                    </span>
-                  </button>
-                </div>
-              ) : null}
             </Card>
           </Rise>
         );
@@ -456,7 +435,7 @@ function Board({ me, today, squad, board, sentNudges, shareStats }: { me: string
             </div>
           </Card>
         ) : (
-          <button type="button" className="press mx-auto block text-[13px] font-semibold" style={{ color: "var(--red)" }} onClick={() => setConfirmLeave(true)}>
+          <button type="button" className="hit press mx-auto block py-2 text-[13px] font-semibold" style={{ color: "var(--red)" }} onClick={() => setConfirmLeave(true)}>
             Leave squad
           </button>
         )}

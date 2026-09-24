@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { ChevronRight as ChevronRightIcon, Flame as FlameIcon } from "./icons";
 
 /** Spring used for anything spatial (rings, bars, rising cards) — mirrors Motion.spatialSlow(). */
@@ -37,27 +38,6 @@ export function Card({
     <div className={`card ${className}`} style={{ padding, ...style }}>
       {children}
     </div>
-  );
-}
-
-/** A card the whole surface of which is a button. */
-export function CardButton({
-  children,
-  onClick,
-  className = "",
-  padding = 14,
-  ariaLabel,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  className?: string;
-  padding?: number;
-  ariaLabel?: string;
-}) {
-  return (
-    <button type="button" onClick={onClick} aria-label={ariaLabel} className={`card press w-full text-left ${className}`} style={{ padding }}>
-      {children}
-    </button>
   );
 }
 
@@ -101,7 +81,11 @@ export function Chip({ label, selected, onClick }: { label: string; selected: bo
   );
 }
 
-export function Segmented({ options, selected, onSelect, label }: { options: string[]; selected: number; onSelect: (i: number) => void; label: string }) {
+/**
+ * Two or three mutually exclusive options on a grey track. Never more than three: anything with
+ * four or more options is a `ChipRow` instead.
+ */
+export function Segmented({ options, selected, onSelect, label }: { options: [string, string] | [string, string, string]; selected: number; onSelect: (i: number) => void; label: string }) {
   return (
     <div className="seg" role="tablist" aria-label={label}>
       {options.map((o, i) => (
@@ -110,6 +94,93 @@ export function Segmented({ options, selected, onSelect, label }: { options: str
         </button>
       ))}
     </div>
+  );
+}
+
+/** A horizontally scrolling row of single-select chips (period filters, categories, squads). */
+export function ChipRow<T extends string>({ options, value, onChange, label }: { options: { key: T; label: string }[]; value: T; onChange: (v: T) => void; label: string }) {
+  return (
+    <div className="-mx-4 overflow-x-auto px-4" style={{ scrollbarWidth: "none" }}>
+      <div className="flex w-max gap-1.5 py-1" role="radiogroup" aria-label={label}>
+        {options.map((o) => (
+          <button key={o.key} type="button" role="radio" aria-checked={o.key === value} className="chip press" style={{ height: 36 }} onClick={() => onChange(o.key)}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The one bottom sheet: grab handle, title, content, optional primary button. Backdrop tap and
+ * Escape close it; it slides up with a spring and locks page scroll while open.
+ */
+export function BottomSheet({
+  open,
+  title,
+  subtitle,
+  onClose,
+  children,
+  primary,
+}: {
+  open: boolean;
+  title: string;
+  subtitle?: React.ReactNode;
+  onClose: () => void;
+  children?: React.ReactNode;
+  primary?: { label: React.ReactNode; onClick: () => void; disabled?: boolean };
+}) {
+  return <AnimatePresence>{open ? <SheetFrame title={title} subtitle={subtitle} onClose={onClose} primary={primary}>{children}</SheetFrame> : null}</AnimatePresence>;
+}
+
+function SheetFrame({ title, subtitle, onClose, children, primary }: { title: string; subtitle?: React.ReactNode; onClose: () => void; children?: React.ReactNode; primary?: { label: React.ReactNode; onClick: () => void; disabled?: boolean } }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      style={{ background: "rgba(0,0,0,0.45)" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onClose}
+    >
+      <motion.div
+        className="flex w-full max-w-[480px] flex-col"
+        style={{ background: "var(--card)", borderRadius: "28px 28px 0 0", maxHeight: "88vh", padding: "10px 20px calc(18px + env(safe-area-inset-bottom, 0px))" }}
+        initial={{ y: 80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 80, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 28 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full" style={{ background: "var(--hair)" }} />
+        <p className="shrink-0 text-[19px] font-extrabold leading-tight" style={{ letterSpacing: "-0.02em" }}>
+          {title}
+        </p>
+        {subtitle ? <div className="mt-0.5 shrink-0 text-[13px] muted">{subtitle}</div> : null}
+        {children ? <div className="-mx-1 mt-3 min-h-0 overflow-y-auto px-1">{children}</div> : null}
+        {primary ? (
+          <div className="mt-4 shrink-0">
+            <PillButton onClick={primary.onClick} disabled={primary.disabled}>
+              {primary.label}
+            </PillButton>
+          </div>
+        ) : null}
+      </motion.div>
+    </motion.div>
   );
 }
 

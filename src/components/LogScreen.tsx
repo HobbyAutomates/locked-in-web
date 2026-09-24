@@ -9,22 +9,27 @@ import MealForm from "./MealForm";
 import WorkoutForm from "./WorkoutForm";
 import type { FoodPreset, Profile, SavedMeal, Workout } from "@/lib/types";
 
-/** Full-screen Log page: Workout / Meal / Exercise segments (opened from the + FAB or a workout row). */
+/** Full-screen Log page: Workout / Meal / Exercise segments (opened from the + FAB or a workout row). The Meal segment is Add food. */
 export default function LogScreen({
   existing,
+  last = null,
   date,
   startOnMeal,
   startOnExercise = false,
   savedMeals,
   presets,
+  usage = {},
   profile,
 }: {
   existing: Workout | null;
+  /** The most recent workout, for "Same as last time" on a new one. */
+  last?: Workout | null;
   date: string;
   startOnMeal: boolean;
   startOnExercise?: boolean;
   savedMeals: SavedMeal[];
   presets: FoodPreset[];
+  usage?: Record<string, number>;
   profile: Profile;
 }) {
   const router = useRouter();
@@ -52,9 +57,9 @@ export default function LogScreen({
         </div>
       ) : null}
       {existing || seg === 0 ? (
-        <WorkoutForm existing={existing} initialDate={date} target={profile.weekly_workout_target} onClose={close} />
+        <WorkoutForm existing={existing} last={existing ? null : last} initialDate={date} target={profile.weekly_workout_target} onClose={close} />
       ) : seg === 1 ? (
-        <MealForm date={date} savedMeals={savedMeals} presets={presets} onClose={close} />
+        <MealForm date={date} savedMeals={savedMeals} presets={presets} usage={usage} onClose={close} />
       ) : (
         <ExerciseForm date={date} weightKg={profile.weight_kg ?? null} onClose={close} />
       )}

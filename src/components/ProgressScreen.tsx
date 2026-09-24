@@ -10,9 +10,14 @@ import { restByMuscle } from "@/lib/streaks";
 import { MUSCLE_COLOR, type Muscle } from "@/lib/muscles";
 import type { ExerciseEntry, Meal, Profile, WeightEntry, Workout } from "@/lib/types";
 import HexMedal from "./HexMedal";
-import { BreathingFlame, Card, Chevron, MacroDot, Rise, SPRING, Segmented, fmt } from "./ui";
+import { BreathingFlame, Card, ChipRow, Chevron, MacroDot, Rise, SPRING, fmt } from "./ui";
 
-const WEEK_OPTIONS = ["This week", "Last week", "2 wks ago", "3 wks ago"];
+const WEEK_OPTIONS = [
+  { key: "0", label: "This week" },
+  { key: "1", label: "Last week" },
+  { key: "2", label: "2 weeks ago" },
+  { key: "3", label: "3 weeks ago" },
+];
 
 export default function ProgressScreen({
   profile,
@@ -102,7 +107,7 @@ export default function ProgressScreen({
       </Rise>
 
       <Rise index={2}>
-        <Segmented options={WEEK_OPTIONS} selected={weekBack} onSelect={setWeekBack} label="Which week" />
+        <ChipRow options={WEEK_OPTIONS} value={String(weekBack)} onChange={(v) => setWeekBack(Number(v))} label="Which week" />
       </Rise>
 
       <Rise index={3}>

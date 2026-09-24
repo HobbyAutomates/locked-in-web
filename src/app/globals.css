@@ -228,7 +228,23 @@ button {
   font-size: 13px;
   font-weight: 500;
 }
-.chip[aria-pressed="true"] {
+/* Chips and small icon buttons draw smaller than 44 px but always catch a 44 px tap. */
+.chip,
+.hit {
+  position: relative;
+}
+.chip::before,
+.hit::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+.chip[aria-pressed="true"],
+.chip[aria-checked="true"] {
   background: var(--btn);
   color: var(--btn-ink);
   font-weight: 600;
@@ -598,4 +614,49 @@ button {
 }
 .ruler:active {
   cursor: grabbing;
+}
+
+/* The Add-food plate: a sticky panel that caps its height and scrolls inside. */
+.plate-panel {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: var(--card);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -8px 24px rgba(17, 17, 17, 0.1);
+}
+:root[data-theme="dark"] .plate-panel {
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
+  border-top: 1px solid var(--hair);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .plate-panel {
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
+    border-top: 1px solid var(--hair);
+  }
+}
+
+/* Search bar with the mic inside it. */
+.searchbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 6px 0 14px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+.searchbar input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+}
+.searchbar input::placeholder {
+  color: var(--muted);
 }

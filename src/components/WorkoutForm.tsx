@@ -5,15 +5,19 @@ import { useRouter } from "next/navigation";
 import { deleteWorkout, saveWorkout } from "@/lib/actions";
 import { BAND_LEVELS, MUSCLES } from "@/lib/muscles";
 import type { Workout } from "@/lib/types";
+import { Refresh } from "./icons";
 import { Card, Chip, ErrorNote, Hair, NumberField, PillButton, PillSwitch, Rise, SettingRow, fmt } from "./ui";
 
 export default function WorkoutForm({
   existing,
+  last = null,
   initialDate,
   target,
   onClose,
 }: {
   existing: Workout | null;
+  /** The most recent workout: "Same as last time" copies it into a new one. */
+  last?: Workout | null;
   initialDate: string;
   target: number;
   onClose: () => void;
@@ -28,6 +32,19 @@ export default function WorkoutForm({
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [copied, setCopied] = useState(false);
+
+  /** Pre-fill everything but the date from the most recent workout. */
+  function sameAsLast() {
+    if (!last) return;
+    setMuscles([...last.muscles]);
+    setBand(last.band_level ?? "Medium");
+    setKg(last.resistance_kg != null ? fmt(Number(last.resistance_kg)) : "");
+    setMinutes(last.minutes != null ? String(last.minutes) : "");
+    setExercises(last.exercises ?? "");
+    setCopied(true);
+  }
 
   function toggle(m: string) {
     setMuscles((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]));
@@ -73,6 +90,20 @@ export default function WorkoutForm({
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex flex-col gap-3.5 px-4 pb-4 pt-1.5">
+        {!existing && last ? (
+          <Rise index={0}>
+            <button type="button" onClick={sameAsLast} aria-pressed={copied} className="chip press w-full justify-between" style={{ height: 48, padding: "0 16px", ...(copied ? {} : { background: "var(--card)", boxShadow: "var(--shadow-sm)" }) }}>
+              <span className="flex min-w-0 items-center gap-2">
+                <Refresh size={16} />
+                <span className="font-semibold">{copied ? "Copied from last time" : "Same as last time"}</span>
+              </span>
+              <span className="min-w-0 truncate pl-2 text-xs" style={{ opacity: 0.7 }}>
+                {last.muscles.join(" · ")}
+                {last.minutes != null ? ` · ${last.minutes} min` : ""}
+              </span>
+            </button>
+          </Rise>
+        ) : null}
         <Rise index={0}>
           <Card>
             <p className="text-[13px] font-semibold muted">Muscles</p>

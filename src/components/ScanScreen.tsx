@@ -2,149 +2,115 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import { deleteScan, saveMeal } from "@/lib/actions";
 import { today } from "@/lib/dates";
-import { type QuantityFood } from "@/lib/quantity";
+import { decodeBarcode, postJson, toJpegBase64 } from "@/lib/image";
+import { mealItemFromPlate, type QuantityFood } from "@/lib/quantity";
 import { initialLens, type Fit, type LabelReport, type Lens, type MealItem, type PlateEstimate, type PlateItem, type Profile, type ScanHistoryItem } from "@/lib/types";
-import { Bowl, Check, Scan, Spinner, Trash } from "./icons";
+import { Bowl, Check, ChevronDown, Scan, Spinner, Spoon, Trash } from "./icons";
 import QuantitySheet from "./QuantitySheet";
-import { Card, ErrorNote, Hair, MacroDot, PillButton, Ring, Rise, Segmented, fmt } from "./ui";
+import { Card, ErrorNote, Hair, MacroDot, PillButton, Ring, Rise, SPRING, fmt } from "./ui";
 
-const MAX_EDGE = 2200;
 const LENSES: { key: Lens; label: string }[] = [
   { key: "protein", label: "Protein" },
   { key: "snack", label: "Snack" },
   { key: "cutting", label: "Cutting" },
   { key: "bulking", label: "Bulking" },
 ];
-type Mode = "label" | "barcode" | "photo";
 
-/** Try to read an EAN/UPC from a still image in the browser (iPhone Safari has no native reader). */
-async function decodeBarcode(dataUrl: string): Promise<string | null> {
-  try {
-    const { BrowserMultiFormatReader } = await import("@zxing/browser");
-    const { BarcodeFormat, DecodeHintType } = await import("@zxing/library");
-    const hints = new Map();
-    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]);
-    hints.set(DecodeHintType.TRY_HARDER, true);
-    const reader = new BrowserMultiFormatReader(hints);
-    const result = await reader.decodeFromImageUrl(dataUrl);
-    const digits = result.getText().replace(/\D/g, "");
-    return digits.length >= 8 ? digits : null;
-  } catch {
-    return null;
-  }
+export type ScanKind = "barcode" | "label" | "plate";
+const KIND_CHIPS: { key: ScanKind; label: string }[] = [
+  { key: "barcode", label: "a barcode" },
+  { key: "label", label: "a label" },
+  { key: "plate", label: "a plate" },
+];
+const NOT_FOUND = "Not in the database yet — photograph the label side.";
+
+/** What /api/scan came back with, as the screen renders it. */
+export type ScanResult = { kind: ScanKind; report?: LabelReport; plate?: PlateEstimate; notFound?: string };
+
+function toResult(r: Record<string, unknown>): ScanResult {
+  const kind = (r.kind === "plate" || r.kind === "barcode" ? r.kind : "label") as ScanKind;
+  if (kind === "plate") return { kind, plate: r as unknown as PlateEstimate };
+  if (r.found === false) return { kind, notFound: typeof r.message === "string" && r.message ? r.message : NOT_FOUND };
+  return { kind, report: r as unknown as LabelReport };
 }
 
-/** Downscale and re-encode as JPEG, matching the Android scanner. */
-async function toJpegBase64(file: File, maxEdge = MAX_EDGE, quality = 0.88): Promise<{ base64: string; media_type: string; preview: string }> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not read that image");
-  ctx.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close?.();
-  const dataUrl = canvas.toDataURL("image/jpeg", quality);
-  return { base64: dataUrl.split(",")[1] ?? "", media_type: "image/jpeg", preview: dataUrl };
-}
-
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? `Request failed (${res.status})`);
-  return (await res.json()) as T;
-}
-
-export default function ScanScreen({ history, profile, initialMode = "label" }: { history: ScanHistoryItem[]; profile: Profile; initialMode?: Mode }) {
-  const [mode, setMode] = useState<Mode>(initialMode);
+/**
+ * The Scan tab: one button. The photo is decoded for a barcode in the browser first; everything
+ * else goes to /api/scan, which works out whether it's a barcode, a label or a plate and runs that
+ * pipeline. Analysis starts as soon as the photo is taken. A chip row under the result lets the
+ * user correct the guess, which re-runs the scan with that kind forced.
+ */
+export default function ScanScreen({ history, profile }: { history: ScanHistoryItem[]; profile: Profile }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [payload, setPayload] = useState<{ base64: string; media_type: string } | null>(null);
+  const [digits, setDigits] = useState("");
+  const [showDigits, setShowDigits] = useState(false);
   const [note, setNote] = useState("");
-  const [barcode, setBarcode] = useState("");
-  const [decoding, setDecoding] = useState(false);
-  const [decodeNote, setDecodeNote] = useState<string | null>(null);
+  const [showNote, setShowNote] = useState(false);
   // Profile → Preferences → "Judge scans for" decides where the lens starts.
-  const [lens, setLens] = useState<Lens>(initialLens(profile));
+  const [lens] = useState<Lens>(initialLens(profile));
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [report, setReport] = useState<LabelReport | null>(null);
-  const [plate, setPlate] = useState<PlateEstimate | null>(null);
-  const [notFound, setNotFound] = useState(false);
+  const [res, setRes] = useState<ScanResult | null>(null);
   const [opened, setOpened] = useState<Record<string, unknown> | null>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const galleryRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function reset() {
     setError(null);
-    setReport(null);
-    setPlate(null);
-    setNotFound(false);
+    setRes(null);
     setOpened(null);
+  }
+
+  async function run(extra: { kind?: ScanKind; barcode?: string }, pl: { base64: string; media_type: string } | null = payload) {
+    setBusy(true);
+    setError(null);
+    setRes(null);
+    setOpened(null);
+    setStage(extra.kind === "plate" ? "Looking at the plate… 10–20 s" : extra.barcode ? "Looking it up and writing your report… 15–30 s" : "Working out what it is, then reading it… 15–45 s");
+    try {
+      const r = await postJson<Record<string, unknown>>("/api/scan", { image: pl?.base64, media_type: pl?.media_type, lens, note: note.trim() || undefined, ...extra });
+      if (typeof r.barcode === "string" && r.barcode) setDigits(r.barcode);
+      setRes(toResult(r));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not scan that");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function pick(file: File | undefined) {
     if (!file) return;
     reset();
+    setDigits("");
     try {
-      const out = mode === "photo" ? await toJpegBase64(file, 1600, 0.85) : await toJpegBase64(file);
-      setPayload({ base64: out.base64, media_type: out.media_type });
+      const out = await toJpegBase64(file, 2000, 0.86);
+      const pl = { base64: out.base64, media_type: out.media_type };
+      setPayload(pl);
       setPreview(out.preview);
-      if (mode === "barcode") {
-        setDecodeNote(null);
-        setDecoding(true);
-        const digits = await decodeBarcode(out.preview);
-        setDecoding(false);
-        if (digits) setBarcode(digits);
-        else setDecodeNote("Couldn't read the bars from that photo. Tap Analyse and the printed digits will be read on the server, or type them below.");
-      }
+      setBusy(true);
+      setStage("Reading the bars…");
+      const code = await decodeBarcode(out.preview);
+      if (code) setDigits(code);
+      await run(code ? { barcode: code } : {}, pl);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not read that image");
-    }
-  }
-
-  async function analyse() {
-    setBusy(true);
-    setError(null);
-    try {
-      if (mode === "barcode") {
-        const digits = barcode.replace(/\D/g, "");
-        const r = await post<LabelReport & { found?: boolean; message?: string; barcode?: string }>("/api/scan-barcode", {
-          barcode: digits.length >= 8 ? digits : undefined,
-          image: digits.length >= 8 ? undefined : payload?.base64,
-          media_type: digits.length >= 8 ? undefined : payload?.media_type,
-          lens,
-          note: note.trim() || undefined,
-        });
-        if (r.barcode && digits.length < 8) setBarcode(r.barcode);
-        if (r.found === false) {
-          setNotFound(true);
-          if (r.message) setError(r.message);
-        } else setReport(r);
-      } else if (mode === "photo") {
-        if (!payload) return;
-        setPlate(await post<PlateEstimate>("/api/photo-meal", { image: payload.base64, media_type: payload.media_type, note: note.trim() || undefined }));
-      } else {
-        if (!payload) return;
-        setReport(await post<LabelReport>("/api/scan-label", { image: payload.base64, media_type: payload.media_type, note: note.trim() || undefined, lens }));
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not analyse that");
-    } finally {
       setBusy(false);
+      setError(e instanceof Error ? e.message : "Could not read that image");
     }
   }
 
   async function open(item: ScanHistoryItem) {
     reset();
     setBusy(true);
+    setStage("Opening…");
     try {
-      const res = await fetch(`/api/scans/${item.id}`);
-      if (!res.ok) throw new Error("Could not load that scan");
-      setOpened((await res.json()) as Record<string, unknown>);
+      const r = await fetch(`/api/scans/${item.id}`);
+      if (!r.ok) throw new Error("Could not load that scan");
+      setOpened((await r.json()) as Record<string, unknown>);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load that scan");
     } finally {
@@ -152,146 +118,93 @@ export default function ScanScreen({ history, profile, initialMode = "label" }: 
     }
   }
 
-  const modeIndex = mode === "label" ? 0 : mode === "barcode" ? 1 : 2;
-  const canAnalyse = mode === "barcode" ? barcode.replace(/\D/g, "").length >= 8 || !!payload : !!payload;
+  const code = digits.replace(/\D/g, "");
 
   return (
     <div className="flex flex-col gap-3.5">
       <Rise index={0}>
         <h1 className="screen-title">Scan</h1>
-        <p className="text-[13px] muted">Label, barcode or a photo of your plate</p>
+        <p className="text-[13px] muted">A barcode, a nutrition label or your plate</p>
       </Rise>
 
       <Rise index={1}>
-        <Segmented
-          options={["Label", "Barcode", "Food photo"]}
-          selected={modeIndex}
-          label="Scan mode"
-          onSelect={(i) => {
-            setMode(i === 0 ? "label" : i === 1 ? "barcode" : "photo");
-            setPreview(null);
-            setPayload(null);
-            reset();
-          }}
-        />
-      </Rise>
-
-      <Rise index={2}>
         <Card>
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: "var(--btn)", color: "var(--btn-ink)" }}>
-              {mode === "photo" ? <Bowl size={18} /> : <Scan size={18} />}
-            </span>
-            <span>
-              <span className="block text-[15px] font-semibold">
-                {mode === "label" ? "Scan an ingredients label" : mode === "barcode" ? "Scan a barcode" : "Photograph your plate"}
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a local canvas data URL, not a remote asset
+            <img src={preview} alt="What you scanned" className="mb-3 h-[190px] w-full rounded-[14px] object-cover" />
+          ) : (
+            <div className="mb-3 flex items-center gap-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)" }}>
+                <Scan size={22} />
               </span>
-              <span className="block text-xs muted">
-                {mode === "label"
-                  ? "What it is, how it fits your goal, and whether to trust the pack"
-                  : mode === "barcode"
-                    ? "Photograph the bars — looked up on Open Food Facts"
-                    : "Each item with grams, calories, macros and micros. An estimate — edit anything."}
-              </span>
+              <p className="text-[13px] leading-snug muted">Point it at a pack&apos;s barcode, its nutrition label, or your plate — it works out which.</p>
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
+          <PillButton disabled={busy} onClick={() => fileRef.current?.click()}>
+            <span className="inline-flex items-center gap-2">
+              <Scan size={18} />
+              {preview ? "Scan another" : "Scan"}
             </span>
+          </PillButton>
+          {busy ? (
+            <>
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
+                <div className="shimmer h-full w-1/2 rounded-full" style={{ background: "var(--ink)" }} />
+              </div>
+              <p className="mt-1.5 text-xs muted">{stage}</p>
+            </>
+          ) : null}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4">
+            <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showDigits} onClick={() => setShowDigits((v) => !v)}>
+              Type barcode digits
+            </button>
+            {res || preview ? (
+              <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showNote} onClick={() => setShowNote((v) => !v)}>
+                Add a note
+              </button>
+            ) : null}
           </div>
-
-          {mode !== "photo" ? (
-            <div className="mt-3">
-              <p className="mb-1.5 text-xs font-semibold muted">Judge it for</p>
-              <LensSwitch value={lens} onChange={setLens} />
+          {showDigits ? (
+            <div className="mt-1 flex gap-2">
+              <input className="field num" inputMode="numeric" value={digits} aria-label="Barcode digits" onChange={(e) => setDigits(e.target.value.replace(/[^\d]/g, "").slice(0, 14))} placeholder="The digits under the bars" />
+              <PillButton height={48} className="!w-auto shrink-0 !px-5" disabled={busy || code.length < 8} onClick={() => { setPreview(null); setPayload(null); void run({ kind: "barcode", barcode: code }, null); }}>
+                Look up
+              </PillButton>
             </div>
           ) : null}
-
-          {mode === "barcode" ? (
-            <>
-              {preview ? (
-                // eslint-disable-next-line @next/next/no-img-element -- a local canvas data URL, not a remote asset
-                <img src={preview} alt="The barcode you photographed" className="mt-3 h-[180px] w-full rounded-[14px] object-cover" />
-              ) : null}
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => void pick(e.target.files?.[0])} />
-              <input ref={galleryRef} type="file" accept="image/*" className="sr-only" onChange={(e) => void pick(e.target.files?.[0])} />
-              <div className="mt-3 flex gap-2">
-                <PillButton height={46} onClick={() => cameraRef.current?.click()}>
-                  {preview ? "Retake" : "Photograph the barcode"}
-                </PillButton>
-                <PillButton height={46} soft onClick={() => galleryRef.current?.click()}>
-                  Gallery
-                </PillButton>
-              </div>
-              {decoding ? <p className="mt-2 text-xs muted">Reading the bars…</p> : null}
-              {decodeNote && !barcode ? <p className="mt-2 text-xs muted">{decodeNote}</p> : null}
-              <input
-                className="field mt-3 num"
-                inputMode="numeric"
-                value={barcode}
-                aria-label="Barcode digits"
-                onChange={(e) => setBarcode(e.target.value.replace(/[^\d]/g, ""))}
-                placeholder="…or type the digits under the bars"
-              />
-            </>
-          ) : (
-            <>
-              {preview ? (
-                // eslint-disable-next-line @next/next/no-img-element -- a local canvas data URL, not a remote asset
-                <img src={preview} alt={mode === "photo" ? "Your plate" : "The label you photographed"} className="mt-3 h-[220px] w-full rounded-[14px] object-cover" />
-              ) : null}
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => void pick(e.target.files?.[0])} />
-              <input ref={galleryRef} type="file" accept="image/*" className="sr-only" onChange={(e) => void pick(e.target.files?.[0])} />
-              <div className="mt-3 flex gap-2">
-                <PillButton height={46} onClick={() => cameraRef.current?.click()}>
-                  {preview ? "Retake" : "Take photo"}
-                </PillButton>
-                <PillButton height={46} soft onClick={() => galleryRef.current?.click()}>
-                  Gallery
-                </PillButton>
-              </div>
-            </>
-          )}
-
-          {canAnalyse ? (
-            <>
-              <input
-                className="field mt-2.5"
-                value={note}
-                aria-label="Optional note"
-                onChange={(e) => setNote(e.target.value)}
-                placeholder={mode === "photo" ? "Optional: e.g. the dal has ghee, two rotis" : "Optional: what is it / what do you want to know"}
-              />
-              <div className="mt-2.5">
-                <PillButton height={48} disabled={busy} onClick={analyse}>
-                  {busy ? (mode === "photo" ? "Looking at the plate…" : "Reading and researching…") : mode === "photo" ? "Estimate" : "Analyse"}
-                </PillButton>
-              </div>
-              {busy ? (
-                <>
-                  <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
-                    <div className="shimmer h-full w-1/2 rounded-full" style={{ background: "var(--ink)" }} />
-                  </div>
-                  <p className="mt-1.5 text-xs muted">{mode === "photo" ? "Identifying each item, then checking the food table. 10–20 s." : "Reading → researching the brand → writing your report. 20–45 s."}</p>
-                </>
-              ) : null}
-            </>
+          {showNote ? (
+            <div className="mt-1 flex gap-2">
+              <input className="field" value={note} aria-label="Note" onChange={(e) => setNote(e.target.value)} placeholder={res?.kind === "plate" ? "e.g. the dal has ghee, two rotis" : "What is it / what do you want to know"} />
+              <PillButton height={48} className="!w-auto shrink-0 !px-5" disabled={busy || !note.trim() || (!payload && code.length < 8)} onClick={() => void run({ kind: res?.kind, barcode: code.length >= 8 ? code : undefined })}>
+                Redo
+              </PillButton>
+            </div>
           ) : null}
         </Card>
       </Rise>
 
       <ErrorNote text={error} />
-      {notFound ? (
-        <Rise index={3}>
+
+      {res && payload ? (
+        <Rise index={2}>
+          <KindChips kind={res.kind} onPick={(k) => void run({ kind: k, barcode: k === "barcode" && code.length >= 8 ? code : undefined })} disabled={busy} />
+        </Rise>
+      ) : null}
+      {res?.notFound ? (
+        <Rise index={2}>
           <Card>
-            <p className="font-bold">Not in the database yet</p>
-            <p className="text-[13px] muted">Open Food Facts doesn&apos;t know this barcode. Scan the label instead — it reads the pack itself.</p>
-            <div className="mt-2.5">
-              <PillButton height={44} soft onClick={() => setMode("label")}>
-                Scan the label
+            <p className="text-[15px]">{res.notFound}</p>
+            <div className="mt-3">
+              <PillButton soft height={46} onClick={() => fileRef.current?.click()}>
+                Scan again
               </PillButton>
             </div>
           </Card>
         </Rise>
       ) : null}
-      {report ? <ReportView report={report} initialLens={lens} /> : null}
-      {plate ? <PlateReview plate={plate} onSaved={() => setPlate(null)} /> : null}
+      {res?.report ? <ReportView key={String(res.report.id ?? res.report.product)} report={res.report} initialLens={lens} /> : null}
+      {res?.plate ? <PlateReview key={String(res.plate.id ?? "plate")} plate={res.plate} onSaved={() => setRes(null)} /> : null}
       {opened ? <OpenedScan data={opened} onClose={() => setOpened(null)} /> : null}
 
       <History items={history} onOpen={open} />
@@ -299,25 +212,29 @@ export default function ScanScreen({ history, profile, initialMode = "label" }: 
   );
 }
 
-function LensSwitch({ value, onChange }: { value: Lens; onChange: (l: Lens) => void }) {
+/** "Looks like a barcode / a label / a plate — change?" The detected one is filled; another re-runs forced. */
+export function KindChips({ kind, onPick, disabled }: { kind: ScanKind; onPick: (k: ScanKind) => void; disabled?: boolean }) {
   return (
-    <div className="flex gap-1 rounded-full p-[3px]" style={{ background: "var(--card2)" }} role="radiogroup" aria-label="Lens">
-      {LENSES.map((l) => {
-        const sel = l.key === value;
-        return (
-          <button
-            key={l.key}
-            type="button"
-            role="radio"
-            aria-checked={sel}
-            onClick={() => onChange(l.key)}
-            className="press flex-1 rounded-full py-1.5 text-xs font-semibold"
-            style={{ background: sel ? "var(--btn)" : "transparent", color: sel ? "var(--btn-ink)" : "var(--muted)" }}
-          >
-            {l.label}
-          </button>
-        );
-      })}
+    <div className="flex flex-wrap items-center gap-1.5 px-1">
+      <span className="text-[13px] muted">Looks like</span>
+      {KIND_CHIPS.map((c) => (
+        <button key={c.key} type="button" aria-pressed={c.key === kind} disabled={disabled} className="chip press" style={{ height: 30, fontSize: 12, padding: "0 11px" }} onClick={() => c.key !== kind && onPick(c.key)}>
+          {c.label}
+        </button>
+      ))}
+      <span className="text-[13px] muted">— change?</span>
+    </div>
+  );
+}
+
+function LensChips({ value, onChange }: { value: Lens; onChange: (l: Lens) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Judge it for">
+      {LENSES.map((l) => (
+        <button key={l.key} type="button" role="radio" aria-checked={l.key === value} className="chip press" style={{ height: 30, fontSize: 12, padding: "0 12px" }} onClick={() => onChange(l.key)}>
+          {l.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -330,11 +247,6 @@ const TRUST: Record<string, { color: string; bg: string; label: string }> = {
   unsafe: { color: "var(--red)", bg: "var(--red-bg)", label: "Unsafe" },
   misleading: { color: "var(--purple)", bg: "var(--purple-bg)", label: "Misleading" },
   fake: { color: "var(--red)", bg: "var(--red-bg)", label: "Likely fake" },
-};
-const FIT_STYLE: Record<string, { color: string; label: string }> = {
-  great: { color: "var(--green)", label: "Great fit" },
-  ok: { color: "var(--orange)", label: "Fine" },
-  weak: { color: "var(--muted)", label: "Weak fit" },
 };
 
 const PER_100 = [
@@ -404,13 +316,29 @@ function MacroDonut({ per100, servingG }: { per100: NonNullable<LabelReport["per
   );
 }
 
-export function ReportView({ report: r, initialLens, readOnly }: { report: LabelReport; initialLens?: Lens; readOnly?: boolean }) {
+const EAT: Record<string, { label: string; color: string }> = {
+  great: { label: "Yes", color: "var(--green)" },
+  yes: { label: "Yes", color: "var(--green)" },
+  ok: { label: "Sometimes", color: "var(--orange)" },
+  sometimes: { label: "Sometimes", color: "var(--orange)" },
+  weak: { label: "Skip", color: "var(--red)" },
+  skip: { label: "Skip", color: "var(--red)" },
+};
+/** How far along the Trust meter each verdict sits (of 4). */
+const TRUST_LEVEL: Record<string, number> = { safe: 4, caution: 2, misleading: 2, unsafe: 1, fake: 1 };
+
+/**
+ * The label / barcode report. Hero first — product, score, one-liner, "Eat it?" for the chosen
+ * lens and why — then one black "Log 1 serving" button, then everything else behind one Details
+ * expander (collapsed by default).
+ */
+export function ReportView({ report: r, initialLens, defaultOpen = false }: { report: LabelReport; initialLens?: Lens; defaultOpen?: boolean }) {
   const router = useRouter();
   const [lens, setLens] = useState<Lens>(initialLens ?? r.lens ?? "protein");
+  const [details, setDetails] = useState(defaultOpen);
   const [logFood, setLogFood] = useState<QuantityFood | null>(null);
   const [logged, setLogged] = useState<string | null>(null);
   const [logErr, setLogErr] = useState<string | null>(null);
-  const t = TRUST[r.verdict] ?? { color: "var(--muted)", bg: "var(--card2)", label: r.verdict };
   const food = reportFood(r);
 
   if (!r.readable) {
@@ -418,20 +346,17 @@ export function ReportView({ report: r, initialLens, readOnly }: { report: Label
       <Rise index={2}>
         <Card>
           <p className="font-bold">Couldn&apos;t read that as a food label</p>
-          <p className="text-[13px] muted">{r.verdict_reason}</p>
+          <p className="mt-0.5 text-[13px] muted">{r.verdict_reason}</p>
         </Card>
       </Rise>
     );
   }
 
-  const per100 = r.per_100g ?? {};
-  const protein = r.protein;
-  const proteinColor = protein?.rating === "excellent" || protein?.rating === "good" ? "var(--green)" : protein?.rating === "average" ? "var(--orange)" : "var(--muted)";
   const fit: Fit | undefined = r.fits?.[lens];
-  const fs = fit ? FIT_STYLE[fit.verdict] : null;
   const info = r.infographic;
+  const eat = EAT[fit?.verdict ?? info?.eat_it ?? ""] ?? null;
   const score = info?.score_out_of_10 ?? null;
-  const scoreColor = score == null ? "var(--muted)" : score >= 7 ? "var(--green)" : score >= 4 ? "var(--orange)" : "var(--muted)";
+  const scoreColor = score == null ? "var(--muted)" : score >= 7 ? "var(--green)" : score >= 4 ? "var(--orange)" : "var(--red)";
 
   async function logServing(item: MealItem) {
     setLogFood(null);
@@ -447,19 +372,22 @@ export function ReportView({ report: r, initialLens, readOnly }: { report: Label
 
   return (
     <>
+      {/* ---- hero ---- */}
       <Rise index={2}>
-        <Card>
+        <Card padding={18}>
           <div className="flex items-start gap-3">
             {r.image_url ? (
               // eslint-disable-next-line @next/next/no-img-element -- Open Food Facts product photo
               <img src={r.image_url} alt="" className="h-16 w-16 shrink-0 rounded-[12px] object-cover" style={{ background: "var(--card2)" }} />
             ) : null}
             <div className="min-w-0 flex-1">
-              <p className="text-[17px] font-bold leading-snug" style={{ overflowWrap: "anywhere" }}>{r.product || "Unknown product"}</p>
-              {info?.one_liner ? <p className="mt-1 text-[13px] muted">{info.one_liner}</p> : null}
+              <p className="text-[18px] font-extrabold leading-snug" style={{ overflowWrap: "anywhere", letterSpacing: "-0.02em" }}>
+                {r.product || "Unknown product"}
+              </p>
+              {info?.one_liner ? <p className="mt-1 text-[13px] leading-snug muted">{info.one_liner}</p> : null}
             </div>
             {score != null ? (
-              <Ring fraction={score / 10} color={scoreColor} size={64} stroke={7}>
+              <Ring fraction={score / 10} color={scoreColor} size={62} stroke={7}>
                 <span className="flex flex-col items-center leading-none">
                   <span className="num text-[20px] font-extrabold">{score}</span>
                   <span className="text-[9px] font-semibold muted">/ 10</span>
@@ -467,168 +395,240 @@ export function ReportView({ report: r, initialLens, readOnly }: { report: Label
               </Ring>
             ) : null}
           </div>
-          {r.what_it_is ? <p className="mt-2.5 text-sm leading-relaxed">{r.what_it_is}</p> : null}
-          {food ? (
-            <div className="mt-3 flex flex-col gap-2">
-              <PillButton height={44} onClick={() => setLogFood(food)}>
-                Log 1 serving{r.serving_g ? ` · ${Math.round(r.serving_g)} g` : ""}
-              </PillButton>
-              {logged ? (
-                <p className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--green)" }}>
-                  <Check size={14} />
-                  {logged} — on Home
-                </p>
+          {eat || fit ? (
+            <div className="mt-3.5 rounded-2xl px-3.5 py-3" style={{ background: "var(--card2)" }}>
+              {eat ? (
+                <span className="badge" style={{ background: `color-mix(in srgb, ${eat.color} 16%, transparent)`, color: eat.color }}>
+                  Eat it? {eat.label}
+                </span>
               ) : null}
-              {logErr ? <p className="text-xs" style={{ color: "var(--red)" }}>{logErr}</p> : null}
+              {fit?.why ? <p className="mt-1.5 text-sm leading-relaxed">{fit.why}</p> : null}
             </div>
           ) : null}
-          {Object.keys(per100).length > 0 ? (
-            <>
-              <div className="my-2.5">
-                <Hair />
-              </div>
-              <p className="mb-2 text-xs font-semibold muted">One serving</p>
-              <MacroDonut per100={per100} servingG={r.serving_g} />
-              <div className="my-2.5">
-                <Hair />
-              </div>
-              <p className="text-xs font-semibold muted">Per 100 g</p>
-              <div className="mt-1 flex justify-between gap-2">
-                {PER_100.filter(([k]) => per100[k] != null).map(([k, unit]) => (
-                  <span key={k}>
-                    <span className="num block text-[15px] font-bold">{Math.round(Number(per100[k]))}</span>
-                    <span className="block text-[10px] muted">{unit}</span>
-                  </span>
-                ))}
-              </div>
-            </>
+          {r.fits && Object.keys(r.fits).length ? (
+            <div className="mt-3">
+              <LensChips value={lens} onChange={setLens} />
+            </div>
           ) : null}
         </Card>
       </Rise>
 
-      {r.fits && Object.keys(r.fits).length ? (
+      {food ? (
         <Rise index={3}>
-          <Card>
-            <p className="text-[15px] font-bold">How it fits</p>
-            <div className="mt-2">{readOnly && !r.fits ? null : <LensSwitch value={lens} onChange={setLens} />}</div>
-            {fit && fs ? (
-              <div className="mt-3 rounded-[14px] p-3" style={{ background: `color-mix(in srgb, ${fs.color} 12%, transparent)` }}>
-                <span className="badge" style={{ background: `color-mix(in srgb, ${fs.color} 18%, transparent)`, color: fs.color }}>
-                  {fs.label}
-                </span>
-                <p className="mt-1.5 text-sm leading-relaxed">{fit.why}</p>
-              </div>
-            ) : null}
-          </Card>
+          <PillButton onClick={() => setLogFood(food)}>Log 1 serving{r.serving_g ? ` · ${Math.round(r.serving_g)} g` : ""}</PillButton>
+          {logged ? (
+            <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-semibold" style={{ color: "var(--green)" }}>
+              <Check size={14} />
+              {logged} — on Home
+            </p>
+          ) : null}
+          {logErr ? <p className="mt-2 text-center text-xs" style={{ color: "var(--red)" }}>{logErr}</p> : null}
         </Rise>
       ) : null}
 
-      {info && info.serving_share && info.serving_share.calories_pct + info.serving_share.protein_pct + info.serving_share.carbs_pct + info.serving_share.fat_pct > 0 ? (
-        <Rise index={4}>
-          <Card>
-            <p className="text-[15px] font-bold">One serving = …</p>
-            <p className="text-xs muted">…this much of your whole day.</p>
-            <div className="mt-3 flex flex-col gap-2.5">
-              {(
-                [
-                  ["Calories", info.serving_share.calories_pct, "var(--ink)"],
-                  ["Protein", info.serving_share.protein_pct, "var(--red)"],
-                  ["Carbs", info.serving_share.carbs_pct, "var(--orange)"],
-                  ["Fat", info.serving_share.fat_pct, "var(--blue)"],
-                ] as const
-              ).map(([label, pct, color]) => (
-                <div key={label} className="flex items-center gap-2.5">
-                  <span className="w-[62px] shrink-0 text-xs font-semibold muted">{label}</span>
-                  <span className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
-                    <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} />
-                  </span>
-                  <span className="num w-10 shrink-0 text-right text-[13px] font-bold">{pct}%</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Rise>
-      ) : null}
-
+      {/* ---- details ---- */}
       <Rise index={4}>
-        <Card>
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[15px] font-bold">Trust</p>
-            <span className="badge shrink-0" style={{ background: t.bg, color: t.color }}>
-              {t.label}
+        <div className="card" style={{ padding: 0 }}>
+          <button type="button" aria-expanded={details} className="press flex min-h-[52px] w-full items-center justify-between px-4 text-left" onClick={() => setDetails((d) => !d)}>
+            <span className="text-[15px] font-bold">Details</span>
+            <span className="flex items-center gap-1.5 text-xs muted">
+              {details ? "Hide" : "Trust, macros, ingredients, claims"}
+              <motion.span animate={{ rotate: details ? 180 : 0 }} transition={SPRING} className="inline-flex">
+                <ChevronDown size={18} />
+              </motion.span>
             </span>
-          </div>
-          <p className="mt-1.5 text-sm leading-relaxed">{r.verdict_reason}</p>
-        </Card>
+          </button>
+          <AnimatePresence initial={false}>
+            {details ? (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} style={{ overflow: "hidden" }}>
+                <Details r={r} />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
       </Rise>
-
-      {protein ? (
-        <Rise index={5}>
-          <Card>
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[15px] font-bold">Protein</p>
-              <span className="badge shrink-0" style={{ background: `color-mix(in srgb, ${proteinColor} 16%, transparent)`, color: proteinColor }}>
-                {protein.rating.slice(0, 1).toUpperCase() + protein.rating.slice(1)}
-                {protein.per_serving_g != null ? ` · ${Math.round(protein.per_serving_g)} g / serving` : ""}
-              </span>
-            </div>
-            <p className="mt-1.5 text-sm">{protein.quality}</p>
-            {protein.note ? <p className="mt-1 text-[13px] muted">{protein.note}</p> : null}
-          </Card>
-        </Rise>
-      ) : null}
-
-      {r.concerns?.length ? (
-        <Rise index={6}>
-          <Card>
-            <p className="text-[15px] font-bold">Ingredients to know about</p>
-            {r.concerns.map((c, i) => (
-              <div key={i} className="mt-2 flex items-start gap-2">
-                <span className="mt-1.5 shrink-0 rounded-full" style={{ width: 8, height: 8, background: c.severity === "high" ? "var(--red)" : c.severity === "medium" ? "var(--orange)" : "var(--muted)" }} />
-                <span>
-                  <span className="block text-sm font-semibold">{c.ingredient}</span>
-                  <span className="block text-[13px] muted">{c.issue}</span>
-                </span>
-              </div>
-            ))}
-          </Card>
-        </Rise>
-      ) : null}
-
-      {r.claims?.length ? (
-        <Rise index={7}>
-          <Card>
-            <p className="text-[15px] font-bold">Claims on the pack</p>
-            {r.claims.map((c, i) => (
-              <div key={i} className="mt-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex-1 text-sm font-semibold">&ldquo;{c.claim}&rdquo;</span>
-                  <span className="shrink-0 text-xs font-bold" style={{ color: c.status === "supported" ? "var(--green)" : c.status === "unclear" ? "var(--orange)" : "var(--red)" }}>
-                    {c.status}
-                  </span>
-                </div>
-                <p className="text-[13px] muted">{c.why}</p>
-              </div>
-            ))}
-          </Card>
-        </Rise>
-      ) : null}
-
-      {r.research?.length ? <Rise index={8}><Bullets title="What the web says" lines={r.research} /></Rise> : null}
-      {r.suggestions?.length ? <Rise index={9}><Bullets title="For you" lines={r.suggestions} strong /></Rise> : null}
-      {r.alternatives?.length ? <Rise index={9}><Bullets title="Better options" lines={r.alternatives} /></Rise> : null}
       <QuantitySheet food={logFood} title="Log from this scan" cta="Log" onClose={() => setLogFood(null)} onDone={(item) => void logServing(item)} />
     </>
   );
 }
 
+function Section({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="py-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[13px] font-bold muted">{title}</p>
+        {right}
+      </div>
+      <div className="mt-1.5">{children}</div>
+    </div>
+  );
+}
+
+function Details({ r }: { r: LabelReport }) {
+  const t = TRUST[r.verdict] ?? { color: "var(--muted)", bg: "var(--card2)", label: r.verdict };
+  const level = TRUST_LEVEL[r.verdict] ?? 2;
+  const per100 = r.per_100g ?? {};
+  const info = r.infographic;
+  const protein = r.protein;
+  const proteinColor = protein?.rating === "excellent" || protein?.rating === "good" ? "var(--green)" : protein?.rating === "average" ? "var(--orange)" : "var(--muted)";
+  const share = info?.serving_share;
+  const spoons = Math.max(0, Math.round((info?.sugar_teaspoons_per_serving ?? 0) * 2) / 2);
+  const salt = Math.max(0, Math.min(100, info?.sodium_pct_of_2000mg ?? 0));
+  const sections: React.ReactNode[] = [];
+
+  if (r.what_it_is) {
+    sections.push(
+      <Section key="what" title="What it is">
+        <p className="text-sm leading-relaxed">{r.what_it_is}</p>
+      </Section>,
+    );
+  }
+  sections.push(
+    <Section key="trust" title="Trust" right={<span className="badge" style={{ background: t.bg, color: t.color }}>{t.label}</span>}>
+      <div className="flex gap-1" aria-hidden="true">
+        {[1, 2, 3, 4].map((i) => (
+          <span key={i} className="h-2 flex-1 rounded-full" style={{ background: i <= level ? t.color : "var(--track)" }} />
+        ))}
+      </div>
+      <p className="mt-2 text-sm leading-relaxed">{r.verdict_reason}</p>
+    </Section>,
+  );
+  if (Object.keys(per100).length > 0) {
+    sections.push(
+      <Section key="serving" title="One serving">
+        <MacroDonut per100={per100} servingG={r.serving_g} />
+        {share && share.calories_pct + share.protein_pct + share.carbs_pct + share.fat_pct > 0 ? (
+          <div className="mt-3.5 flex flex-col gap-2">
+            <p className="text-xs muted">…this much of your whole day:</p>
+            {(
+              [
+                ["Calories", share.calories_pct, "var(--ink)"],
+                ["Protein", share.protein_pct, "var(--red)"],
+                ["Carbs", share.carbs_pct, "var(--orange)"],
+                ["Fat", share.fat_pct, "var(--blue)"],
+              ] as const
+            ).map(([label, pct, color]) => (
+              <div key={label} className="flex items-center gap-2.5">
+                <span className="w-[62px] shrink-0 text-xs font-semibold muted">{label}</span>
+                <span className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
+                  <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} />
+                </span>
+                <span className="num w-10 shrink-0 text-right text-[13px] font-bold">{pct}%</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <p className="mt-3.5 text-xs font-semibold muted">Per 100 g</p>
+        <div className="mt-1 flex justify-between gap-2">
+          {PER_100.filter(([k]) => per100[k] != null).map(([k, unit]) => (
+            <span key={k}>
+              <span className="num block text-[15px] font-bold">{Math.round(Number(per100[k]))}</span>
+              <span className="block text-[10px] muted">{unit}</span>
+            </span>
+          ))}
+        </div>
+      </Section>,
+    );
+  }
+  if (info) {
+    sections.push(
+      <Section key="sugar-salt" title="Sugar and salt · one serving">
+        <div className="flex items-center gap-2">
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5" style={{ color: spoons > 0 ? "var(--orange)" : "var(--muted)" }} aria-label={`${spoons} teaspoons of sugar`}>
+            {spoons === 0 ? <span className="text-sm muted">No added sugar to speak of</span> : null}
+            {Array.from({ length: Math.min(12, Math.ceil(spoons)) }, (_, i) => (
+              <Spoon key={i} size={20} style={{ opacity: i + 1 > spoons ? 0.45 : 1 }} />
+            ))}
+          </span>
+          {spoons > 0 ? <span className="num shrink-0 text-[13px] font-bold">{fmt(spoons)} tsp sugar</span> : null}
+        </div>
+        <div className="mt-2.5 flex items-center gap-2.5">
+          <span className="w-[62px] shrink-0 text-xs font-semibold muted">Salt</span>
+          <span className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
+            <span className="block h-full rounded-full" style={{ width: `${salt}%`, background: salt >= 30 ? "var(--red)" : salt >= 15 ? "var(--orange)" : "var(--green)" }} />
+          </span>
+          <span className="num w-[76px] shrink-0 text-right text-[12px] font-bold">{salt}% of a day</span>
+        </div>
+      </Section>,
+    );
+  }
+  if (protein) {
+    sections.push(
+      <Section
+        key="protein"
+        title="Protein"
+        right={
+          <span className="badge shrink-0" style={{ background: `color-mix(in srgb, ${proteinColor} 16%, transparent)`, color: proteinColor }}>
+            {protein.rating.slice(0, 1).toUpperCase() + protein.rating.slice(1)}
+            {protein.per_serving_g != null ? ` · ${Math.round(protein.per_serving_g)} g / serving` : ""}
+          </span>
+        }
+      >
+        <p className="text-sm">{protein.quality}</p>
+        {protein.note ? <p className="mt-1 text-[13px] muted">{protein.note}</p> : null}
+      </Section>,
+    );
+  }
+  if (r.concerns?.length) {
+    sections.push(
+      <Section key="ingredients" title="Ingredients to know about">
+        <div className="flex flex-wrap gap-1.5">
+          {r.concerns.map((c, i) => (
+            <span key={i} className="badge" style={{ background: "var(--card2)", color: "var(--ink)", fontWeight: 600, gap: 6 }}>
+              <span className="rounded-full" style={{ width: 7, height: 7, background: c.severity === "high" ? "var(--red)" : c.severity === "medium" ? "var(--orange)" : "var(--muted)" }} />
+              {c.ingredient}
+            </span>
+          ))}
+        </div>
+        <ul className="mt-2 flex list-none flex-col gap-1 p-0">
+          {r.concerns.map((c, i) => (
+            <li key={i} className="text-[13px] leading-snug muted">
+              <span className="font-semibold" style={{ color: "var(--ink)" }}>{c.ingredient}:</span> {c.issue}
+            </li>
+          ))}
+        </ul>
+      </Section>,
+    );
+  }
+  if (r.claims?.length) {
+    sections.push(
+      <Section key="claims" title="Claims on the pack">
+        {r.claims.map((c, i) => (
+          <div key={i} className={i ? "mt-2" : ""}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex-1 text-sm font-semibold">&ldquo;{c.claim}&rdquo;</span>
+              <span className="shrink-0 text-xs font-bold" style={{ color: c.status === "supported" ? "var(--green)" : c.status === "unclear" ? "var(--orange)" : "var(--red)" }}>
+                {c.status}
+              </span>
+            </div>
+            <p className="text-[13px] muted">{c.why}</p>
+          </div>
+        ))}
+      </Section>,
+    );
+  }
+  if (r.suggestions?.length) sections.push(<Bullets key="for-you" title="For you" lines={r.suggestions} strong />);
+  if (r.research?.length) sections.push(<Bullets key="web" title="What the web says" lines={r.research} />);
+  if (r.alternatives?.length) sections.push(<Bullets key="alt" title="Better options" lines={r.alternatives} />);
+
+  return (
+    <div className="px-4 pb-1">
+      {sections.map((s, i) => (
+        <div key={i}>
+          <Hair />
+          {s}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Bullets({ title, lines, strong }: { title: string; lines: string[]; strong?: boolean }) {
   return (
-    <Card>
-      <p className="text-[15px] font-bold">{title}</p>
-      <ul className="mt-1 list-none p-0">
+    <Section title={title}>
+      <ul className="list-none p-0">
         {lines.map((l, i) => (
-          <li key={i} className="mt-1.5 flex gap-2 text-sm leading-relaxed" style={{ color: strong ? "var(--ink)" : "var(--muted)" }}>
+          <li key={i} className="mt-1 flex gap-2 text-sm leading-relaxed" style={{ color: strong ? "var(--ink)" : "var(--muted)" }}>
             <span aria-hidden="true" className="muted">
               •
             </span>
@@ -636,7 +636,7 @@ function Bullets({ title, lines, strong }: { title: string; lines: string[]; str
           </li>
         ))}
       </ul>
-    </Card>
+    </Section>
   );
 }
 
@@ -742,7 +742,8 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                     {!readOnly ? (
                       <>
                         <input
-                          className="field num w-[68px] text-right"
+                          className="field num text-right"
+                          style={{ width: 76, flex: "none", padding: "10px 10px" }}
                           inputMode="decimal"
                           aria-label={`${it.name} grams`}
                           value={it.grams}
@@ -752,7 +753,7 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                           }}
                         />
                         <span className="text-xs muted">g</span>
-                        <button type="button" aria-label={`Remove ${it.name}`} className="press grid h-8 w-8 place-items-center rounded-full" style={{ color: "var(--muted)" }} onClick={() => setItems(items.filter((_, i) => i !== idx))}>
+                        <button type="button" aria-label={`Remove ${it.name}`} className="hit press grid h-8 w-8 place-items-center rounded-full" style={{ color: "var(--muted)" }} onClick={() => setItems(items.filter((_, i) => i !== idx))}>
                           <Trash size={16} />
                         </button>
                       </>
@@ -789,7 +790,7 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                       date: today(),
                       raw_text: plate.plate_note || items.map((i) => i.name).join(", "),
                       photo_path: plate.photo_path ?? null,
-                      items: items.map((i) => ({ food_id: i.food_id, name: i.name, grams: i.grams, calories: i.calories, protein_g: i.protein_g, carbs_g: i.carbs_g, fat_g: i.fat_g, source: i.source, confidence: i.confidence === "high" ? 0.9 : i.confidence === "medium" ? 0.6 : 0.3, micros: i.micros, cooked_in: i.cooked_in ?? null })),
+                      items: items.map(mealItemFromPlate),
                     });
                     onSaved?.();
                     router.push("/");
@@ -852,7 +853,7 @@ function History({ items, onOpen }: { items: ScanHistoryItem[]; onOpen: (i: Scan
                   type="button"
                   aria-label="Delete scan"
                   disabled={removing}
-                  className="press grid h-8 w-8 shrink-0 place-items-center rounded-full"
+                  className="hit press grid h-8 w-8 shrink-0 place-items-center rounded-full"
                   style={{ color: "var(--muted)" }}
                   onClick={() =>
                     startRemove(async () => {
@@ -881,7 +882,7 @@ function OpenedScan({ data, onClose }: { data: Record<string, unknown>; onClose:
       <Rise index={2}>
         <div className="flex items-center justify-between px-1">
           <p className="text-xs font-semibold muted">Saved scan · {KIND_LABEL[kind] ?? kind}</p>
-          <button type="button" className="press text-xs font-semibold" onClick={onClose}>
+          <button type="button" className="hit press text-xs font-semibold" onClick={onClose}>
             Close
           </button>
         </div>
@@ -897,7 +898,7 @@ function OpenedScan({ data, onClose }: { data: Record<string, unknown>; onClose:
           <PlateReview plate={data as unknown as PlateEstimate} readOnly />
         </>
       ) : (
-        <ReportView report={data as unknown as LabelReport} readOnly />
+        <ReportView report={data as unknown as LabelReport} />
       )}
     </>
   );

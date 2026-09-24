@@ -1,6 +1,6 @@
 {
   "name": "band-log-app",
-  "version": "1.9.0",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

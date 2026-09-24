@@ -10,7 +10,6 @@ const ZONE = "Asia/Kolkata";
 const LOCALE = "en-IN";
 
 const TIME = new Intl.DateTimeFormat(LOCALE, { hour: "numeric", minute: "2-digit", timeZone: ZONE });
-const DAY = new Intl.DateTimeFormat(LOCALE, { weekday: "short", day: "numeric", month: "short", timeZone: ZONE });
 const ISO_DAY = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: ZONE });
 
 /** "9:15 pm" for a Postgres timestamptz, in the display zone. */
@@ -25,13 +24,4 @@ export function formatTime(createdAt: string): string {
 /** Today's ISO date in the display zone — stable on both sides of hydration. */
 export function todayInZone(): string {
   return ISO_DAY.format(new Date());
-}
-
-/** "Today" / "Yesterday" / "Sat 19 Sep" for an ISO date. */
-export function relativeDay(date: string): string {
-  const t = todayInZone();
-  if (date === t) return "Today";
-  const prev = new Date(new Date(`${t}T00:00:00Z`).getTime() - 864e5).toISOString().slice(0, 10);
-  if (date === prev) return "Yesterday";
-  return DAY.format(new Date(`${date}T12:00:00Z`));
 }

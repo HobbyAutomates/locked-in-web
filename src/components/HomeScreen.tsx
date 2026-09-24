@@ -8,9 +8,9 @@ import { dismiss, useDismissed } from "@/lib/dismiss";
 import { useBurnedBack } from "@/lib/prefs";
 import { totalsFor } from "@/lib/totals";
 import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Nudge, type Profile, type Workout, type Wrap } from "@/lib/types";
-import { Check, ChevronRight, Close, Fist, Flame, Lock, MoonStar, Share } from "./icons";
-import { ExerciseRow, MealRow, PendingMealRow, WorkoutRow } from "./Rows";
-import { usePendingMeals } from "./PendingMeals";
+import { Check, ChevronRight, Close, Fist, Flame, Lock, MoonStar, Run, Share, Spinner } from "./icons";
+import { ExerciseRow, MealRow, WorkoutRow } from "./Rows";
+import { usePendingMeals, type Pending } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
 
 type Props = {
@@ -54,8 +54,10 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   // Band-workout burns ride on the workout row itself; everything else gets a row of its own.
   const dayExercises = exercises.filter((e) => e.date === selected && e.source !== "workout");
   const workoutBurn = new Map(exercises.filter((e) => e.date === selected && e.source === "workout").map((e) => [e.note, e.kcal]));
-  // No Health Connect on the web, so the burned card is the exercise log alone.
+  // No Health Connect (so no steps) on the web: the activity card is burned kcal + active minutes
+  // from the exercise log (band workouts included, via their auto-burn rows).
   const burned = exercises.filter((e) => e.date === selected).reduce((a, e) => a + e.kcal, 0);
+  const activeMin = exercises.filter((e) => e.date === selected).reduce((a, e) => a + (Number(e.minutes) || 0), 0);
   const trained = new Set(workouts.map((w) => w.date));
   const carbTarget = Math.max(1, carbTargetG(profile));
   const fatTarget = Math.max(1, fatTargetG(profile));
@@ -84,8 +86,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         {error ? <div className="mt-2"><ErrorNote text={error} /></div> : null}
       </Rise>
 
-      {nudges.length ? <NudgeBanner nudges={nudges} /> : null}
-      {wrap ? <WrapCard wrap={wrap} /> : null}
+      <BannerSlot nudges={nudges} wrap={wrap} pending={pending} />
 
       <Rise index={1}>
         <WeekStrip today={today} selected={selected} trained={trained} onSelect={setSelected} />
@@ -120,30 +121,43 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         </div>
       </Rise>
 
-      {isToday ? (
-        <Rise index={4}>
-          <button
-            type="button"
-            className="card press flex w-full items-center gap-2.5 text-left"
-            style={{ padding: 14 }}
-            onClick={() => router.push(`/log?date=${today}&mode=exercise`)}
-            aria-label="Log exercise"
-          >
-            <Ring fraction={burned / 400} color="var(--orange)" size={44} stroke={5}>
-              <span style={{ color: "var(--orange)" }}>
-                <Flame size={16} />
+      <Rise index={4}>
+        <button
+          type="button"
+          className="card press flex w-full items-center text-left"
+          style={{ padding: "14px 10px 14px 14px" }}
+          onClick={() => router.push(`/log?date=${selected}&mode=exercise`)}
+          aria-label={`${Math.round(burned)} kcal burned, ${activeMin} active minutes. Log exercise`}
+        >
+          <span className="grid flex-1 grid-cols-2">
+            <span className="flex min-w-0 items-center gap-2.5 pr-3">
+              <Ring fraction={burned / 400} color="var(--orange)" size={44} stroke={5}>
+                <span style={{ color: "var(--orange)" }}>
+                  <Flame size={16} />
+                </span>
+              </Ring>
+              <span className="flex min-w-0 flex-col">
+                <span className="num text-xl font-extrabold leading-tight">{Math.round(burned)}</span>
+                <span className="truncate text-xs muted">kcal burned</span>
               </span>
-            </Ring>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="num text-xl font-extrabold leading-tight">{Math.round(burned)}</span>
-              <span className="text-xs muted">kcal burned · log exercise</span>
             </span>
-            <span style={{ color: "var(--muted)" }}>
-              <ChevronRight size={18} />
+            <span className="flex min-w-0 items-center gap-2.5 pl-3" style={{ borderLeft: "1px solid var(--hair)" }}>
+              <Ring fraction={activeMin / 60} color="var(--green)" size={44} stroke={5}>
+                <span style={{ color: "var(--green)" }}>
+                  <Run size={16} />
+                </span>
+              </Ring>
+              <span className="flex min-w-0 flex-col">
+                <span className="num text-xl font-extrabold leading-tight">{activeMin}</span>
+                <span className="truncate text-xs muted">active min</span>
+              </span>
             </span>
-          </button>
-        </Rise>
-      ) : null}
+          </span>
+          <span className="shrink-0 pl-1" style={{ color: "var(--muted)" }}>
+            <ChevronRight size={18} />
+          </span>
+        </button>
+      </Rise>
 
       <Rise index={4}>
         <h2 className="text-xl font-extrabold" style={{ letterSpacing: "-0.025em" }}>
@@ -151,13 +165,14 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         </h2>
       </Rise>
 
-      {isToday ? pending.map((p) => <Rise key={p.id} index={5}><PendingMealRow text={p.text} /></Rise>) : null}
-
-      {dayWorkouts.length === 0 && dayMeals.length === 0 && dayExercises.length === 0 && (!isToday || pending.length === 0) ? (
+      {dayWorkouts.length === 0 && dayMeals.length === 0 && dayExercises.length === 0 && !(isToday && pending.length) ? (
         <Rise index={5}>
-          <p className="text-[13px] muted">
-            {isToday ? "Nothing yet today. Tap + to log a workout, a meal or some exercise." : `Nothing logged on ${longDate(selected)}.`}
-          </p>
+          <div className="card flex flex-col items-start gap-3">
+            <p className="text-[15px]">{isToday ? "Nothing logged yet today." : `Nothing logged on ${longDate(selected)}.`}</p>
+            <PillButton soft height={44} onClick={() => router.push(`/log?date=${selected}`)}>
+              {isToday ? "Log something" : "Log for this day"}
+            </PillButton>
+          </div>
         </Rise>
       ) : null}
 
@@ -184,15 +199,65 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   );
 }
 
+/**
+ * One banner slot above the hero: at most one of the squad nudge, the 9 pm wrap and a meal still
+ * being saved, in that priority. With more than one, a dot row underneath steps to the next.
+ */
+function BannerSlot({ nudges, wrap, pending }: { nudges: Nudge[]; wrap: Wrap | null; pending: Pending[] }) {
+  const nudgeHidden = useDismissed(`nudge:${nudges[0]?.id ?? "none"}`);
+  const wrapHidden = useDismissed(`wrap:${wrap?.date ?? "none"}`);
+  const [idx, setIdx] = useState(0);
+  const slots: { key: string; node: React.ReactNode }[] = [];
+  if (nudges.length && !nudgeHidden) slots.push({ key: "nudge", node: <NudgeBanner nudges={nudges} /> });
+  if (wrap && !wrapHidden) slots.push({ key: "wrap", node: <WrapCard wrap={wrap} /> });
+  if (pending.length) slots.push({ key: "pending", node: <PendingBanner pending={pending} /> });
+  if (!slots.length) return null;
+  const i = idx % slots.length;
+  return (
+    <Rise index={1}>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={slots[i].key} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.16 }}>
+          {slots[i].node}
+        </motion.div>
+      </AnimatePresence>
+      {slots.length > 1 ? (
+        <button
+          type="button"
+          className="hit press mx-auto mt-1 flex h-6 items-center gap-1.5 px-3"
+          aria-label={`Banner ${i + 1} of ${slots.length}. Show the next one`}
+          onClick={() => setIdx(i + 1)}
+        >
+          {slots.map((s, j) => (
+            <span key={s.key} className="rounded-full" style={{ width: j === i ? 16 : 6, height: 6, background: j === i ? "var(--ink)" : "var(--hair)", transition: "width 0.2s" }} />
+          ))}
+        </button>
+      ) : null}
+    </Rise>
+  );
+}
+
+/** A meal saved while its parse / photo estimate was still running. */
+function PendingBanner({ pending }: { pending: Pending[] }) {
+  return (
+    <div className="card flex items-center gap-3" style={{ padding: "12px 14px" }} role="status">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)" }}>
+        <Spinner size={16} />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[15px] font-bold">Saving {pending.length === 1 ? `"${pending[0].text}"` : `${pending.length} meals`}</span>
+        <span className="text-xs muted">Working out the calories. It lands in Recently logged.</span>
+      </span>
+    </div>
+  );
+}
+
 /** "Sohum nudged you" — squad-mates poking you to train, dismissible per nudge. */
 function NudgeBanner({ nudges }: { nudges: Nudge[] }) {
   const latest = nudges[0];
-  const hidden = useDismissed(`nudge:${latest.id}`);
-  if (hidden) return null;
   const names = [...new Set(nudges.map((n) => n.from_name))];
   const who = names.length === 1 ? names[0] : names.length === 2 ? `${names[0]} and ${names[1]}` : `${names[0]} and ${names.length - 1} others`;
   return (
-    <Rise index={1}>
+    <div>
       <div className="flex items-center gap-3 rounded-[20px] px-4 py-3" style={{ background: "var(--btn)", color: "var(--btn-ink)" }} role="status">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ background: "rgba(255,255,255,0.14)" }}>
           <Fist size={18} />
@@ -203,18 +268,16 @@ function NudgeBanner({ nudges }: { nudges: Nudge[] }) {
             {latest.group_name} · get a session in today
           </span>
         </span>
-        <button type="button" aria-label="Dismiss" className="press grid h-8 w-8 place-items-center rounded-full" style={{ color: "inherit" }} onClick={() => dismiss(`nudge:${latest.id}`)}>
+        <button type="button" aria-label="Dismiss" className="hit press grid h-8 w-8 place-items-center rounded-full" style={{ color: "inherit" }} onClick={() => dismiss(`nudge:${latest.id}`)}>
           <Close size={16} />
         </button>
       </div>
-    </Rise>
+    </div>
   );
 }
 
 /** The 9 pm daily wrap: protein, calories vs budget, sessions this week, tomorrow's session, best meal. */
 function WrapCard({ wrap }: { wrap: Wrap }) {
-  const hidden = useDismissed(`wrap:${wrap.date}`);
-  if (hidden) return null;
   const pct = Math.min(1, wrap.protein / Math.max(1, wrap.proteinTarget));
   async function share() {
     const text = `Locked In · ${wrap.line}`;
@@ -226,14 +289,14 @@ function WrapCard({ wrap }: { wrap: Wrap }) {
     }
   }
   return (
-    <Rise index={1}>
+    <div>
       <Card padding={18}>
         <div className="flex items-center justify-between">
           <p className="flex items-center gap-2 text-[13px] font-bold muted">
             <MoonStar size={16} />
             {wrap.line.startsWith("Yesterday") ? "Yesterday's wrap" : "Today's wrap"}
           </p>
-          <button type="button" aria-label="Dismiss the wrap" className="press grid h-8 w-8 place-items-center rounded-full" style={{ background: "var(--card2)", color: "var(--muted)" }} onClick={() => dismiss(`wrap:${wrap.date}`)}>
+          <button type="button" aria-label="Dismiss the wrap" className="hit press grid h-8 w-8 place-items-center rounded-full" style={{ background: "var(--card2)", color: "var(--muted)" }} onClick={() => dismiss(`wrap:${wrap.date}`)}>
             <Close size={14} />
           </button>
         </div>
@@ -262,7 +325,7 @@ function WrapCard({ wrap }: { wrap: Wrap }) {
           </PillButton>
         </div>
       </Card>
-    </Rise>
+    </div>
   );
 }
 

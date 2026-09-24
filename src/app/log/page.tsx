@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { getPresets, getProfile, getWorkout } from "@/lib/data";
+import { getFoodUsage, getLatestWorkout, getPresets, getProfile, getWorkout } from "@/lib/data";
 import { listSavedMeals } from "@/lib/actions";
 import { today as todayIso } from "@/lib/dates";
 import LogScreen from "@/components/LogScreen";
@@ -15,21 +15,25 @@ export default async function LogPage({
   const { user } = await requireUser();
   if (!user) redirect("/login");
   const sp = await searchParams;
-  const [profile, existing, savedMeals, presets] = await Promise.all([
+  const [profile, existing, savedMeals, presets, usage, last] = await Promise.all([
     getProfile(),
     sp.workout ? getWorkout(sp.workout) : Promise.resolve(null),
     listSavedMeals().catch(() => []),
     getPresets().catch(() => []),
+    getFoodUsage().catch(() => ({})),
+    sp.workout ? Promise.resolve(null) : getLatestWorkout().catch(() => null),
   ]);
   return (
-      <LogScreen
-        existing={existing}
-        date={existing?.date ?? sp.date ?? todayIso()}
-        startOnMeal={sp.mode === "meal"}
-        startOnExercise={sp.mode === "exercise"}
-        savedMeals={savedMeals}
-        presets={presets}
-        profile={profile}
-      />
+    <LogScreen
+      existing={existing}
+      last={last}
+      date={existing?.date ?? sp.date ?? todayIso()}
+      startOnMeal={sp.mode === "meal"}
+      startOnExercise={sp.mode === "exercise"}
+      savedMeals={savedMeals}
+      presets={presets}
+      usage={usage}
+      profile={profile}
+    />
   );
 }
