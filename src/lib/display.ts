@@ -25,3 +25,26 @@ export function formatTime(createdAt: string): string {
 export function todayInZone(): string {
   return ISO_DAY.format(new Date());
 }
+
+/**
+ * Display-name fallback when profiles.name is blank: the email local-part's first run of letters,
+ * title-cased ("ayaan.khan@x.com" -> "Ayaan"). Same rule as the signup trigger and the Android app.
+ */
+export function nameFromEmail(email: string | null | undefined): string {
+  const local = String(email ?? "").split("@")[0] ?? "";
+  const run = local.match(/[A-Za-z]+/)?.[0] ?? "";
+  return run ? run.charAt(0).toUpperCase() + run.slice(1).toLowerCase() : "";
+}
+
+/** profiles.name, else the email-derived name, else "" (callers pick their own placeholder). */
+export function displayName(name: string | null | undefined, email?: string | null): string {
+  const n = String(name ?? "").trim();
+  return n || nameFromEmail(email);
+}
+
+/** Public URL of an avatar stored as "<uid>/avatar.jpg?v=<ms>" in the public `avatars` bucket. */
+export function avatarUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://evizkfvltacrfngsgbuu.supabase.co";
+  return `${base.replace(/\/$/, "")}/storage/v1/object/public/avatars/${path}`;
+}

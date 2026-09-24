@@ -3,9 +3,10 @@ import { createClient } from "./supabase/server";
 import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Nudge, type Profile, type ScanHistoryItem, type Squad, type SquadMember, type WeightEntry, type Workout } from "./types";
 import { parse as parseReminders } from "./reminders";
 import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
+import { scanName } from "./scanNames";
 
 const PROFILE_COLS =
-  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats";
+  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path";
 
 const num = (v: unknown): number | null => (v == null || v === "" ? null : Number(v));
 
@@ -33,6 +34,7 @@ export async function getProfile(): Promise<Profile> {
     reminders: parseReminders(d.reminders),
     lens_default: (["protein", "goal", "snack", "cutting", "bulking"] as const).includes(d.lens_default as never) ? (d.lens_default as Profile["lens_default"]) : "protein",
     share_stats: d.share_stats !== false,
+    avatar_path: typeof d.avatar_path === "string" && d.avatar_path ? d.avatar_path : null,
   };
 }
 
@@ -195,29 +197,48 @@ export async function getPresets(): Promise<FoodPreset[]> {
     }));
 }
 
-/** Latest scans for the History list (label / barcode / photo), newest first. */
+/**
+ * Latest scans for the History list (label / barcode / photo), newest first. Pictures, in order:
+ * the scan's own thumbnail (scan-photos, signed in one batch), the Open Food Facts image, the plate
+ * photo (meal-photos, signed in one batch). Names never come back blank or "<UNKNOWN>".
+ */
 export async function getScans(limit = 30): Promise<ScanHistoryItem[]> {
   const supabase = await createClient();
-  const { data } = await supabase.from("label_scans").select("id, kind, lens, product, verdict, created_at, image_path, report").order("created_at", { ascending: false }).limit(limit);
-  const rows = (data ?? []) as { id: string; kind: string | null; lens: string | null; product: string; verdict: string; created_at: string; image_path: string | null; report: Record<string, unknown> }[];
-  const paths = rows.filter((r) => r.image_path).map((r) => r.image_path as string);
-  const byPath = new Map<string, string>();
-  if (paths.length) {
-    const { data: signed } = await supabase.storage.from("meal-photos").createSignedUrls(paths, 3600);
-    for (const s of signed ?? []) if (s.signedUrl) byPath.set(s.path ?? "", s.signedUrl);
-  }
+  const { data } = await supabase
+    .from("label_scans")
+    .select("id, kind, lens, product, verdict, created_at, image_path, thumb_path, image_url, report")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  type Row = { id: string; kind: string | null; lens: string | null; product: string | null; verdict: string | null; created_at: string; image_path: string | null; thumb_path: string | null; image_url: string | null; report: Record<string, unknown> | null };
+  const rows = (data ?? []) as Row[];
+  const sign = async (bucket: string, paths: string[]) => {
+    const out = new Map<string, string>();
+    if (!paths.length) return out;
+    const { data: signed, error } = await supabase.storage.from(bucket).createSignedUrls(paths, 3600);
+    if (error) console.error(`[getScans] signing ${bucket} failed`, error);
+    for (const s of signed ?? []) if (s.signedUrl && s.path) out.set(s.path, s.signedUrl);
+    return out;
+  };
+  const [thumbs, plates] = await Promise.all([
+    sign("scan-photos", rows.filter((r) => r.thumb_path).map((r) => r.thumb_path as string)),
+    sign("meal-photos", rows.filter((r) => r.image_path).map((r) => r.image_path as string)),
+  ]);
   return rows.map((r) => {
-    const info = (r.report?.infographic ?? null) as { score_out_of_10?: number } | null;
+    const report = r.report ?? {};
+    const info = (report.infographic ?? null) as { score_out_of_10?: number } | null;
+    const kind = (r.kind === "barcode" || r.kind === "photo" ? r.kind : r.kind === "plate" ? "photo" : "label") as ScanHistoryItem["kind"];
+    const offImage = r.image_url ?? (typeof report.image_url === "string" ? report.image_url : null);
     return {
       id: r.id,
-      kind: (r.kind ?? "label") as ScanHistoryItem["kind"],
+      kind,
       lens: r.lens ?? "protein",
-      product: r.product,
-      verdict: r.verdict,
+      product: scanName(kind, { model: r.product, off: report.product, ingredients: report.transcript }),
+      verdict: r.verdict ?? "",
       created_at: r.created_at,
       score: info?.score_out_of_10 ?? null,
-      image_url: (r.report?.image_url as string | undefined) ?? (r.image_path ? byPath.get(r.image_path) ?? null : null),
+      image_url: (r.thumb_path ? thumbs.get(r.thumb_path) : null) ?? offImage ?? (r.image_path ? plates.get(r.image_path) ?? null : null),
       image_path: r.image_path,
+      what_it_is: typeof report.what_it_is === "string" ? report.what_it_is.replace(/\s+/g, " ").trim() : kind === "photo" && typeof report.plate_note === "string" ? report.plate_note : "",
     };
   });
 }

@@ -8,10 +8,12 @@ import { onCount } from "@/lib/reminders";
 import { THEME_MODES, setThemeMode, useThemeMode, type ThemeMode } from "@/lib/theme";
 import { LENS_DEFAULTS, ageFrom, type LensDefault, type Profile } from "@/lib/types";
 import { APP_VERSION, CHANGELOG, compareVersions } from "@/lib/version";
+import { displayName } from "@/lib/display";
+import { AvatarPicker } from "./Avatar";
 import { Bell, Check, Exit, Flame, Mail, Moon, Palette, Pencil, Person, Phone, Refresh, Scale, Scan, Share, Sparkle, Target } from "./icons";
 import { BottomSheet, Card, Chevron, ErrorNote, GroupLabel, Hair, PillSwitch, Rise, SettingRow, Toggle, fmt } from "./ui";
 
-const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-12.apk";
+const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-14.apk";
 const WEB_URL = "https://web-production-ff1cf.up.railway.app";
 const INVITE_TEXT = `Locked In — workouts, meals by voice, label scanner. Android: ${APK_URL} · iPhone: ${WEB_URL} (Safari → Add to Home Screen)`;
 
@@ -20,7 +22,7 @@ const INVITE_TEXT = `Locked In — workouts, meals by voice, label scanner. Andr
  * behaves) and App (version, invite, help, sign out). Every row either edits in place, opens a
  * bottom sheet, or pushes one of the unchanged sub-pages.
  */
-export default function ProfileScreen({ profile, email }: { profile: Profile; email: string }) {
+export default function ProfileScreen({ profile, email, userId }: { profile: Profile; email: string; userId: string }) {
   const router = useRouter();
   const [sheet, setSheet] = useState<null | "lens" | "rings" | "news" | "home">(null);
   const [invited, setInvited] = useState<string | null>(null);
@@ -28,6 +30,8 @@ export default function ProfileScreen({ profile, email }: { profile: Profile; em
   const theme = useThemeMode();
   const burnedBack = useBurnedBack();
   const age = ageFrom(profile.dob);
+  // Blank name → the email's first run of letters ("ayaan.khan@…" → "Ayaan"), like the signup trigger.
+  const shownName = displayName(profile.name, email);
   const remindersOn = onCount(profile.reminders);
   const [lensDefault, setLensDefault] = useState<LensDefault>(profile.lens_default);
   const [shareStats, setShareStats] = useState(profile.share_stats);
@@ -92,12 +96,11 @@ export default function ProfileScreen({ profile, email }: { profile: Profile; em
         <Card padding={0}>
           <div className="px-4">
             <div className="flex items-center gap-3.5 py-3.5">
-              <span className="grid place-items-center rounded-full text-[22px] font-bold" style={{ width: 52, height: 52, background: "var(--card2)", flex: "none" }}>
-                {(profile.name || email || "?").slice(0, 1).toUpperCase()}
-              </span>
+              <AvatarPicker userId={userId} path={profile.avatar_path} name={shownName || email} size={56} onError={setError} />
               <span className="flex min-w-0 flex-1 flex-col">
-                <NameField name={profile.name} onCommit={saveName} />
-                <span className="text-[13px] muted">{age != null ? `${age} years old` : email || "—"}</span>
+                <NameField name={shownName} onCommit={saveName} />
+                <span className="truncate text-[13px] muted">{email || "—"}</span>
+                {age != null ? <span className="text-xs muted">{age} yrs</span> : null}
               </span>
             </div>
             <Hair />

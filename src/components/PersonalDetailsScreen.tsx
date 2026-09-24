@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveProfile } from "@/lib/actions";
-import type { Gender, Profile } from "@/lib/types";
+import { ageFrom, type Gender, type Profile } from "@/lib/types";
+import { nameFromEmail } from "@/lib/display";
 import SubPage from "./SubPage";
-import { Ruler, Scale, Steps, Target } from "./icons";
+import { CalendarIcon, Person, Ruler, Scale, Steps } from "./icons";
 import { Card, ErrorNote, Hair, NumberField, PillButton, Rise, Segmented, SettingRow, fmt } from "./ui";
 
 const GENDERS: Gender[] = ["male", "female", "other"];
@@ -15,9 +16,10 @@ const shortDob = (iso: string) => {
   return new Date(y, m - 1, d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 };
 
-/** Everything the goal generator needs: weight, height, birthday, gender, step goal. */
-export default function PersonalDetailsScreen({ profile }: { profile: Profile }) {
+/** Name plus everything the goal generator needs: weight, height, birthday, gender, step goal. */
+export default function PersonalDetailsScreen({ profile, email = "" }: { profile: Profile; email?: string }) {
   const router = useRouter();
+  const [name, setName] = useState(profile.name);
   const [weight, setWeight] = useState(profile.weight_kg != null ? fmt(profile.weight_kg) : "");
   const [height, setHeight] = useState(profile.height_cm != null ? fmt(profile.height_cm) : "");
   const [dob, setDob] = useState(profile.dob ?? "");
@@ -28,6 +30,7 @@ export default function PersonalDetailsScreen({ profile }: { profile: Profile })
   const [error, setError] = useState<string | null>(null);
 
   const edited = (): Partial<Profile> => ({
+    name: name.trim().slice(0, 40),
     weight_kg: weight ? Number(weight) || null : null,
     height_cm: height ? Number(height) || null : null,
     dob: dob || null,
@@ -36,7 +39,10 @@ export default function PersonalDetailsScreen({ profile }: { profile: Profile })
   });
   const e = edited();
   const dirty =
+    e.name !== profile.name.trim() ||
     e.weight_kg !== profile.weight_kg || e.height_cm !== profile.height_cm || e.dob !== profile.dob || e.gender !== profile.gender || e.step_goal !== profile.step_goal;
+
+  const age = ageFrom(dob || null);
 
   async function save() {
     setBusy(true);
@@ -78,6 +84,19 @@ export default function PersonalDetailsScreen({ profile }: { profile: Profile })
       <Rise index={1}>
         <Card padding={0}>
           <div className="px-4">
+            <SettingRow icon={<Person size={20} />} label="Name">
+              <input
+                className="min-w-0 rounded-[10px] px-2.5 py-1.5 text-right text-[15px] font-semibold outline-none"
+                style={{ background: "var(--card2)", border: 0, color: "var(--ink)", width: 170 }}
+                value={name}
+                maxLength={40}
+                placeholder={nameFromEmail(email) || "Your name"}
+                autoComplete="name"
+                aria-label="Your name"
+                onChange={(ev) => setName(ev.target.value)}
+              />
+            </SettingRow>
+            <Hair />
             <SettingRow icon={<Scale size={20} />} label="Current weight">
               <NumberField value={weight} onChange={setWeight} unit="kg" label="Current weight in kilograms" decimal />
             </SettingRow>
@@ -86,8 +105,8 @@ export default function PersonalDetailsScreen({ profile }: { profile: Profile })
               <NumberField value={height} onChange={setHeight} unit="cm" label="Height in centimetres" decimal />
             </SettingRow>
             <Hair />
-            <SettingRow icon={<Target size={20} />} label="Date of birth">
-              <label className="relative inline-flex items-center">
+            <SettingRow icon={<CalendarIcon size={20} />} label="Date of birth" subtitle={age != null ? `${age} yrs` : undefined}>
+              <label className="relative inline-flex items-center rounded-[10px] px-2.5 py-1.5" style={{ background: "var(--card2)" }}>
                 <span className="text-sm font-semibold" style={{ color: dob ? "var(--ink)" : "var(--muted)" }}>
                   {dob ? shortDob(dob) : "Set"}
                 </span>

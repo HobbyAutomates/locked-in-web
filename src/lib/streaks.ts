@@ -31,6 +31,14 @@ export function workoutDayStreak(dates: string[]) {
   return n;
 }
 
+/**
+ * v2.2 day streak: consecutive Asia/Kolkata days, ending today or yesterday, on which ANYTHING
+ * was logged — a workout, an exercise_log row (any source) or a meal. `today()` is already IST.
+ */
+export function activityDayStreak(...dateLists: string[][]) {
+  return workoutDayStreak(dateLists.flat());
+}
+
 /** Consecutive days with at least one meal logged, ending today or yesterday. */
 export function mealDayStreak(dates: string[]) {
   return workoutDayStreak(dates);

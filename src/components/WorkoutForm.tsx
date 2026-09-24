@@ -55,7 +55,7 @@ export default function WorkoutForm({
     setBusy(true);
     setError(null);
     try {
-      await saveWorkout({
+      const res = await saveWorkout({
         id: existing?.id,
         date,
         muscles: MUSCLES.filter((m) => muscles.includes(m)),
@@ -65,11 +65,26 @@ export default function WorkoutForm({
         exercises: exercises.trim(),
         notes: notes.trim(),
       });
-      // A new session earns the streak celebration on Home; edits just go back.
+      if (!res.ok) {
+        console.error("[WorkoutForm] save failed:", res.error);
+        setError(res.error);
+        setBusy(false);
+        return;
+      }
+      if (res.warning) {
+        // Saved, but the auto-burn row didn't make it: say so here instead of leaving silently.
+        console.error("[WorkoutForm] saved with a warning:", res.warning);
+        setError(res.warning);
+        setTimeout(() => router.push(existing ? "/" : "/?celebrate=1"), 2500);
+        return;
+      }
+      // A new session earns the streak celebration on Home; edits just go back. The action's
+      // revalidatePath already invalidated the router cache, so no extra router.refresh() here.
       router.push(existing ? "/" : "/?celebrate=1");
-      router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save");
+      // Network drop / server crash: the action never answered.
+      console.error("[WorkoutForm] save threw:", e);
+      setError(e instanceof Error && e.message ? `Couldn't save the workout: ${e.message}` : "Couldn't save the workout — check your connection and try again.");
       setBusy(false);
     }
   }
@@ -77,12 +92,19 @@ export default function WorkoutForm({
   async function remove() {
     if (!existing) return;
     setBusy(true);
+    setError(null);
     try {
-      await deleteWorkout(existing.id);
+      const res = await deleteWorkout(existing.id);
+      if (!res.ok) {
+        console.error("[WorkoutForm] delete failed:", res.error);
+        setError(res.error);
+        setBusy(false);
+        return;
+      }
       onClose();
-      router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete");
+      console.error("[WorkoutForm] delete threw:", e);
+      setError(e instanceof Error && e.message ? e.message : "Could not delete");
       setBusy(false);
     }
   }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { saveDescribedExercises, saveExercise, searchActivities } from "@/lib/actions";
 import { DEFAULT_WEIGHT_KG, DURATIONS, INTENSITIES, QUICK_ACTIVITIES, bandCode, bandKcal, bandLevel, burnKcal, intensityLabel, type Intensity } from "@/lib/burn";
 import { postJson } from "@/lib/image";
@@ -26,7 +25,6 @@ function activityName(a: Activity) {
  * set the minutes (and intensity behind "Adjust"), save. "Enter calories instead" is the manual way.
  */
 export default function ExerciseForm({ date, weightKg, onClose, search = searchActivities }: { date: string; weightKg: number | null; onClose: () => void; search?: (q: string) => Promise<Activity[]> }) {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Activity[]>([]);
   const [searching, setSearching] = useState(false);
@@ -104,7 +102,6 @@ export default function ExerciseForm({ date, weightKg, onClose, search = searchA
       else if (mode === "manual") await saveExercise({ date, activity_code: null, name: manualName.trim() || "Exercise", minutes: Math.max(1, mins), intensity: "medium", kcal: Number(manualKcal), source: "manual" });
       else if (pick) await saveExercise({ date, activity_code: pick.band ? bandCode(bandLevel(intensity)) : pick.code, name: pick.name, minutes: mins, intensity, kcal: pickKcal, source: "manual" });
       onClose();
-      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
       setBusy(false);

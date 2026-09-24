@@ -13,6 +13,9 @@ import { ExerciseRow, MealRow, WorkoutRow } from "./Rows";
 import { usePendingMeals, type Pending } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
 
+/** Background saves already pulled in by a refresh (see PendingMeals); survives remounts of Home. */
+let handledSaves = 0;
+
 type Props = {
   today: string;
   profile: Profile;
@@ -20,6 +23,8 @@ type Props = {
   meals: Meal[];
   exercises: ExerciseEntry[];
   weekStreak: number;
+  /** v2.2: consecutive IST days with anything logged (workout, exercise or meal). */
+  dayStreak: number;
   thisWeek: number;
   celebrate: boolean;
   /** The 9 pm wrap (21:00–04:00 IST only), else null. */
@@ -28,20 +33,28 @@ type Props = {
   nudges: Nudge[];
 };
 
-export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, thisWeek, celebrate, wrap, nudges }: Props) {
+export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(today);
   const { pending, savedCount, error } = usePendingMeals();
-  // When a background quick-log finishes, pull the freshly saved row in.
+  // When a background quick-log finishes, pull the freshly saved row in — once per save. The count
+  // lives in a module-level store that outlives this screen, so "savedCount > 0" alone re-ran
+  // router.refresh() (a second full Home render: workouts, meals, my_nudges…) on every visit.
   useEffect(() => {
-    if (savedCount > 0) router.refresh();
+    if (savedCount > handledSaves) {
+      handledSaves = savedCount;
+      router.refresh();
+    }
   }, [savedCount, router]);
-  // Squad rollup: refresh today's daily_stats on every open (and yesterday's on the first open of a session).
+  // Squad rollup: refresh today's daily_stats when Home opens (yesterday's too on the first open of
+  // a session), at most every 10 minutes — every save already recomputes it server-side.
   useEffect(() => {
     let first = true;
     try {
-      first = window.sessionStorage.getItem("lockedin-rollup") !== today;
-      window.sessionStorage.setItem("lockedin-rollup", today);
+      const last = JSON.parse(window.sessionStorage.getItem("lockedin-rollup-at") ?? "null") as { day: string; at: number; saves: number } | null;
+      first = last?.day !== today;
+      if (!first && last && Date.now() - last.at < 10 * 60_000 && last.saves === savedCount) return;
+      window.sessionStorage.setItem("lockedin-rollup-at", JSON.stringify({ day: today, at: Date.now(), saves: savedCount }));
     } catch {
       // No session storage: just include yesterday every time.
     }
@@ -84,6 +97,10 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
           </span>
         </div>
         {error ? <div className="mt-2"><ErrorNote text={error} /></div> : null}
+      </Rise>
+
+      <Rise index={1}>
+        <DayStreakPill days={dayStreak} loggedToday={meals.some((m) => m.date === today) || workouts.some((w) => w.date === today) || exercises.some((e) => e.date === today)} />
       </Rise>
 
       <BannerSlot nudges={nudges} wrap={wrap} pending={pending} />
@@ -195,6 +212,33 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       <AnimatePresence>
         {celebrate ? <Celebration thisWeek={thisWeek} target={profile.weekly_workout_target} streakWeeks={weekStreak} /> : null}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * v2.2 day streak: "🔥 N-day streak" — any workout, exercise or meal counts for the day. At 0 it
+ * turns into a muted nudge to start one; when the run is alive but nothing is in yet today it says
+ * so, so the streak doesn't break by surprise.
+ */
+function DayStreakPill({ days, loggedToday }: { days: number; loggedToday: boolean }) {
+  const alive = days > 0;
+  return (
+    <div className="card flex items-center gap-3" style={{ padding: "12px 16px", borderRadius: 999 }} role="status" aria-label={alive ? `${days}-day streak` : "No day streak yet"}>
+      <span
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-full"
+        style={{ background: alive ? "color-mix(in srgb, var(--flame) 14%, transparent)" : "var(--card2)", color: alive ? "var(--flame)" : "var(--muted)" }}
+      >
+        {alive ? <BreathingFlame size={20} /> : <Flame size={18} />}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="num text-[16px] font-extrabold leading-tight" style={{ letterSpacing: "-0.02em", color: alive ? "var(--ink)" : "var(--muted)" }}>
+          {alive ? `${days}-day streak` : "Start a streak today"}
+        </span>
+        <span className="truncate text-xs muted">
+          {!alive ? "Log a meal, a workout or any exercise" : loggedToday ? "Today counts — keep it going tomorrow" : "Log anything today to keep it alive"}
+        </span>
+      </span>
     </div>
   );
 }

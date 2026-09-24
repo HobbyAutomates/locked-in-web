@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { nameFromEmail } from "@/lib/display";
 import { Lock } from "@/components/icons";
 import { ErrorNote, PillButton } from "@/components/ui";
 
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [mode, setMode] = useState<"in" | "up">("in");
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -22,7 +24,12 @@ export default function LoginPage() {
     const { error } =
       mode === "in"
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        : await supabase.auth.signUp({
+            email,
+            password,
+            // The signup trigger copies this into profiles.name; the confirmation email greets with it.
+            options: { data: { name: name.trim().slice(0, 40) || nameFromEmail(email) } },
+          });
     setBusy(false);
     if (error) return setMsg(error.message);
     if (mode === "up") {
@@ -43,7 +50,24 @@ export default function LoginPage() {
         <h1 className="text-3xl font-extrabold">{mode === "in" ? "Sign in" : "Create account"}</h1>
         <p className="text-[13px] muted">One sign-in on this phone. You&apos;ll stay logged in.</p>
 
-        <div className="mt-3 flex flex-col gap-2">
+        {mode === "up" ? (
+          <div className="mt-3 flex flex-col gap-2">
+            <label className="text-[13px] font-semibold muted" htmlFor="name">
+              Your name <span className="font-normal">(optional)</span>
+            </label>
+            <input
+              id="name"
+              className="field"
+              type="text"
+              autoComplete="given-name"
+              maxLength={40}
+              value={name}
+              placeholder={nameFromEmail(email) || "What your squad calls you"}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+        ) : null}
+        <div className={mode === "up" ? "flex flex-col gap-2" : "mt-3 flex flex-col gap-2"}>
           <label className="text-[13px] font-semibold muted" htmlFor="email">
             Email
           </label>

@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
   const [profile, { user }] = await Promise.all([getProfile(), requireUser()]);
-  return <ProfileScreen profile={profile} email={user?.email ?? ""} />;
+  return <ProfileScreen profile={profile} email={user?.email ?? ""} userId={user?.id ?? ""} />;
 }

@@ -309,13 +309,14 @@ export function unreadableReport(reason: string, transcript = ""): Record<string
 /** Persist a scan for the History list. Returns the row id. */
 export async function saveScan(
   admin: AdminClient,
-  row: { userId: string; kind: "label" | "barcode" | "photo"; lens: string; product: string; verdict: string; report: Record<string, unknown>; imagePath?: string | null },
+  row: { userId: string; kind: "label" | "barcode" | "photo"; lens: string; product: string; verdict: string; report: Record<string, unknown>; imagePath?: string | null; imageUrl?: string | null },
 ): Promise<string | null> {
-  const { data } = await admin
+  const { data, error } = await admin
     .from("label_scans")
-    .insert({ user_id: row.userId, kind: row.kind, lens: row.lens, product: row.product, verdict: row.verdict, report: row.report, image_path: row.imagePath ?? null })
+    .insert({ user_id: row.userId, kind: row.kind, lens: row.lens, product: row.product, verdict: row.verdict, report: row.report, image_path: row.imagePath ?? null, image_url: row.imageUrl ?? null })
     .select("id")
     .single();
+  if (error) console.error("[saveScan] label_scans insert failed", { kind: row.kind, error });
   return (data?.id as string | undefined) ?? null;
 }
 

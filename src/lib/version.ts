@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.1";
+export const APP_VERSION = "2.2";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.2",
+    date: "2026-09-24",
+    lines: [
+      "A day streak on Home: every day you log a meal, a workout or any exercise keeps the flame going.",
+      "Edit your name, birthday and profile photo (it shows on your squad too); Nutrition goals gets Auto-generate with a before → after preview and a Protein / Carbs / Fat split.",
+      "Scan history shows a picture or an icon for every scan with a cleaner report up top — plus fixes: workout saves always tell you if something went wrong, and Home stops reloading itself.",
+    ],
+  },
   {
     version: "2.1",
     date: "2026-09-24",

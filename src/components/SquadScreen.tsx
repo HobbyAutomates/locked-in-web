@@ -7,9 +7,10 @@ import { createSquad, joinSquad, leaveSquad, nudgeMember, renameSquad } from "@/
 import { addDays, weekStart } from "@/lib/dates";
 import type { Squad, SquadMember } from "@/lib/types";
 import { Check, Close, Copy, Fist, Pencil, Plus, Share } from "./icons";
+import { Avatar } from "./Avatar";
 import { BreathingFlame, Card, ChipRow, ErrorNote, PillButton, Rise } from "./ui";
 
-const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-12.apk";
+const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-14.apk";
 const WEB_URL = "https://web-production-ff1cf.up.railway.app";
 
 export function inviteText(code: string) {
@@ -329,7 +330,7 @@ function Board({ me, today, squad, board, sentNudges, shareStats }: { me: string
             <Card padding={14}>
               <div className="flex items-center gap-3">
                 <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full text-[17px] font-bold" style={{ background: "var(--card2)" }}>
-                  {(m.name || "?").slice(0, 1).toUpperCase()}
+                  <Avatar path={m.avatar_path} name={m.name || "?"} size={44} fontSize={17} />
                   <span
                     className="absolute bottom-0 right-0 rounded-full"
                     style={{ width: 12, height: 12, background: trainedToday ? "var(--green)" : "var(--hair)", border: "2px solid var(--card)" }}

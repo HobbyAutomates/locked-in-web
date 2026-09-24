@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { deleteScan, saveMeal } from "@/lib/actions";
 import { today } from "@/lib/dates";
-import { decodeBarcode, postJson, toJpegBase64 } from "@/lib/image";
+import { decodeBarcode, makeThumb, postJson, toJpegBase64 } from "@/lib/image";
 import { mealItemFromPlate, type QuantityFood } from "@/lib/quantity";
 import { initialLens, type Fit, type LabelReport, type Lens, type MealItem, type PlateEstimate, type PlateItem, type Profile, type ScanHistoryItem } from "@/lib/types";
-import { Bowl, Check, ChevronDown, Scan, Spinner, Spoon, Trash } from "./icons";
+import { Alert, Barcode, Camera, Check, ChevronDown, Close, Scan, Spinner, Spoon, Tag, Trash } from "./icons";
 import QuantitySheet from "./QuantitySheet";
 import { Card, ErrorNote, Hair, MacroDot, PillButton, Ring, Rise, SPRING, fmt } from "./ui";
 
@@ -27,6 +27,9 @@ const KIND_CHIPS: { key: ScanKind; label: string }[] = [
 ];
 const NOT_FOUND = "Not in the database yet — photograph the label side.";
 
+/** The picked photo: the full JPEG for the model and the v2.2 320 px thumbnail for History. */
+type Payload = { base64: string; media_type: string; thumb: string | null };
+
 /** What /api/scan came back with, as the screen renders it. */
 export type ScanResult = { kind: ScanKind; report?: LabelReport; plate?: PlateEstimate; notFound?: string };
 
@@ -44,8 +47,9 @@ function toResult(r: Record<string, unknown>): ScanResult {
  * user correct the guess, which re-runs the scan with that kind forced.
  */
 export default function ScanScreen({ history, profile }: { history: ScanHistoryItem[]; profile: Profile }) {
+  const router = useRouter();
   const [preview, setPreview] = useState<string | null>(null);
-  const [payload, setPayload] = useState<{ base64: string; media_type: string } | null>(null);
+  const [payload, setPayload] = useState<Payload | null>(null);
   const [digits, setDigits] = useState("");
   const [showDigits, setShowDigits] = useState(false);
   const [note, setNote] = useState("");
@@ -65,16 +69,18 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
     setOpened(null);
   }
 
-  async function run(extra: { kind?: ScanKind; barcode?: string }, pl: { base64: string; media_type: string } | null = payload) {
+  async function run(extra: { kind?: ScanKind; barcode?: string }, pl: Payload | null = payload) {
     setBusy(true);
     setError(null);
     setRes(null);
     setOpened(null);
     setStage(extra.kind === "plate" ? "Looking at the plate… 10–20 s" : extra.barcode ? "Looking it up and writing your report… 15–30 s" : "Working out what it is, then reading it… 15–45 s");
     try {
-      const r = await postJson<Record<string, unknown>>("/api/scan", { image: pl?.base64, media_type: pl?.media_type, lens, note: note.trim() || undefined, ...extra });
+      const r = await postJson<Record<string, unknown>>("/api/scan", { image: pl?.base64, media_type: pl?.media_type, thumb: pl?.thumb ?? undefined, lens, note: note.trim() || undefined, ...extra });
       if (typeof r.barcode === "string" && r.barcode) setDigits(r.barcode);
       setRes(toResult(r));
+      // A saved scan (it has an id) belongs in History with its new thumbnail.
+      if (r.id) router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not scan that");
     } finally {
@@ -87,8 +93,8 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
     reset();
     setDigits("");
     try {
-      const out = await toJpegBase64(file, 2000, 0.86);
-      const pl = { base64: out.base64, media_type: out.media_type };
+      const [out, thumb] = await Promise.all([toJpegBase64(file, 2000, 0.86), makeThumb(file)]);
+      const pl: Payload = { base64: out.base64, media_type: out.media_type, thumb };
       setPayload(pl);
       setPreview(out.preview);
       setBusy(true);
@@ -227,26 +233,47 @@ export function KindChips({ kind, onPick, disabled }: { kind: ScanKind; onPick: 
   );
 }
 
-function LensChips({ value, onChange }: { value: Lens; onChange: (l: Lens) => void }) {
+/** great = green, ok = amber, weak = grey: the dot on each "fits" pill. */
+const FIT_DOT: Record<string, { color: string; word: string }> = {
+  great: { color: "var(--green)", word: "great" },
+  ok: { color: "var(--orange)", word: "OK" },
+  weak: { color: "var(--muted)", word: "weak" },
+};
+
+/** The fits row: four small pills (Protein / Snack / Cutting / Bulking), each with its verdict dot; tap to read why. */
+function LensChips({ value, onChange, fits }: { value: Lens; onChange: (l: Lens) => void; fits?: LabelReport["fits"] }) {
   return (
     <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Judge it for">
-      {LENSES.map((l) => (
-        <button key={l.key} type="button" role="radio" aria-checked={l.key === value} className="chip press" style={{ height: 30, fontSize: 12, padding: "0 12px" }} onClick={() => onChange(l.key)}>
-          {l.label}
-        </button>
-      ))}
+      {LENSES.map((l) => {
+        const dot = FIT_DOT[fits?.[l.key]?.verdict ?? ""];
+        return (
+          <button
+            key={l.key}
+            type="button"
+            role="radio"
+            aria-checked={l.key === value}
+            aria-label={dot ? `${l.label}: ${dot.word}` : l.label}
+            className="chip press whitespace-nowrap"
+            style={{ height: 30, fontSize: 12, padding: "0 11px", gap: 6 }}
+            onClick={() => onChange(l.key)}
+          >
+            <span className="shrink-0 rounded-full" style={{ width: 8, height: 8, background: dot?.color ?? "var(--hair)", boxShadow: l.key === value ? "0 0 0 1.5px var(--card)" : undefined }} />
+            {l.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 // ---- the label / barcode report ----
 
-const TRUST: Record<string, { color: string; bg: string; label: string }> = {
-  safe: { color: "var(--green)", bg: "var(--green-bg)", label: "Safe" },
-  caution: { color: "var(--orange)", bg: "var(--orange-bg)", label: "Caution" },
-  unsafe: { color: "var(--red)", bg: "var(--red-bg)", label: "Unsafe" },
-  misleading: { color: "var(--purple)", bg: "var(--purple-bg)", label: "Misleading" },
-  fake: { color: "var(--red)", bg: "var(--red-bg)", label: "Likely fake" },
+const TRUST: Record<string, { color: string; bg: string; label: string; short: string }> = {
+  safe: { color: "var(--green)", bg: "var(--green-bg)", label: "Safe", short: "Trust" },
+  caution: { color: "var(--orange)", bg: "var(--orange-bg)", label: "Caution", short: "Caution" },
+  unsafe: { color: "var(--red)", bg: "var(--red-bg)", label: "Unsafe", short: "Avoid" },
+  misleading: { color: "var(--purple)", bg: "var(--purple-bg)", label: "Misleading", short: "Misleading" },
+  fake: { color: "var(--red)", bg: "var(--red-bg)", label: "Likely fake", short: "Fake" },
 };
 
 const PER_100 = [
@@ -376,13 +403,13 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
       <Rise index={2}>
         <Card padding={18}>
           <div className="flex items-start gap-3">
-            {r.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element -- Open Food Facts product photo
-              <img src={r.image_url} alt="" className="h-16 w-16 shrink-0 rounded-[12px] object-cover" style={{ background: "var(--card2)" }} />
+            {r.image_url || r.thumb_url ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Open Food Facts product photo, or the scan's own signed thumbnail
+              <img src={(r.image_url || r.thumb_url) as string} alt="" className="h-16 w-16 shrink-0 rounded-[12px] object-cover" style={{ background: "var(--card2)" }} />
             ) : null}
             <div className="min-w-0 flex-1">
               <p className="text-[18px] font-extrabold leading-snug" style={{ overflowWrap: "anywhere", letterSpacing: "-0.02em" }}>
-                {r.product || "Unknown product"}
+                {r.product || "Unnamed label"}
               </p>
               {info?.one_liner ? <p className="mt-1 text-[13px] leading-snug muted">{info.one_liner}</p> : null}
             </div>
@@ -407,11 +434,13 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
           ) : null}
           {r.fits && Object.keys(r.fits).length ? (
             <div className="mt-3">
-              <LensChips value={lens} onChange={setLens} />
+              <LensChips value={lens} onChange={setLens} fits={r.fits} />
             </div>
           ) : null}
         </Card>
       </Rise>
+
+      <SummaryGrid r={r} />
 
       {food ? (
         <Rise index={3}>
@@ -449,6 +478,47 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
       </Rise>
       <QuantitySheet food={logFood} title="Log from this scan" cta="Log" onClose={() => setLogFood(null)} onDone={(item) => void logServing(item)} />
     </>
+  );
+}
+
+/**
+ * The report's top summary: a 2×2 grid of Protein (g) / Calories (kcal) / Sugar (g) / Fat (g) for
+ * one serving — or per 100 g, labelled, when the pack gives no serving size. Big numbers, tiny labels.
+ */
+function SummaryGrid({ r }: { r: LabelReport }) {
+  const p = r.per_100g ?? {};
+  const hasServing = !!(r.serving_g && r.serving_g > 0);
+  const k = hasServing ? (r.serving_g as number) / 100 : 1;
+  const at = (v: number | undefined) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v) * k);
+  const protein = hasServing && r.protein?.per_serving_g != null ? Number(r.protein.per_serving_g) : at(p.protein_g);
+  const cells: { label: string; value: number | null; unit: string; color: string }[] = [
+    { label: "Protein", value: protein, unit: "g", color: "var(--red)" },
+    { label: "Calories", value: at(p.calories), unit: "kcal", color: "var(--ink)" },
+    { label: "Sugar", value: at(p.sugar_g), unit: "g", color: "var(--orange)" },
+    { label: "Fat", value: at(p.fat_g), unit: "g", color: "var(--blue)" },
+  ];
+  if (cells.every((c) => c.value == null)) return null;
+  const show = (v: number, unit: string) => (unit === "kcal" || v >= 10 ? String(Math.round(v)) : fmt(Math.round(v * 10) / 10));
+  return (
+    <Rise index={3}>
+      <Card padding={14}>
+        <p className="px-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] muted">{hasServing ? `Per serving · ${Math.round(r.serving_g as number)} g` : "Per 100 g"}</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {cells.map((c) => (
+            <div key={c.label} className="rounded-2xl px-3.5 py-3" style={{ background: "var(--card2)" }}>
+              <p className="num text-[26px] font-extrabold leading-none" style={{ letterSpacing: "-0.03em", color: c.value == null ? "var(--muted)" : "var(--ink)" }}>
+                {c.value == null ? "—" : show(c.value, c.unit)}
+                <span className="ml-0.5 text-[13px] font-bold muted">{c.value == null ? "" : c.unit}</span>
+              </p>
+              <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold muted">
+                <span className="rounded-full" style={{ width: 6, height: 6, background: c.color }} />
+                {c.label}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </Rise>
   );
 }
 
@@ -572,20 +642,21 @@ function Details({ r }: { r: LabelReport }) {
   if (r.concerns?.length) {
     sections.push(
       <Section key="ingredients" title="Ingredients to know about">
-        <div className="flex flex-wrap gap-1.5">
-          {r.concerns.map((c, i) => (
-            <span key={i} className="badge" style={{ background: "var(--card2)", color: "var(--ink)", fontWeight: 600, gap: 6 }}>
-              <span className="rounded-full" style={{ width: 7, height: 7, background: c.severity === "high" ? "var(--red)" : c.severity === "medium" ? "var(--orange)" : "var(--muted)" }} />
-              {c.ingredient}
-            </span>
-          ))}
-        </div>
-        <ul className="mt-2 flex list-none flex-col gap-1 p-0">
-          {r.concerns.map((c, i) => (
-            <li key={i} className="text-[13px] leading-snug muted">
-              <span className="font-semibold" style={{ color: "var(--ink)" }}>{c.ingredient}:</span> {c.issue}
-            </li>
-          ))}
+        <ul className="flex list-none flex-col gap-2.5 p-0">
+          {r.concerns.map((c, i) => {
+            const color = c.severity === "high" ? "var(--red)" : c.severity === "medium" ? "var(--orange)" : "var(--muted)";
+            return (
+              <li key={i} className="flex items-start gap-2.5">
+                <span className="mt-px grid h-5 w-5 shrink-0 place-items-center" style={{ color }} aria-label={`${c.severity} concern`}>
+                  <Alert size={20} />
+                </span>
+                <span className="min-w-0 text-[13px] leading-snug">
+                  <span className="font-semibold">{c.ingredient}</span>
+                  <span className="muted"> — {c.issue}</span>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </Section>,
     );
@@ -593,17 +664,25 @@ function Details({ r }: { r: LabelReport }) {
   if (r.claims?.length) {
     sections.push(
       <Section key="claims" title="Claims on the pack">
-        {r.claims.map((c, i) => (
-          <div key={i} className={i ? "mt-2" : ""}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="flex-1 text-sm font-semibold">&ldquo;{c.claim}&rdquo;</span>
-              <span className="shrink-0 text-xs font-bold" style={{ color: c.status === "supported" ? "var(--green)" : c.status === "unclear" ? "var(--orange)" : "var(--red)" }}>
-                {c.status}
+        {r.claims.map((c, i) => {
+          const color = c.status === "supported" ? "var(--green)" : c.status === "unclear" ? "var(--orange)" : "var(--red)";
+          return (
+            <div key={i} className={`flex items-start gap-2.5${i ? " mt-2.5" : ""}`}>
+              <span className="mt-px grid h-5 w-5 shrink-0 place-items-center" style={{ color }} aria-label={c.status}>
+                {c.status === "supported" ? <Check size={20} /> : c.status === "unclear" ? <Alert size={20} /> : <Close size={20} />}
               </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex-1 text-sm font-semibold">&ldquo;{c.claim}&rdquo;</span>
+                  <span className="shrink-0 whitespace-nowrap text-xs font-bold" style={{ color }}>
+                    {c.status}
+                  </span>
+                </div>
+                <p className="text-[13px] muted">{c.why}</p>
+              </div>
             </div>
-            <p className="text-[13px] muted">{c.why}</p>
-          </div>
-        ))}
+          );
+        })}
       </Section>,
     );
   }
@@ -825,27 +904,31 @@ function History({ items, onOpen }: { items: ScanHistoryItem[]; onOpen: (i: Scan
       <div className="flex flex-col gap-2">
         {rows.map((it) => {
           const t = TRUST[it.verdict];
+          const name = it.product || (it.kind === "photo" ? "Plate photo" : "Unnamed label");
           return (
             <Card key={it.id} padding={12}>
               <div className="flex items-center gap-3">
-                <button type="button" className="press flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => onOpen(it)} aria-label={`Open ${it.product || KIND_LABEL[it.kind]}`}>
-                  {it.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- product / plate thumbnail
-                    <img src={it.image_url} alt="" className="h-11 w-11 shrink-0 rounded-[12px] object-cover" style={{ background: "var(--card2)" }} />
-                  ) : (
-                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: "var(--card2)", color: "var(--muted)" }}>
-                      {it.kind === "photo" ? <Bowl size={20} /> : <Scan size={20} />}
-                    </span>
-                  )}
+                <button type="button" className="press flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => onOpen(it)} aria-label={`Open ${name}`}>
+                  <HistoryThumb item={it} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{it.product || KIND_LABEL[it.kind]}</span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] muted">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</span>
+                      {t ? (
+                        <span
+                          className="badge shrink-0 justify-center whitespace-nowrap"
+                          style={{ background: t.bg, color: t.color, fontSize: 10, minWidth: 54, maxWidth: 84 }}
+                          title={t.label}
+                        >
+                          <span className="min-w-0 truncate">{t.short}</span>
+                        </span>
+                      ) : null}
+                    </span>
+                    {it.what_it_is ? <span className="mt-0.5 block truncate text-xs muted">{it.what_it_is}</span> : null}
+                    <span className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[11px] muted">
                       <span>{KIND_LABEL[it.kind]}</span>
                       <span>·</span>
-                      <span>{new Date(it.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
+                      <span>{new Date(it.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}</span>
                       {it.score != null ? <span className="num">· {it.score}/10</span> : null}
-                      {it.kind !== "photo" ? <span className="badge" style={{ background: "var(--card2)", color: "var(--ink)", fontSize: 10 }}>{it.lens}</span> : null}
-                      {t ? <span style={{ color: t.color }}>{t.label}</span> : null}
                     </span>
                   </span>
                 </button>
@@ -871,6 +954,22 @@ function History({ items, onOpen }: { items: ScanHistoryItem[]; onOpen: (i: Scan
         })}
       </div>
     </Rise>
+  );
+}
+
+/** 44 px history picture: the scan's thumbnail / pack shot / plate photo, else the kind's icon. */
+function HistoryThumb({ item }: { item: ScanHistoryItem }) {
+  const [broken, setBroken] = useState(false);
+  if (item.image_url && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL or Open Food Facts image
+      <img src={item.image_url} alt="" loading="lazy" onError={() => setBroken(true)} className="h-11 w-11 shrink-0 rounded-[12px] object-cover" style={{ background: "var(--card2)" }} />
+    );
+  }
+  return (
+    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: "var(--card2)", color: "var(--muted)" }} aria-hidden="true">
+      {item.kind === "photo" ? <Camera size={20} /> : item.kind === "barcode" ? <Barcode size={20} /> : <Tag size={20} />}
+    </span>
   );
 }
 

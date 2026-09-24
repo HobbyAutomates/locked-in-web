@@ -1,5 +1,5 @@
 import { getDashboard, getMyNudges } from "@/lib/data";
-import { thisWeekCount, workoutWeekStreak } from "@/lib/streaks";
+import { activityDayStreak, thisWeekCount, workoutWeekStreak } from "@/lib/streaks";
 import { computeWrap, wrapWindow } from "@/lib/wrap";
 import HomeScreen from "@/components/HomeScreen";
 
@@ -18,6 +18,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       meals={meals}
       exercises={exercises}
       weekStreak={workoutWeekStreak(workoutDates, profile.weekly_workout_target)}
+      dayStreak={activityDayStreak(workoutDates, exercises.map((e) => e.date), meals.map((m) => m.date))}
       thisWeek={thisWeekCount(workoutDates)}
       celebrate={sp.celebrate === "1"}
       wrap={wrap}

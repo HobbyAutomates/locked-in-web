@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { createSavedMeal, saveMeal, searchFoodsForPicker } from "@/lib/actions";
-import { postJson, toJpegBase64 } from "@/lib/image";
+import { postJson, toJpegBase64, makeThumb } from "@/lib/image";
 import { looksLikeSentence } from "@/lib/mealText";
 import { applyRestaurant, foodFromItem, mealItemFromPlate, priceItem, restaurantOil, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
 import { useDictation } from "@/lib/speech";
@@ -214,11 +214,11 @@ export default function MealForm({
     if (!file) return;
     setError(null);
     try {
-      const out = await toJpegBase64(file, 1600, 0.85);
+      const [out, thumb] = await Promise.all([toJpegBase64(file, 1600, 0.85), makeThumb(file)]);
       startJob(
         "photo",
         "Plate photo",
-        postJson<PlateEstimate>("/api/photo-meal", { image: out.base64, media_type: out.media_type }).then((p) => ({
+        postJson<PlateEstimate>("/api/photo-meal", { image: out.base64, media_type: out.media_type, thumb: thumb ?? undefined }).then((p) => ({
           items: p.items.map(mealItemFromPlate),
           photo_path: p.photo_path ?? null,
           notes: p.items.length ? p.notes : [p.plate_note || "Couldn't find food in that photo."],
@@ -243,7 +243,6 @@ export default function MealForm({
     try {
       await saveMeal({ date, raw_text: raw, items, photo_path: photoPath });
       onClose();
-      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
       setSaving(false);

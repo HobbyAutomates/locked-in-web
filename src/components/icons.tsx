@@ -468,3 +468,33 @@ export function Phone(p: P) {
     </Stroke>
   );
 }
+
+/** Price tag for label scans in the Scan history. */
+export function Tag(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M3 12.2V4.5A1.5 1.5 0 0 1 4.5 3h7.7a1.5 1.5 0 0 1 1.06.44l7.3 7.3a1.5 1.5 0 0 1 0 2.12l-7.7 7.7a1.5 1.5 0 0 1-2.12 0l-7.3-7.3A1.5 1.5 0 0 1 3 12.2z" />
+      <circle cx="8" cy="8" r="1.5" />
+    </Stroke>
+  );
+}
+
+/** Barcode bars for barcode scans in the Scan history. */
+export function Barcode(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M3 7V5a1 1 0 0 1 1-1h2M18 4h2a1 1 0 0 1 1 1v2M21 17v2a1 1 0 0 1-1 1h-2M6 20H4a1 1 0 0 1-1-1v-2" />
+      <path d="M7 8v8M10 8v8M13 8v8M15.5 8v8M17.5 8v8" />
+    </Stroke>
+  );
+}
+
+/** Warning triangle for ingredient flags in a scan report. */
+export function Alert(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M10.3 4.2L2.8 17.5A2 2 0 0 0 4.5 20.5h15a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z" />
+      <path d="M12 9.5v4.5M12 17.2v.1" />
+    </Stroke>
+  );
+}

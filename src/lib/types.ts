@@ -117,6 +117,8 @@ export type Profile = {
   lens_default: LensDefault;
   /** Squads: share protein & calories with squad-mates, or streaks only. */
   share_stats: boolean;
+  /** v2.2: "<uid>/avatar.jpg?v=<ms>" in the public `avatars` bucket, or null (initials). */
+  avatar_path: string | null;
 };
 
 export const DEFAULT_PROFILE: Profile = {
@@ -137,6 +139,7 @@ export const DEFAULT_PROFILE: Profile = {
   reminders: {},
   lens_default: "protein",
   share_stats: true,
+  avatar_path: null,
 };
 
 /** One row of `bandlog.weight_log`, newest first. */
@@ -239,6 +242,9 @@ export type LabelReport = {
     eat_it: "yes" | "sometimes" | "skip";
   };
   image_url?: string | null;
+  /** v2.2: scan-photos path of the 320 px thumbnail, and a signed URL for it on a stored scan. */
+  thumb_path?: string | null;
+  thumb_url?: string | null;
   barcode?: string | null;
   transcript?: string;
 };
@@ -294,6 +300,8 @@ export type SquadMember = {
   share_stats: boolean;
   is_owner: boolean;
   joined_at: string;
+  /** v2.2: same format as profiles.avatar_path; null shows initials. */
+  avatar_path?: string | null;
   days: SquadDay[];
 };
 
@@ -326,8 +334,11 @@ export type ScanHistoryItem = {
   verdict: string;
   created_at: string;
   score: number | null;
+  /** Best picture for the row: the scan's thumbnail (signed), the OFF pack shot, or the plate photo (signed). */
   image_url: string | null;
   image_path: string | null;
+  /** v2.2: one line from the report ("A sweetened whey protein bar"), "" when there is none. */
+  what_it_is: string;
 };
 
 /** Macro targets, exactly as Android's Profile: explicit if set, else fat 25% of kcal and carbs the remainder. */

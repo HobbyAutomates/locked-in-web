@@ -13,9 +13,9 @@ export async function POST(req: Request) {
   const { user, admin } = await apiUser(req);
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 });
-  const body = (await req.json().catch(() => ({}))) as { barcode?: string; lens?: string; note?: string; image?: string; media_type?: string };
+  const body = (await req.json().catch(() => ({}))) as { barcode?: string; lens?: string; note?: string; image?: string; media_type?: string; thumb?: string };
   try {
-    return NextResponse.json(await barcodeFlow({ admin, userId: user.id, barcode: body.barcode, image: body.image, mediaType: body.media_type, note: body.note, lens: body.lens }));
+    return NextResponse.json(await barcodeFlow({ admin, userId: user.id, barcode: body.barcode, image: body.image, mediaType: body.media_type, note: body.note, lens: body.lens, thumb: typeof body.thumb === "string" ? body.thumb : null }));
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Barcode lookup failed" }, { status: e instanceof FlowError ? e.status : 500 });
   }

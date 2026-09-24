@@ -18,6 +18,18 @@ async function userOrThrow() {
   return { supabase, user };
 }
 
+/**
+ * What the workout actions hand back. They never throw for a database failure: Next hides thrown
+ * Server Action messages in production ("An error occurred in the Server Components render..."),
+ * which is how a failed save used to look like nothing happened. The Supabase error text comes
+ * back in `error` (and is console.error'd on the server) so the form can show it.
+ */
+export type ActionResult = { ok: true; id?: string; warning?: string } | { ok: false; error: string };
+
+function describe(error: { message?: string; code?: string; details?: string | null; hint?: string | null }) {
+  return [error.message, error.details, error.hint].filter(Boolean).join(" — ") + (error.code ? ` (${error.code})` : "");
+}
+
 export async function saveWorkout(input: {
   id?: string;
   date: string;
@@ -27,24 +39,40 @@ export async function saveWorkout(input: {
   minutes: number | null;
   exercises: string;
   notes: string;
-}) {
-  const { supabase, user } = await userOrThrow();
-  const row = { ...input, user_id: user.id };
+}): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You're signed out — sign in again, then save." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { ok: false, error: "Pick a valid date for this workout." };
+  if (!input.muscles.length) return { ok: false, error: "Pick at least one muscle" };
+  const { id: _id, ...fields } = input;
+  void _id;
+  const row = { ...fields, user_id: user.id };
   const before = input.id ? ((await supabase.from("workouts").select("date").eq("id", input.id).maybeSingle()).data?.date as string | undefined) : undefined;
   const { data, error } = input.id
     ? await supabase.from("workouts").update(row).eq("id", input.id).eq("user_id", user.id).select("id").single()
     : await supabase.from("workouts").insert(row).select("id").single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("[saveWorkout] workouts write failed", { user: user.id, id: input.id ?? null, date: input.date, error });
+    return { ok: false, error: `Couldn't save the workout: ${describe(error)}` };
+  }
   const workoutId = (data?.id as string | undefined) ?? input.id;
   // Auto-burn: one exercise_log row per workout, tagged with the workout id in `note`. An edit
-  // replaces the row so minutes / band changes flow through to the burn. Best-effort.
+  // replaces the row so minutes / band changes flow through to the burn. The workout itself is
+  // saved by now, so a failure here is a warning, not a failed save — but it is never silent.
+  let warning: string | undefined;
   if (workoutId) {
     try {
-      if (input.id) await supabase.from("exercise_log").delete().eq("user_id", user.id).eq("source", "workout").eq("note", workoutId);
+      if (input.id) {
+        const del = await supabase.from("exercise_log").delete().eq("user_id", user.id).eq("source", "workout").eq("note", workoutId);
+        if (del.error) console.error("[saveWorkout] old burn row delete failed", { workoutId, error: del.error });
+      }
       const { data: prof } = await supabase.from("profiles").select("weight_kg").eq("id", user.id).maybeSingle();
       const weight = prof?.weight_kg == null ? null : Number(prof.weight_kg);
       const minutes = Math.max(1, input.minutes ?? 30);
-      await supabase.from("exercise_log").insert({
+      const burn = await supabase.from("exercise_log").insert({
         user_id: user.id,
         date: input.date,
         activity_code: bandCode(input.band_level),
@@ -55,22 +83,37 @@ export async function saveWorkout(input: {
         source: "workout",
         note: workoutId,
       });
-    } catch {
-      // The workout itself saved; a missing burn row is not worth failing the save over.
+      if (burn.error) {
+        console.error("[saveWorkout] burn row insert failed", { workoutId, error: burn.error });
+        warning = `Workout saved, but its calories burned didn't: ${describe(burn.error)}`;
+      }
+    } catch (e) {
+      console.error("[saveWorkout] burn row threw", e);
+      warning = "Workout saved, but its calories burned didn't.";
     }
   }
   await rollupQuietly(supabase, user.id, before && before !== input.date ? [input.date, before] : [input.date]);
   revalidatePath("/", "layout");
+  return { ok: true, id: workoutId, warning };
 }
 
-export async function deleteWorkout(id: string) {
-  const { supabase, user } = await userOrThrow();
+export async function deleteWorkout(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You're signed out — sign in again." };
   const date = (await supabase.from("workouts").select("date").eq("id", id).maybeSingle()).data?.date as string | undefined;
-  await supabase.from("exercise_log").delete().eq("user_id", user.id).eq("source", "workout").eq("note", id);
+  const burn = await supabase.from("exercise_log").delete().eq("user_id", user.id).eq("source", "workout").eq("note", id);
+  if (burn.error) console.error("[deleteWorkout] burn row delete failed", { id, error: burn.error });
   const { error } = await supabase.from("workouts").delete().eq("id", id).eq("user_id", user.id);
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error("[deleteWorkout] failed", { id, error });
+    return { ok: false, error: `Couldn't delete the workout: ${describe(error)}` };
+  }
   await rollupQuietly(supabase, user.id, date ? [date] : []);
   revalidatePath("/", "layout");
+  return { ok: true };
 }
 
 // ---- exercise log (calories burned) ----

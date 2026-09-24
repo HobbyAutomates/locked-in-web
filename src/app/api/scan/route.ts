@@ -13,6 +13,7 @@ export const maxDuration = 240;
  *     barcode     digits the browser already decoded (ZXing) or the user typed
  *     text        on-device OCR (Android), used for the label path when long enough
  *     kind        "barcode" | "label" | "plate" forces that pipeline (the "change?" chips)
+ *     thumb       optional <= 320 px JPEG (base64) -> scan-photos/<uid>/<id>.jpg, `thumb_path` in the reply
  *
  *   → { kind: "barcode" | "label" | "plate", detected, ...report }
  *     barcode / label: the label-report shape of /api/scan-label and /api/scan-barcode
@@ -32,13 +33,14 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 });
 
-  const body = (await req.json().catch(() => ({}))) as { image?: string; media_type?: string; barcode?: string; text?: string; lens?: string; note?: string; kind?: string };
+  const body = (await req.json().catch(() => ({}))) as { image?: string; media_type?: string; barcode?: string; text?: string; lens?: string; note?: string; kind?: string; thumb?: string };
   const image = (body.image ?? "").trim() || null;
   const digits = String(body.barcode ?? "").replace(/\D/g, "");
   const text = (body.text ?? "").trim();
   const forced = KINDS.has(body.kind as ScanKind) ? (body.kind as ScanKind) : null;
   if (!image && digits.length < 8 && !text) return NextResponse.json({ error: "No image" }, { status: 400 });
-  const base = { admin, userId: user.id, mediaType: body.media_type, note: body.note, lens: body.lens };
+  // `thumb` (v2.2, optional): the browser's 320 px JPEG, stored per scan for the History list.
+  const base = { admin, userId: user.id, mediaType: body.media_type, note: body.note, lens: body.lens, thumb: typeof body.thumb === "string" ? body.thumb : null };
   const mt = mediaType(body.media_type);
 
   let classified: Classified | null = null;

@@ -3,121 +3,214 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveProfile } from "@/lib/actions";
-import { generate, missing } from "@/lib/goals";
+import { generate, missing, type Targets } from "@/lib/goals";
 import { carbTargetG, fatTargetG, type Profile } from "@/lib/types";
 import SubPage from "./SubPage";
-import { Card, ErrorNote, Hair, NumberField, PillButton, Ring, Rise, fmt } from "./ui";
+import { ChevronRight } from "./icons";
+import { Card, ErrorNote, Hair, NumberField, PillButton, Rise, fmt } from "./ui";
 
-const clamp = (s: string, lo: number, hi: number, fallback: number) => {
-  const v = Number(s);
-  return s && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;
-};
+type Key = "p" | "c" | "f";
+type Split = Record<Key, number>;
 
-/** Four editable macro goals plus the "✨ Auto Generate Goals" shortcut. */
+const MACROS: { key: Key; label: string; color: string; kcalPerG: number }[] = [
+  { key: "p", label: "Protein", color: "var(--red)", kcalPerG: 4 },
+  { key: "c", label: "Carbs", color: "var(--orange)", kcalPerG: 4 },
+  { key: "f", label: "Fat", color: "var(--blue)", kcalPerG: 9 },
+];
+
+const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** Whole-number P/C/F percentages of `calories` for the given grams, summing to exactly 100. */
+function splitFrom(t: Targets): Split {
+  const kcal = Math.max(1, t.calories);
+  const p = clampN(Math.round(((t.protein * 4) / kcal) * 100), 0, 100);
+  const f = clampN(Math.round(((t.fat * 9) / kcal) * 100), 0, 100 - p);
+  return { p, c: 100 - p - f, f };
+}
+
+/**
+ * Set one percentage and rebalance so the three still sum to 100: protein or fat moves take from
+ * (or give to) carbs first; a carbs move is balanced by fat first. The other macro only moves when
+ * the first one hits 0 or 100.
+ */
+function rebalance(s: Split, key: Key, value: number): Split {
+  const next: Split = { ...s, [key]: clampN(Math.round(value), 0, 100) };
+  const order: Key[] = key === "c" ? ["f", "p"] : key === "p" ? ["c", "f"] : ["c", "p"];
+  let diff = 100 - (next.p + next.c + next.f);
+  for (const k of order) {
+    if (diff === 0) break;
+    const v = clampN(next[k] + diff, 0, 100);
+    diff -= v - next[k];
+    next[k] = v;
+  }
+  if (diff !== 0) next[key] += diff;
+  return next;
+}
+
+/** Grams from calories and a split: 4 kcal/g for protein and carbs, 9 for fat, rounded. */
+function gramsFrom(calories: number, s: Split): Targets {
+  return {
+    calories,
+    protein: Math.round((calories * s.p) / 100 / 4),
+    carbs: Math.round((calories * s.c) / 100 / 4),
+    fat: Math.round((calories * s.f) / 100 / 9),
+  };
+}
+
+/**
+ * Nutrition goals on one screen: a calorie goal, a Protein / Carbs / Fat split that always sums to
+ * 100 % (grams follow the calories), and "Auto generate" — the Mifflin-St Jeor engine run in place
+ * with a before → after preview. Nothing is stored until Save.
+ */
 export default function NutritionGoalsScreen({ profile }: { profile: Profile }) {
   const router = useRouter();
-  const [calories, setCalories] = useState(String(profile.calorie_target));
-  const [protein, setProtein] = useState(String(profile.protein_target_g));
-  const [carbs, setCarbs] = useState(String(carbTargetG(profile)));
-  const [fat, setFat] = useState(String(fatTargetG(profile)));
+  const current: Targets = { calories: profile.calorie_target, protein: profile.protein_target_g, carbs: carbTargetG(profile), fat: fatTargetG(profile) };
+  const [calories, setCalories] = useState(String(current.calories));
+  const [split, setSplit] = useState<Split>(() => splitFrom(current));
+  /** Exact grams to save as-is (the current goals, or freshly generated ones) until the split is touched. */
+  const [exact, setExact] = useState<Targets | null>(current);
+  const [preview, setPreview] = useState<{ before: Targets; after: Targets } | null>(null);
+  const [gapNote, setGapNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const gaps = missing(profile);
 
-  const edited = (): Partial<Profile> => ({
-    calorie_target: clamp(calories, 800, 10_000, profile.calorie_target),
-    protein_target_g: clamp(protein, 10, 500, profile.protein_target_g),
-    carb_target_g: carbs ? clamp(carbs, 0, 1000, carbTargetG(profile)) : null,
-    fat_target_g: fat ? clamp(fat, 0, 500, fatTargetG(profile)) : null,
-  });
-  const e = edited();
-  const dirty = e.calorie_target !== profile.calorie_target || e.protein_target_g !== profile.protein_target_g || e.carb_target_g !== profile.carb_target_g || e.fat_target_g !== profile.fat_target_g;
+  const kcal = clampN(Number(calories) || 0, 0, 10_000);
+  const kcalValid = kcal >= 800 && kcal <= 10_000;
+  const next: Targets = exact && exact.calories === kcal ? exact : gramsFrom(kcal, split);
+  const dirty = next.calories !== current.calories || next.protein !== current.protein || next.carbs !== (profile.carb_target_g ?? -1) || next.fat !== (profile.fat_target_g ?? -1);
+
+  function setPct(key: Key, value: number) {
+    setSplit((s) => rebalance(s, key, value));
+    setExact(null);
+    setSaved(false);
+  }
 
   function autoGenerate() {
+    setError(null);
     if (gaps.length) {
-      setNote(`Add your ${gaps.join(", ")} in Personal details first.`);
+      setPreview(null);
+      setGapNote(`Add your ${gaps.join(", ")} in Personal details first.`);
       return;
     }
     const t = generate(profile);
     if (!t) return;
+    setGapNote(null);
+    setPreview({ before: current, after: t });
     setCalories(String(t.calories));
-    setProtein(String(t.protein));
-    setCarbs(String(t.carbs));
-    setFat(String(t.fat));
-    setNote("Generated — review, then Save goals.");
+    setSplit(splitFrom(t));
+    setExact(t);
+    setSaved(false);
   }
 
   async function save() {
+    if (!kcalValid) return setError("Calorie goal must be between 800 and 10,000 kcal.");
     setBusy(true);
     setSaved(false);
-    setNote(null);
     setError(null);
     try {
-      await saveProfile(edited());
+      await saveProfile({ calorie_target: next.calories, protein_target_g: next.protein, carb_target_g: next.carbs, fat_target_g: next.fat });
       setSaved(true);
+      setPreview(null);
+      setExact(next);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save");
+      console.error("[NutritionGoals] save failed", err);
+      setError(err instanceof Error && err.message ? err.message : "Could not save your goals");
     } finally {
       setBusy(false);
     }
   }
 
-  const generated = note?.startsWith("Generated");
+  const grams: Record<Key, number> = { p: next.protein, c: next.carbs, f: next.fat };
 
   return (
-    <SubPage title="Edit nutrition goals" back="/profile">
+    <SubPage title="Nutrition goals" back="/profile">
+      {/* ---- Auto generate ---- */}
       <Rise index={0}>
-        <Card padding={0}>
-          <div className="px-4">
-            <GoalRow label="Calorie goal" color="var(--ink)" value={calories} unit="kcal" onChange={(v) => setCalories(v.slice(0, 5))} />
-            <Hair />
-            <GoalRow label="Protein goal" color="var(--red)" value={protein} unit="g" onChange={(v) => setProtein(v.slice(0, 4))} />
-            <Hair />
-            <GoalRow label="Carb goal" color="var(--orange)" value={carbs} unit="g" onChange={(v) => setCarbs(v.slice(0, 4))} />
-            <Hair />
-            <GoalRow label="Fat goal" color="var(--blue)" value={fat} unit="g" onChange={(v) => setFat(v.slice(0, 4))} />
-          </div>
-        </Card>
-      </Rise>
-
-      <Rise index={1}>
         <Card>
-          <p className="text-[15px] font-bold">Auto Generate Goals</p>
-          <p className="mt-1 text-xs leading-[17px] muted">
-            Mifflin-St Jeor from your weight, height, age and gender, adjusted for {profile.goal_type} at {fmt(profile.goal_speed_kg_wk)} kg/week. Protein 1.8 g/kg, fat a quarter of your
-            calories, carbs the rest.
-          </p>
-          <div className="mt-3">
-            <PillButton onClick={autoGenerate} height={46}>
-              <SparkleIcon />
-              Auto Generate Goals
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[15px] font-bold">Auto generate</p>
+              <p className="mt-0.5 text-xs leading-[17px] muted">
+                From your weight, height, age and gender, set for {profile.goal_type} at {fmt(profile.goal_speed_kg_wk)} kg/week.
+              </p>
+            </div>
+            <PillButton onClick={autoGenerate} height={40} className="!w-auto shrink-0 !px-4 text-[13px]" style={{ minHeight: 40 }}>
+              <span className="inline-flex items-center gap-1.5">
+                <SparkleIcon />
+                Generate
+              </span>
             </PillButton>
           </div>
-          {note ? (
-            <>
-              <p className="mt-2.5 text-xs font-semibold" style={{ color: generated ? "var(--green)" : "var(--orange)" }}>
-                {note}
+          {gapNote ? (
+            <div className="mt-3 rounded-2xl px-3.5 py-3" style={{ background: "var(--orange-bg)" }}>
+              <p className="text-[13px] font-semibold" style={{ color: "var(--orange)" }}>
+                {gapNote}
               </p>
-              {!generated ? (
-                <div className="mt-2">
-                  <PillButton soft height={42} onClick={() => router.push("/profile/details")}>
-                    Open Personal details
-                  </PillButton>
-                </div>
-              ) : null}
-            </>
+              <button type="button" className="press mt-1.5 inline-flex items-center gap-1 text-[13px] font-bold" style={{ background: "none", border: 0, padding: 0, color: "var(--ink)" }} onClick={() => router.push("/profile/details")}>
+                Open Personal details
+                <ChevronRight size={16} />
+              </button>
+            </div>
           ) : null}
+          {preview ? <BeforeAfter before={preview.before} after={preview.after} /> : null}
         </Card>
       </Rise>
 
+      {/* ---- Calories ---- */}
+      <Rise index={1}>
+        <Card padding={0}>
+          <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+            <span className="flex flex-col">
+              <span className="text-[15px] font-bold">Calorie goal</span>
+              <span className="text-xs muted">Per day</span>
+            </span>
+            <NumberField
+              value={calories}
+              onChange={(v) => {
+                setCalories(v.slice(0, 5));
+                setSaved(false);
+              }}
+              unit="kcal"
+              label="Calorie goal"
+            />
+          </div>
+        </Card>
+      </Rise>
+
+      {/* ---- Macro split ---- */}
       <Rise index={2}>
+        <Card padding={0}>
+          <div className="px-4 pt-3.5">
+            <div className="flex items-center justify-between">
+              <p className="text-[15px] font-bold">Macro split</p>
+              <p className="num text-xs font-semibold muted">{split.p + split.c + split.f}% of {kcal.toLocaleString("en-IN")} kcal</p>
+            </div>
+            <div className="mt-2.5 flex h-2.5 overflow-hidden rounded-full" style={{ background: "var(--track)" }} aria-hidden="true">
+              {MACROS.map((m) => (
+                <span key={m.key} className="block h-full" style={{ width: `${split[m.key]}%`, background: m.color, transition: "width 0.2s" }} />
+              ))}
+            </div>
+          </div>
+          <div className="px-4">
+            {MACROS.map((m, i) => (
+              <div key={m.key}>
+                {i > 0 ? <Hair /> : null}
+                <MacroRow label={m.label} color={m.color} pct={split[m.key]} grams={grams[m.key]} onChange={(v) => setPct(m.key, v)} />
+              </div>
+            ))}
+          </div>
+          <p className="px-4 pb-3.5 text-[11px] leading-4 muted">Grams follow your calories: protein and carbs 4 kcal per gram, fat 9.</p>
+        </Card>
+      </Rise>
+
+      <Rise index={3}>
         <ErrorNote text={error} />
       </Rise>
-      <Rise index={2}>
-        <PillButton onClick={save} disabled={busy || !dirty}>
+      <Rise index={3}>
+        <PillButton onClick={save} disabled={busy || !dirty || !kcalValid}>
           {busy ? "Saving…" : saved && !dirty ? "Saved" : "Save goals"}
         </PillButton>
       </Rise>
@@ -125,25 +218,91 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
   );
 }
 
-/** A coloured ring icon, the goal's name, and its editable number. */
-function GoalRow({ label, color, value, unit, onChange }: { label: string; color: string; value: string; unit: string; onChange: (v: string) => void }) {
+/** "2,200 → 2,450 kcal" for calories and each macro, changes in bold. */
+function BeforeAfter({ before, after }: { before: Targets; after: Targets }) {
+  const rows: [string, number, number, string, string][] = [
+    ["Calories", before.calories, after.calories, "kcal", "var(--ink)"],
+    ["Protein", before.protein, after.protein, "g", "var(--red)"],
+    ["Carbs", before.carbs, after.carbs, "g", "var(--orange)"],
+    ["Fat", before.fat, after.fat, "g", "var(--blue)"],
+  ];
   return (
-    <div className="flex items-center justify-between gap-3 py-[11px]">
-      <span className="flex items-center gap-3">
-        <Ring fraction={1} color={color} size={28} stroke={4}>
-          <span className="rounded-full" style={{ width: 7, height: 7, background: color }} />
-        </Ring>
-        <span className="text-[15px] font-medium">{label}</span>
-      </span>
-      <NumberField value={value} onChange={onChange} unit={unit} label={label} />
+    <div className="mt-3 rounded-2xl px-3.5 py-2.5" style={{ background: "var(--card2)" }}>
+      {rows.map(([label, a, b, unit, color]) => (
+        <div key={label} className="flex items-center justify-between gap-2 py-1">
+          <span className="flex items-center gap-2 text-[13px] font-semibold">
+            <span className="rounded-full" style={{ width: 8, height: 8, background: color }} />
+            {label}
+          </span>
+          <span className="num text-[13px]">
+            <span className="muted">{a.toLocaleString("en-IN")}</span>
+            <span className="muted"> → </span>
+            <span className="font-extrabold">{b.toLocaleString("en-IN")}</span> <span className="muted">{unit}</span>
+          </span>
+        </div>
+      ))}
+      <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--green)" }}>
+        Applied below — tap Save goals to keep them.
+      </p>
     </div>
+  );
+}
+
+/** One macro: name + grams, a −5 / slider / +5 control and the percentage. */
+function MacroRow({ label, color, pct, grams, onChange }: { label: string; color: string; pct: number; grams: number; onChange: (v: number) => void }) {
+  return (
+    <div className="py-3">
+      <div className="flex items-baseline justify-between">
+        <span className="flex items-center gap-2 text-[15px] font-semibold">
+          <span className="rounded-full" style={{ width: 10, height: 10, background: color }} />
+          {label}
+        </span>
+        <span className="num text-[15px] font-extrabold">
+          {grams} g <span className="text-xs font-semibold muted">· {pct}%</span>
+        </span>
+      </div>
+      <div className="mt-2 flex items-center gap-2.5">
+        <Step label={`${label} minus 5 percent`} onClick={() => onChange(pct - 5)} disabled={pct <= 0}>
+          −
+        </Step>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={pct}
+          onChange={(e) => onChange(Number(e.target.value))}
+          aria-label={`${label} percent of calories`}
+          className="h-6 min-w-0 flex-1"
+          style={{ accentColor: color }}
+        />
+        <Step label={`${label} plus 5 percent`} onClick={() => onChange(pct + 5)} disabled={pct >= 100}>
+          +
+        </Step>
+      </div>
+    </div>
+  );
+}
+
+function Step({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-[18px] font-bold"
+      style={{ background: "var(--card2)", color: "var(--ink)", border: 0, opacity: disabled ? 0.4 : 1 }}
+    >
+      {children}
+    </button>
   );
 }
 
 /** Four-point sparkle, the "✨" of the Android button without the emoji. */
 function SparkleIcon() {
   return (
-    <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
       <path d="M12 2l1.8 5.6L19.5 9.4l-5.7 1.8L12 16.8l-1.8-5.6L4.5 9.4l5.7-1.8zM19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9zM5 15l.7 1.9 1.9.7-1.9.7L5 20.2l-.7-1.9-1.9-.7 1.9-.7z" />
     </svg>
   );

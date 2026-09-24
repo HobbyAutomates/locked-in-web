@@ -4,6 +4,7 @@ import type { AdminClient } from "@/lib/apiAuth";
 import { microsFor, searchFoods, sourceBonus, type FoodHit } from "@/lib/foodSearch";
 import { TRANSCRIBE, analyseTranscript, fetchOff, lensFor, loadScanProfile, offComplete, offTranscript, saveScan, unreadableReport, type OffProduct } from "@/lib/labelAnalysis";
 import { RESTAURANT_MULTIPLIER, RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
+import { scanName } from "@/lib/scanNames";
 import type { ItemMicros, PlateEstimate, PlateItem } from "@/lib/types";
 
 /**
@@ -22,6 +23,37 @@ export class FlowError extends Error {
 }
 
 type MediaType = "image/jpeg" | "image/png" | "image/webp";
+
+/**
+ * v2.2: store the browser's <= 320 px JPEG thumbnail of a scan at scan-photos/<uid>/<scan id>.jpg
+ * (service role, upsert) and point label_scans.thumb_path at it. Best-effort: a missing or broken
+ * thumb never fails the scan (old Android clients never send one). Returns the path or null.
+ */
+export async function attachThumb(admin: AdminClient, userId: string, scanId: string | null, thumb: string | null | undefined): Promise<string | null> {
+  const b64 = String(thumb ?? "")
+    .replace(/^data:[^,]*,/, "")
+    .trim();
+  if (!scanId || !b64) return null;
+  // A 320 px JPEG is ~15-40 KB; anything far bigger isn't a thumbnail.
+  if (b64.length > 700_000) return null;
+  try {
+    const path = `${userId}/${scanId}.jpg`;
+    const up = await admin.storage.from("scan-photos").upload(path, Buffer.from(b64, "base64"), { contentType: "image/jpeg", upsert: true });
+    if (up.error) {
+      console.error("[attachThumb] upload failed", { scanId, error: up.error });
+      return null;
+    }
+    const { error } = await admin.from("label_scans").update({ thumb_path: path }).eq("id", scanId).eq("user_id", userId);
+    if (error) {
+      console.error("[attachThumb] thumb_path update failed", { scanId, error });
+      return null;
+    }
+    return path;
+  } catch (e) {
+    console.error("[attachThumb] threw", e);
+    return null;
+  }
+}
 export const mediaType = (mt?: string | null): MediaType => (mt === "image/png" || mt === "image/webp" ? mt : "image/jpeg");
 
 function anthropic() {
@@ -50,6 +82,8 @@ export async function labelFlow(input: {
   transcript?: string | null;
   note?: string | null;
   lens?: string | null;
+  /** v2.2: optional <= 320 px JPEG thumbnail (base64) from the browser. */
+  thumb?: string | null;
 }): Promise<Record<string, unknown>> {
   const ocrText = (input.text ?? "").trim();
   if (!input.image && ocrText.length === 0 && !input.transcript) throw new FlowError("No image", 400);
@@ -81,16 +115,19 @@ export async function labelFlow(input: {
   }
 
   const { report, analysis } = await analyseTranscript({ client, transcript, note: input.note ?? undefined, lens, profile, fromPhoneOcr: fromPhone, kind: "label" });
-  const full = { ...report, kind: "label", lens, transcript, analysis };
+  // Never store "<UNKNOWN>" or a blank name: the model's name, else the first ingredient, else "Unnamed label".
+  const product = scanName("label", { model: report.product, ingredients: transcript });
+  const full = { ...report, product, kind: "label", lens, transcript, analysis };
   const id = await saveScan(input.admin, {
     userId: input.userId,
     kind: "label",
     lens,
-    product: String(report.product ?? ""),
+    product,
     verdict: String(report.verdict ?? ""),
     report: full,
   });
-  return { id, ...report, kind: "label", lens, transcript };
+  const thumb_path = await attachThumb(input.admin, input.userId, id, input.thumb);
+  return { id, ...report, product, kind: "label", lens, transcript, thumb_path };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -122,6 +159,8 @@ export async function barcodeFlow(input: {
   mediaType?: string | null;
   note?: string | null;
   lens?: string | null;
+  /** v2.2: optional thumbnail of the photo; only kept when OFF has no product image. */
+  thumb?: string | null;
 }): Promise<Record<string, unknown>> {
   let barcode = String(input.barcode ?? "").replace(/\D/g, "");
   // No digits but a photo: iPhone Safari has no barcode reader, and ZXing in the browser can miss a
@@ -151,16 +190,20 @@ export async function barcodeFlow(input: {
   const transcript = offTranscript(product);
   const { report, analysis } = await analyseTranscript({ client: anthropic(), transcript, note: input.note ?? undefined, lens, profile, kind: "barcode", maxSearches: offComplete(product) ? 1 : 2 });
   const image_url = product.image_url ?? null;
-  const full = { ...report, kind: "barcode", lens, barcode, image_url, transcript, analysis };
+  const productName = scanName("barcode", { model: report.product, off: product.product_name, ingredients: product.ingredients_text });
+  const full = { ...report, product: productName, kind: "barcode", lens, barcode, image_url, transcript, analysis };
   const id = await saveScan(input.admin, {
     userId: input.userId,
     kind: "barcode",
     lens,
-    product: String(report.product ?? product.product_name ?? ""),
+    product: productName,
     verdict: String(report.verdict ?? ""),
     report: full,
+    imageUrl: image_url,
   });
-  return { id, found: true, ...report, kind: "barcode", lens, barcode, image_url, transcript };
+  // The OFF pack shot is the better history picture; the photo of the bars only fills in without one.
+  const thumb_path = image_url ? null : await attachThumb(input.admin, input.userId, id, input.thumb);
+  return { id, found: true, ...report, product: productName, kind: "barcode", lens, barcode, image_url, transcript, thumb_path };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -229,7 +272,7 @@ function n(v: unknown, fallback = 0) {
  *   3. The JPEG goes to Storage (meal-photos/<user>/<uuid>.jpg) and the estimate to label_scans
  *      kind='photo', so the History list can show it and "Save as meal" can reuse the photo.
  */
-export async function plateFlow(input: { admin: AdminClient; userId: string; image: string; mediaType?: string | null; note?: string | null }): Promise<PlateEstimate> {
+export async function plateFlow(input: { admin: AdminClient; userId: string; image: string; mediaType?: string | null; note?: string | null; thumb?: string | null }): Promise<PlateEstimate & { thumb_path?: string | null }> {
   const image = (input.image ?? "").trim();
   if (!image) throw new FlowError("No image", 400);
   const mt = mediaType(input.mediaType);
@@ -348,12 +391,13 @@ export async function plateFlow(input: { admin: AdminClient; userId: string; ima
     userId: userId,
     kind: "photo",
     lens: "protein",
-    product: plate_note || finalItems.map((i) => i.name).join(", "),
+    product: scanName("photo", { model: plate_note, off: finalItems.map((i) => i.name).join(", ") }),
     verdict: "",
     report,
     imagePath: photo_path,
   });
-  const result: PlateEstimate = { id, items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint };
+  const thumb_path = await attachThumb(admin, userId, id, input.thumb);
+  const result: PlateEstimate & { thumb_path: string | null } = { id, items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, thumb_path };
   return result;
 }
 
