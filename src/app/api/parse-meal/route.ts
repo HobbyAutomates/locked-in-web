@@ -123,6 +123,34 @@ function priced(it: HaikuItem, food: FoodHit | null): ParsedItem {
 const SAID_AMOUNT = /\d|[०-९]|\b(ek|do|teen|tin|char|chaar|paanch|panch|chhe|chhah|saat|aath|nau|das|aadha|adha|aadhi|dedh|dhai|half|one|two|three|four|five|six|seven|eight|nine|ten|couple|dozen|thoda|thodi|zyada|jyada|bahut|extra|little|double)\b|एक|दो|तीन|चार|पाँच|पांच|छह|सात|आठ|नौ|दस|आधा|आधी|डेढ़|ढाई|थोड़ा|थोड़ी|ज़्यादा|ज्यादा|बहुत/i;
 const SAID_WEIGHT = /\d+(\.\d+)?\s*(g|gm|gms|gram|grams|kg|ml|l|litre|liter)\b|ग्राम/i;
 
+/** Hindi/Hinglish/Devanagari number and fraction words a count item's own text may open with. */
+const COUNT_WORDS: Record<string, number> = {
+  ek: 1, one: 1, do: 2, two: 2, teen: 3, tin: 3, three: 3, char: 4, chaar: 4, four: 4,
+  paanch: 5, panch: 5, five: 5, chhe: 6, chhah: 6, six: 6, saat: 7, seven: 7, aath: 8, eight: 8,
+  nau: 9, nine: 9, das: 10, ten: 10, couple: 2, dozen: 12,
+  aadha: 0.5, adha: 0.5, aadhi: 0.5, half: 0.5, dedh: 1.5, dhai: 2.5,
+  एक: 1, दो: 2, तीन: 3, चार: 4, पाँच: 5, पांच: 5, छह: 6, सात: 7, आठ: 8, नौ: 9, दस: 10,
+  आधा: 0.5, आधी: 0.5, डेढ़: 1.5, ढाई: 2.5,
+};
+
+/**
+ * The number the person actually said for THIS item, when their own words open with one —
+ * "4 idli" → 4, "aadhi roti" / "आधी रोटी" / "half a roti" / "½ roti" → 0.5. `null` when the words
+ * don't start with a number, so the caller falls back to a default rather than guessing.
+ */
+function explicitCount(words: string): number | null {
+  const w = words.trim();
+  if (!w) return null;
+  if (/^half\b/i.test(w) || /^आधा\b|^आधी\b/.test(w)) return 0.5;
+  const first = (w.split(/\s+/)[0] ?? "").replace(/[,.]$/, "");
+  if (first === "½") return 0.5;
+  if (/^[०-९]+(\.[०-९]+)?$/.test(first)) {
+    return Number([...first].map((c) => (c === "." ? "." : "०१२३४५६७८९".indexOf(c))).join(""));
+  }
+  if (/^\d+(\.\d+)?$/.test(first)) return Number(first);
+  return COUNT_WORDS[first.toLowerCase()] ?? null;
+}
+
 /**
  * v2.5: count foods (roti, egg, glass of milk, katori of dal …) come back as N units of the food's own
  * unit, with `default_count` — ONE unit unless the person said a number. Loose foods stay in grams.
@@ -135,7 +163,11 @@ function counted(it: HaikuItem, food: FoodHit | null): ParsedItem {
   const words = it.input ?? "";
   if (!step || SAID_WEIGHT.test(words)) return base;
   const said = SAID_AMOUNT.test(words);
-  const count = said ? Math.max(step, Math.round(base.grams / unit.grams / step) * step) : 1;
+  // An explicit number in the person's own words ("4 idli", "aadhi roti") always wins over the
+  // model's grams-derived guess; otherwise fall back to at least half a step, never a whole step,
+  // so "aadhi roti" (if it ever misses the explicit match) doesn't round up to a full roti.
+  const explicit = explicitCount(words);
+  const count = explicit ?? (said ? Math.max(step / 2, Math.round(base.grams / unit.grams / step) * step) : 1);
   const repriced = priced({ ...it, grams: Math.round(count * unit.grams * 10) / 10 }, food);
   return { ...repriced, unit: "serving", servings: count, serving_unit: unit, default_count: count };
 }

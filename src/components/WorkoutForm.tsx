@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteWorkout, saveWorkout } from "@/lib/actions";
 import { POPULAR, exerciseDef, exercisesText, lastSets, musclesOf, searchExercises } from "@/lib/exercises";
@@ -78,6 +78,12 @@ export default function WorkoutForm({
   const [kind, setKind] = useState<WorkoutKind>((existing?.kind as WorkoutKind | null) ?? lastKind ?? "gym");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (deleteTimer.current) clearTimeout(deleteTimer.current);
+  }, []);
 
   async function persist(payload: Payload) {
     setBusy(true);
@@ -106,16 +112,31 @@ export default function WorkoutForm({
     }
   }
 
-  async function remove() {
+  /** Undoable delete: the confirm button turns into "Deleted · Undo" for ~5s; only then does the
+   * real delete happen and the editor close. */
+  function remove() {
+    if (!existing) return;
+    setError(null);
+    setPendingDelete(true);
+    deleteTimer.current = setTimeout(() => void finalizeRemove(), 5000);
+  }
+
+  function undoRemove() {
+    if (deleteTimer.current) clearTimeout(deleteTimer.current);
+    deleteTimer.current = null;
+    setPendingDelete(false);
+  }
+
+  async function finalizeRemove() {
     if (!existing) return;
     setBusy(true);
-    setError(null);
     try {
       const res = await deleteWorkout(existing.id);
       if (!res.ok) {
         console.error("[WorkoutForm] delete failed:", res.error);
         setError(res.error);
         setBusy(false);
+        setPendingDelete(false);
         return;
       }
       onClose();
@@ -123,12 +144,13 @@ export default function WorkoutForm({
       console.error("[WorkoutForm] delete threw:", e);
       setError(e instanceof Error && e.message ? e.message : "Could not delete");
       setBusy(false);
+      setPendingDelete(false);
     }
   }
 
   // An existing session can move between Gym / Bodyweight / Bands; the log-only types can't hold it.
   const kinds = existing ? KINDS.filter((k) => k.key === "gym" || k.key === "bodyweight" || k.key === "bands") : KINDS;
-  const shared = { existing, initialDate, busy, error, target, persist, remove };
+  const shared = { existing, initialDate, busy, error, target, persist, remove, pendingDelete, undoRemove };
 
   return (
     <div className="flex flex-1 flex-col">
@@ -183,19 +205,30 @@ type Shared = {
   error: string | null;
   target: number;
   persist: (p: Payload) => Promise<void>;
-  remove: () => Promise<void>;
+  remove: () => void;
+  pendingDelete: boolean;
+  undoRemove: () => void;
 };
 
-function Footer({ existing, busy, error, target, remove, onSave, label = "Save workout" }: Shared & { onSave: () => void; label?: string }) {
+function Footer({ existing, busy, error, target, remove, pendingDelete, undoRemove, onSave, label = "Save workout" }: Shared & { onSave: () => void; label?: string }) {
   return (
     <>
       <div className="flex flex-col gap-3 px-4 pb-4">
         <ErrorNote text={error} />
         <p className="text-xs muted">Target {target} sessions a week.</p>
         {existing ? (
-          <button type="button" onClick={() => void remove()} disabled={busy} className="press py-2 text-[15px] font-semibold" style={{ color: "var(--red)", background: "none", border: 0 }}>
-            Delete workout
-          </button>
+          pendingDelete ? (
+            <div className="flex items-center justify-between gap-2 py-1">
+              <span className="text-[15px] font-semibold muted">Deleted · Undo</span>
+              <button type="button" onClick={undoRemove} className="press text-[15px] font-bold" style={{ color: "var(--btn)", background: "none", border: 0 }}>
+                Undo
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={remove} disabled={busy} className="press py-2 text-[15px] font-semibold" style={{ color: "var(--red)", background: "none", border: 0 }}>
+              Delete workout
+            </button>
+          )
         ) : null}
       </div>
       <div className="sticky bottom-0 mt-auto px-4 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-3" style={{ background: "var(--bg)" }}>
