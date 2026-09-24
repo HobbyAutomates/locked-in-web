@@ -21,6 +21,26 @@ export function formatTime(createdAt: string): string {
   return Number.isNaN(d.getTime()) ? "" : TIME.format(d);
 }
 
+/** v2.6: the display-zone ISO day of a timestamptz ("2026-09-24"). */
+export function dayOf(createdAt: string): string {
+  const raw = (createdAt || "").replace(" ", "T");
+  const d = new Date(/([Z+]|-\d\d:\d\d)$/.test(raw) ? raw : `${raw}Z`);
+  return Number.isNaN(d.getTime()) ? "" : ISO_DAY.format(d);
+}
+
+/** v2.6 chat / feed stamp: "3:13 pm" today, "Yesterday, 3:13 pm", else "Tue 22 Sep, 3:13 pm". */
+export function postStamp(createdAt: string, today: string): string {
+  const day = dayOf(createdAt);
+  const time = formatTime(createdAt);
+  if (day === today) return time;
+  const [y, m, dd] = today.split("-").map(Number);
+  const yesterday = ISO_DAY.format(new Date(Date.UTC(y, m - 1, dd - 1, 12)));
+  if (day === yesterday) return `Yesterday, ${time}`;
+  const [py, pm, pd] = day.split("-").map(Number);
+  const label = new Date(Date.UTC(py, pm - 1, pd, 12)).toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  return `${label}, ${time}`;
+}
+
 /** Today's ISO date in the display zone — stable on both sides of hydration. */
 export function todayInZone(): string {
   return ISO_DAY.format(new Date());

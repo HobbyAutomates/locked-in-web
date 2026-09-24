@@ -8,9 +8,9 @@ import { addDays, longDate, shortDate } from "@/lib/dates";
 import { dismiss, useDismissed } from "@/lib/dismiss";
 import { calorieBudget, totalsFor } from "@/lib/totals";
 import { logWater } from "@/lib/actions";
-import LogWaterSheet from "./LogWaterSheet";
+import { litres, WaterBottle } from "./WaterBottle";
 import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Nudge, type Profile, type WaterEntry, type Workout, type Wrap } from "@/lib/types";
-import { CalendarIcon, Check, ChevronRight, Close, Fist, Flame, Glass, Lock, MoonStar, Plus, Run, Share, Spinner } from "./icons";
+import { CalendarIcon, Check, ChevronRight, Close, Fist, Flame, Lock, MoonStar, Plus, Run, Share, Spinner } from "./icons";
 import { ExerciseRow, MealRow, WorkoutRow } from "./Rows";
 import { usePendingMeals, type Pending } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
@@ -197,7 +197,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       </Rise>
 
       <Rise index={4}>
-        <WaterCard date={selected} isToday={isToday} ml={water.filter((w) => w.date === selected).reduce((a, w) => a + w.ml, 0)} goal={profile.water_goal_ml} />
+        <WaterCard date={selected} isToday={isToday} ml={water.filter((w) => w.date === selected).reduce((a, w) => a + w.ml, 0)} goal={profile.water_goal_ml} glassMl={profile.water_glass_ml} />
       </Rise>
 
       <Rise index={4}>
@@ -240,49 +240,54 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   );
 }
 
-/** v2.3 water: today's mL against the goal, a "+ Glass" quick action and the full Log water sheet. */
-function WaterCard({ date, isToday, ml, goal }: { date: string; isToday: boolean; ml: number; goal: number }) {
+/** v2.6 water tile: "Water · 1.75 L / 2.5 L" with a mini bottle and + Glass; the tile opens the Water page. */
+function WaterCard({ date, isToday, ml, goal, glassMl }: { date: string; isToday: boolean; ml: number; goal: number; glassMl: number }) {
   const router = useRouter();
-  const [sheet, setSheet] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [extra, setExtra] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const target = Math.max(250, goal || 2500);
-  const glasses = Math.round(ml / 250);
+  const glass = glassMl || 250;
+  const shown = ml + extra;
   async function addGlass() {
     setAdding(true);
     setError(null);
+    setExtra((x) => x + glass);
     try {
-      await logWater(250, date);
+      await logWater(glass, date, "glass");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not log that");
     } finally {
+      setExtra(0);
       setAdding(false);
     }
   }
   return (
-    <>
-      <div className="card flex items-center gap-3" style={{ padding: "12px 12px 12px 14px" }}>
-        <button type="button" className="press flex min-w-0 flex-1 items-center gap-3 text-left" style={{ background: "none", border: 0, padding: 0, color: "var(--ink)" }} onClick={() => setSheet(true)} aria-label={`Water: ${ml} of ${target} mL. Log water`}>
-          <Ring fraction={ml / target} color="var(--blue)" size={44} stroke={5}>
-            <span style={{ color: "var(--blue)" }}>
-              <Glass size={16} />
-            </span>
-          </Ring>
-          <span className="flex min-w-0 flex-col">
-            <span className="num text-xl font-extrabold leading-tight">
-              {ml.toLocaleString("en-IN")} <span className="text-[13px] font-semibold muted">/ {target.toLocaleString("en-IN")} mL</span>
-            </span>
-            <span className="truncate text-xs muted">{error ?? (ml >= target ? "Water goal hit" : `Water${isToday ? " today" : ""} · ${glasses} glass${glasses === 1 ? "" : "es"}`)}</span>
+    <div className="card flex items-center gap-3" style={{ padding: "10px 12px 10px 12px" }}>
+      <button
+        type="button"
+        className="press flex min-w-0 flex-1 items-center gap-3 text-left"
+        style={{ background: "none", border: 0, padding: 0, color: "var(--ink)" }}
+        onClick={() => router.push(isToday ? "/water" : `/water?date=${date}`)}
+        aria-label={`Water: ${litres(shown)} of ${litres(target)}. Open the water page`}
+      >
+        <span className="grid h-[52px] w-9 shrink-0 place-items-center">
+          <WaterBottle fraction={shown / target} height={52} />
+        </span>
+        <span className="flex min-w-0 flex-col">
+          <span className="text-xs font-semibold muted">Water{isToday ? "" : ` · ${shortDate(date)}`}</span>
+          <span className="num text-xl font-extrabold leading-tight">
+            {litres(shown)} <span className="text-[13px] font-semibold muted">/ {litres(target)}</span>
           </span>
-        </button>
-        <button type="button" className="chip press shrink-0 gap-1 whitespace-nowrap" style={{ height: 36, padding: "0 12px", fontWeight: 700 }} disabled={adding} onClick={() => void addGlass()} aria-label="Add a 250 mL glass">
-          {adding ? <Spinner size={14} /> : <Plus size={15} />}
-          Glass
-        </button>
-      </div>
-      <LogWaterSheet open={sheet} onClose={() => setSheet(false)} date={date} />
-    </>
+          <span className="truncate text-xs muted">{error ?? (shown >= target ? "Water goal hit" : `${Math.max(0, Math.ceil((target - shown) / glass))} glasses to go`)}</span>
+        </span>
+      </button>
+      <button type="button" className="chip press shrink-0 gap-1 whitespace-nowrap" style={{ height: 36, padding: "0 12px", fontWeight: 700 }} disabled={adding} onClick={() => void addGlass()} aria-label={`Add a ${glass} mL glass`}>
+        {adding ? <Spinner size={14} /> : <Plus size={15} />}
+        Glass
+      </button>
+    </div>
   );
 }
 

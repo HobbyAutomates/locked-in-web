@@ -144,6 +144,14 @@ export type Profile = {
   water_goal_ml: number;
   /** v2.4 Preferences → Tracking: how weights are shown (always stored in kg). */
   units: Units;
+  /** v2.6: @handle for squads (lowercase a-z 0-9 _, 3–20), null until created. */
+  username: string | null;
+  /** v2.6 water: one glass in mL (the + / − step and the goal's "gl" unit). */
+  water_glass_ml: number;
+  /** v2.6 water reminder window "HH:MM" and interval (0 = never; 30/60/120/180/240). */
+  water_reminder_from: string;
+  water_reminder_to: string;
+  water_reminder_every_min: number;
 };
 
 export type Units = "metric" | "imperial";
@@ -173,6 +181,11 @@ export const DEFAULT_PROFILE: Profile = {
   rollover_calories: false,
   water_goal_ml: 2500,
   units: "metric",
+  username: null,
+  water_glass_ml: 250,
+  water_reminder_from: "08:00",
+  water_reminder_to: "22:00",
+  water_reminder_every_min: 0,
 };
 
 export const DEFAULT_FIBER_G = 30;
@@ -217,13 +230,14 @@ export type ExerciseEntry = {
 };
 
 /** v2.3: one glass / bottle logged (`bandlog.water_log`). */
-export type WaterEntry = { id: string; date: string; ml: number; created_at: string };
+export type WaterVessel = "glass" | "bottle" | "large" | "custom";
+export type WaterEntry = { id: string; date: string; ml: number; created_at: string; vessel?: WaterVessel | null };
 
 /** v2.3: a progress photo with a short-lived signed URL. */
 export type ProgressPhoto = { id: string; date: string; path: string; note: string; url: string | null };
 
 /** v2.3: a row of `bandlog.public_groups()`. */
-export type PublicSquad = { id: string; name: string; tagline: string | null; cover_url: string | null; member_count: number; joined: boolean };
+export type PublicSquad = { id: string; name: string; tagline: string | null; cover_url: string | null; member_count: number; joined: boolean; icon?: string | null; description?: string | null; join_policy?: JoinPolicy };
 
 /** One activity Haiku pulled out of a free-text description (see /api/describe-exercise). */
 export type DescribedExercise = {
@@ -334,7 +348,53 @@ export type PlateEstimate = {
 // ---- v2.0: squads ----
 
 /** A squad the signed-in user belongs to. */
-export type Squad = { id: string; name: string; code: string; owner_id: string; created_at: string };
+export type JoinPolicy = "open" | "request";
+
+export type Squad = {
+  id: string;
+  name: string;
+  code: string;
+  owner_id: string;
+  created_at: string;
+  /** v2.6 */
+  description?: string | null;
+  icon?: string | null;
+  cover_url?: string | null;
+  tagline?: string | null;
+  is_public?: boolean | null;
+  join_policy?: JoinPolicy | null;
+  member_count?: number;
+};
+
+export type SquadPostKind = "message" | "meal" | "workout" | "pr" | "photo";
+
+/** One row of `bandlog.group_feed(g, before, n, kinds)`; `photo_url` is signed server-side. */
+export type SquadPost = {
+  id: string;
+  group_id: string;
+  user_id: string;
+  kind: SquadPostKind;
+  body: string;
+  ref_id: string | null;
+  photo_path: string | null;
+  photo_url?: string | null;
+  created_at: string;
+  author_name: string;
+  author_username: string | null;
+  author_avatar_path: string | null;
+};
+
+/** One row of `bandlog.group_leaderboard(g)`. */
+export type LeaderRow = { rank: number; user_id: string; name: string; username: string | null; avatar_path: string | null; flames: number; week_points: number; is_owner: boolean };
+
+/** One row of `bandlog.group_members_detail(g)`. */
+export type SquadMemberDetail = { id: string; name: string; username: string | null; avatar_path: string | null; is_owner: boolean; flames: number; joined_at: string };
+
+/** One row of `bandlog.group_requests(g)` (owner only). */
+export type JoinRequest = { id: string; user_id: string; name: string; username: string | null; avatar_path: string | null; created_at: string };
+
+/** `bandlog.group_by_code(code)`: the /join/<code> preview. */
+export type SquadInvite = { id: string; name: string; description: string | null; icon: string | null; cover_url: string | null; tagline: string | null; is_public: boolean; join_policy: JoinPolicy; member_count: number; joined: boolean; requested: boolean };
 
 /** One day of a member's rollup (bandlog.daily_stats); numbers are null when they share streaks only. */
 export type SquadDay = {

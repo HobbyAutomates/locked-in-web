@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { Bowl, Chart, Dumbbell, Glass, Home, People, Person, Plus, Run, Scale, ScanFilled } from "./icons";
-import LogWaterSheet from "./LogWaterSheet";
 import { today } from "@/lib/dates";
 
 /** v2.4: five tabs. Calendar moved to a button in the Home header (the /calendar route stays). */
@@ -33,7 +32,6 @@ export default function BottomNav() {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [water, setWater] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -45,7 +43,7 @@ export default function BottomNav() {
   function go(key: DialKey) {
     setOpen(false);
     const d = today();
-    if (key === "water") return setWater(true);
+    if (key === "water") return router.push("/water");
     if (key === "weight") return router.push("/profile/weight?log=1");
     router.push(key === "meal" ? `/log?date=${d}&mode=meal` : key === "exercise" ? `/log?date=${d}&mode=exercise` : `/log?date=${d}`);
   }
@@ -137,7 +135,6 @@ export default function BottomNav() {
           </div>
         </nav>
       </div>
-      <LogWaterSheet open={water} onClose={() => setWater(false)} />
     </>
   );
 }

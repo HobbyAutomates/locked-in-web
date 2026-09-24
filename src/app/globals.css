@@ -439,6 +439,16 @@ button {
   transform-origin: center;
 }
 
+/* v2.6: the water bottle's surface — one 50-unit wave period, sliding forever. */
+@keyframes water-wave {
+  to {
+    transform: translateX(-50px);
+  }
+}
+.water-wave {
+  animation: water-wave 2.6s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

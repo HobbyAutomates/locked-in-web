@@ -7,6 +7,7 @@ import { ageFrom, type Profile } from "@/lib/types";
 import { APP_VERSION, CHANGELOG, compareVersions } from "@/lib/version";
 import { displayName, weightText } from "@/lib/display";
 import { AvatarPicker } from "./Avatar";
+import ProfileSetupSheet from "./ProfileSetupSheet";
 import { Flame, Gear, Mail, Medal, Pencil, Person, Phone, Refresh, Scale, Share, Sparkle, Target } from "./icons";
 import { BottomSheet, Card, Chevron, ErrorNote, GroupLabel, Hair, Rise, SettingRow } from "./ui";
 
@@ -24,6 +25,8 @@ export default function ProfileScreen({ profile, email, userId }: { profile: Pro
   const [sheet, setSheet] = useState<null | "news" | "home">(null);
   const [invited, setInvited] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // v2.6: no username yet → the one-time "Create a username / Add a profile photo" sheet.
+  const [setup, setSetup] = useState<null | "full" | "username">(profile.username ? null : "full");
   const age = ageFrom(profile.dob);
   // Blank name → the email's first run of letters ("ayaan.khan@…" → "Ayaan"), like the signup trigger.
   const shownName = displayName(profile.name, email);
@@ -75,12 +78,17 @@ export default function ProfileScreen({ profile, email, userId }: { profile: Pro
             <AvatarPicker userId={userId} path={profile.avatar_path} name={shownName || email} size={60} onError={setError} />
             <span className="flex min-w-0 flex-1 flex-col">
               <NameField name={shownName} onCommit={saveName} />
+              <button type="button" className="press self-start truncate text-left text-[13px] font-semibold" style={{ background: "none", border: 0, padding: 0, color: profile.username ? "var(--ink)" : "var(--blue)" }} onClick={() => setSetup(profile.username ? "username" : "full")}>
+                {profile.username ? `@${profile.username}` : "Create a username"}
+              </button>
               <span className="truncate text-[13px] muted">{email || "—"}</span>
               {age != null ? <span className="text-xs muted">{age} yrs</span> : null}
             </span>
           </div>
         </Card>
       </Rise>
+
+      <ProfileSetupSheet open={setup !== null} photo={setup === "full"} onClose={() => setSetup(null)} userId={userId} name={shownName} username={profile.username} avatarPath={profile.avatar_path} />
 
       {/* ---- You ---- */}
       <Rise index={1}>

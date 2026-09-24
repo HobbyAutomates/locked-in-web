@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/data";
 import { ONBOARD_SKIP_COOKIE, needsOnboarding } from "@/lib/onboarding";
 import BottomNav from "@/components/BottomNav";
+import WaterReminderClock from "@/components/WaterReminderClock";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -33,6 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {children}
       </main>
       <BottomNav />
+      <WaterReminderClock from={profile.water_reminder_from} to={profile.water_reminder_to} every={profile.water_reminder_every_min} />
     </>
   );
 }

@@ -672,3 +672,73 @@ export function Pushup(p: P) {
     </Stroke>
   );
 }
+
+/* ---- v2.6 ---- */
+
+export function Minus(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M5 12h14" />
+    </Stroke>
+  );
+}
+
+/** Paper plane: send a chat message. */
+export function Send(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M21 3L10 14" />
+      <path d="M21 3l-6.5 18-3.5-7-7-3.5z" />
+    </Stroke>
+  );
+}
+
+/** A picture (photo posts). */
+export function Photo(p: P) {
+  return (
+    <Stroke {...p}>
+      <rect x="3" y="4.5" width="18" height="15" rx="3" />
+      <circle cx="9" cy="10" r="1.7" />
+      <path d="M21 16l-5-5-8.5 8.5" />
+    </Stroke>
+  );
+}
+
+/** Chain link (invite link). */
+export function LinkIcon(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1" />
+      <path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1" />
+    </Stroke>
+  );
+}
+
+/** Speech bubble (chat / WhatsApp-style share). */
+export function Chat(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M4 18.5l1.3-3.6A8 8 0 1 1 8.6 19z" />
+    </Stroke>
+  );
+}
+
+/** Globe (public squad). */
+export function Globe(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z" />
+    </Stroke>
+  );
+}
+
+/** Padlock outline (private squad). */
+export function Padlock(p: P) {
+  return (
+    <Stroke {...p}>
+      <rect x="5" y="10.5" width="14" height="10" rx="2.5" />
+      <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+    </Stroke>
+  );
+}

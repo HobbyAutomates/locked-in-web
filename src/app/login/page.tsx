@@ -36,7 +36,9 @@ export default function LoginPage() {
       const { data } = await supabase.auth.getSession();
       if (!data.session) return setMsg("Account created. Confirm the email we sent, then sign in.");
     }
-    router.replace("/");
+    // v2.6: invite links send people here with ?next=/join/<code>; only same-site paths are followed.
+    const next = new URLSearchParams(window.location.search).get("next") ?? "";
+    router.replace(next.startsWith("/") && !next.startsWith("//") ? next : "/");
     router.refresh();
   }
 

@@ -1,14 +1,16 @@
 import { addDays, today } from "./dates";
 import { createClient } from "./supabase/server";
-import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Nudge, type Profile, type ProgressPhoto, type PublicSquad, type ScanHistoryItem, type Squad, type SquadMember, type WaterEntry, type WeightEntry, type Workout } from "./types";
+import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Nudge, type Profile, type ProgressPhoto, type PublicSquad, type ScanHistoryItem, type Squad, type SquadMember, type WaterEntry, type WeightEntry, type Workout, type JoinRequest, type LeaderRow, type SquadInvite, type SquadMemberDetail, type SquadPost } from "./types";
 import { parse as parseReminders } from "./reminders";
 import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 import { scanName } from "./scanNames";
 
 const PROFILE_COLS =
-  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml, units";
+  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml, units, username, water_glass_ml, water_reminder_from, water_reminder_to, water_reminder_every_min";
 
 const num = (v: unknown): number | null => (v == null || v === "" ? null : Number(v));
+/** Postgres `time` ("08:00:00") → "08:00". */
+const hhmm = (v: unknown, fallback: string): string => (typeof v === "string" && /^\d{2}:\d{2}/.test(v) ? v.slice(0, 5) : fallback);
 
 /** The signed-in user's `profiles` row with Android's defaults filled in for anything unset. */
 export async function getProfile(): Promise<Profile> {
@@ -41,6 +43,11 @@ export async function getProfile(): Promise<Profile> {
     rollover_calories: d.rollover_calories === true,
     water_goal_ml: num(d.water_goal_ml) ?? DEFAULT_PROFILE.water_goal_ml,
     units: d.units === "imperial" ? "imperial" : "metric",
+    username: typeof d.username === "string" && d.username ? d.username : null,
+    water_glass_ml: num(d.water_glass_ml) ?? DEFAULT_PROFILE.water_glass_ml,
+    water_reminder_from: hhmm(d.water_reminder_from, DEFAULT_PROFILE.water_reminder_from),
+    water_reminder_to: hhmm(d.water_reminder_to, DEFAULT_PROFILE.water_reminder_to),
+    water_reminder_every_min: num(d.water_reminder_every_min) ?? 0,
   };
 }
 
@@ -186,9 +193,9 @@ export async function getMeals(from: string, to: string): Promise<(Meal & { phot
 /** v2.3: glasses / bottles logged between `from` and `to`, newest first. */
 export async function getWater(from: string, to: string): Promise<WaterEntry[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("water_log").select("id, date, ml, created_at").gte("date", from).lte("date", to).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("water_log").select("id, date, ml, created_at, vessel").gte("date", from).lte("date", to).order("created_at", { ascending: false });
   if (error) return [];
-  return (data ?? []).map((r) => ({ id: r.id as string, date: r.date as string, ml: Number(r.ml), created_at: r.created_at as string }));
+  return (data ?? []).map((r) => ({ id: r.id as string, date: r.date as string, ml: Number(r.ml), created_at: r.created_at as string, vessel: (r.vessel as WaterEntry["vessel"]) ?? null }));
 }
 
 /** v2.3: progress photos, newest first, each with a 1-hour signed URL (private bucket). */
@@ -206,7 +213,7 @@ export async function getPublicSquads(): Promise<PublicSquad[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("public_groups");
   if (error) return [];
-  return ((data ?? []) as PublicSquad[]).map((g) => ({ ...g, member_count: Number(g.member_count ?? 0), joined: !!g.joined }));
+  return ((data ?? []) as PublicSquad[]).map((g) => ({ ...g, member_count: Number(g.member_count ?? 0), joined: !!g.joined, join_policy: g.join_policy === "request" ? "request" : "open" }));
 }
 
 /** Everything the Today and Calendar screens need, in one round trip each. */
@@ -318,8 +325,13 @@ export async function getMySquads(): Promise<Squad[]> {
   const { data: mine } = await supabase.from("group_members").select("group_id, joined_at").eq("user_id", user.id).order("joined_at", { ascending: true });
   const ids = (mine ?? []).map((m) => m.group_id as string);
   if (!ids.length) return [];
-  const { data } = await supabase.from("groups").select("id, name, code, owner_id, created_at").in("id", ids);
-  const byId = new Map(((data ?? []) as Squad[]).map((g) => [g.id, g]));
+  const [{ data }, { data: counts }] = await Promise.all([
+    supabase.from("groups").select(SQUAD_COLS).in("id", ids),
+    supabase.from("group_members").select("group_id").in("group_id", ids),
+  ]);
+  const members = new Map<string, number>();
+  for (const r of counts ?? []) members.set(r.group_id as string, (members.get(r.group_id as string) ?? 0) + 1);
+  const byId = new Map<string, Squad>(((data ?? []) as Squad[]).map((g) => [g.id, { ...g, member_count: members.get(g.id) ?? 1 }]));
   return ids.map((id) => byId.get(id)).filter((g): g is Squad => !!g);
 }
 
@@ -359,6 +371,77 @@ export async function getSentNudges(): Promise<string[]> {
   const since = new Date(Date.now() - 20 * 3600 * 1000).toISOString();
   const { data } = await supabase.from("nudges").select("to_user").eq("from_user", user.id).gte("created_at", since);
   return [...new Set((data ?? []).map((r) => r.to_user as string))];
+}
+
+// ---- v2.6: squads v2 ----
+
+const SQUAD_COLS = "id, name, code, owner_id, created_at, description, icon, cover_url, tagline, is_public, join_policy";
+
+/** One squad I'm in (RLS hides the rest), with its member count. */
+export async function getSquad(id: string): Promise<Squad | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("groups").select(SQUAD_COLS).eq("id", id).maybeSingle();
+  if (!data) return null;
+  const { count } = await supabase.from("group_members").select("user_id", { count: "exact", head: true }).eq("group_id", id);
+  return { ...(data as Squad), member_count: count ?? 1 };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Client = Awaited<ReturnType<typeof createClient>> | import("@supabase/supabase-js").SupabaseClient<any, any, any>;
+
+/** Chat / feed rows, newest first, with feed photos signed (group-photos, 1 h). Shared with the actions. */
+export async function fetchSquadPosts(supabase: Client, groupId: string, kinds: string[] | null, before: string | null = null, n = 40): Promise<SquadPost[]> {
+  const { data, error } = await supabase.rpc("group_feed", { g: groupId, before, n, kinds });
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as SquadPost[];
+  const paths = [...new Set(rows.filter((r) => r.photo_path).map((r) => r.photo_path as string))];
+  if (paths.length) {
+    const { data: signed } = await supabase.storage.from("group-photos").createSignedUrls(paths, 3600);
+    const byPath = new Map<string, string>();
+    for (const x of (signed ?? []) as { path: string | null; signedUrl: string | null }[]) if (x.path && x.signedUrl) byPath.set(x.path, x.signedUrl);
+    for (const r of rows) if (r.photo_path) r.photo_url = byPath.get(r.photo_path) ?? null;
+  }
+  return rows;
+}
+
+export async function getSquadPosts(groupId: string, kinds: string[] | null): Promise<SquadPost[]> {
+  const supabase = await createClient();
+  try {
+    return await fetchSquadPosts(supabase, groupId, kinds);
+  } catch {
+    return [];
+  }
+}
+
+export async function getLeaderboard(groupId: string): Promise<LeaderRow[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("group_leaderboard", { g: groupId });
+  if (error) return [];
+  return ((data ?? []) as LeaderRow[]).map((r) => ({ ...r, rank: Number(r.rank), flames: Number(r.flames ?? 0), week_points: Number(r.week_points ?? 0) }));
+}
+
+export async function getSquadMembers(groupId: string): Promise<SquadMemberDetail[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("group_members_detail", { g: groupId });
+  if (error) return [];
+  return ((data ?? []) as SquadMemberDetail[]).map((r) => ({ ...r, flames: Number(r.flames ?? 0) }));
+}
+
+/** Pending join requests (empty unless I own the squad). */
+export async function getJoinRequests(groupId: string): Promise<JoinRequest[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("group_requests", { g: groupId });
+  if (error) return [];
+  return (data ?? []) as JoinRequest[];
+}
+
+/** The /join/<code> preview, or null for an unknown code. */
+export async function getSquadByCode(code: string): Promise<SquadInvite | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("group_by_code", { p_code: code });
+  if (error) return null;
+  const row = (Array.isArray(data) ? data[0] : data) as SquadInvite | undefined;
+  return row ? { ...row, member_count: Number(row.member_count ?? 0), join_policy: row.join_policy === "request" ? "request" : "open" } : null;
 }
 
 export { totalsFor } from "./totals";

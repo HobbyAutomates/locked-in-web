@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.5";
+export const APP_VERSION = "2.6";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.6",
+    date: "2026-09-24",
+    lines: [
+      "Water has its own page: set your goal in glasses, watch the bottle fill as you tap + (or − to undo), add a glass, bottle, large bottle or any amount — and get confetti when you hit your goal. Set reminder times and how often you want a nudge to drink.",
+      "Squads, rebuilt: pick a username and a profile photo, create a squad with a name, icon and public or private setting, and invite friends with a link (Share, WhatsApp or Copy). Private squads take requests the owner approves.",
+      "Every squad has Chat, a Feed where your meals, workouts and gym PRs post by themselves, and a Leaderboard ranked by 🔥 day streak.",
+    ],
+  },
   {
     version: "2.5",
     date: "2026-09-24",

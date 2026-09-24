@@ -9,7 +9,9 @@ import { bandCode, bandIntensity, bandKcal, burnKcal } from "./burn";
 import { rollupQuietly } from "./rollup";
 import { adminClient } from "./apiAuth";
 import { today as todayIso } from "./dates";
-import type { Activity, DescribedExercise, FoodSearchHit, MealItem, Profile, SavedMeal, SquadMember, WorkoutExercise, WorkoutKind } from "./types";
+import type { Activity, DescribedExercise, FoodSearchHit, LeaderRow, MealItem, Profile, SavedMeal, SquadMember, SquadPost, WaterEntry, WaterVessel, WorkoutExercise, WorkoutKind } from "./types";
+import { mealPostBody, prPostBody, workoutPostBody } from "./squadPosts";
+import { fetchSquadPosts } from "./data";
 
 /** v2.5: Compendium rows for the auto-burn of gym / bodyweight sessions. */
 const LIFT_BURN: Record<"gym" | "bodyweight", { code: string; met: number; label: string }> = {
@@ -136,6 +138,7 @@ export async function saveWorkout(input: {
     }
   }
   await rollupQuietly(supabase, user.id, before && before !== input.date ? [input.date, before] : [input.date]);
+  if (workoutId) await postWorkoutToSquads(supabase, user.id, workoutId, kind, exercisesJson, input.muscles, input.minutes);
   revalidatePath("/", "layout");
   return { ok: true, id: workoutId, warning };
 }
@@ -150,6 +153,7 @@ export async function deleteWorkout(id: string): Promise<ActionResult> {
   const burn = await supabase.from("exercise_log").delete().eq("user_id", user.id).eq("source", "workout").eq("note", id);
   if (burn.error) console.error("[deleteWorkout] burn row delete failed", { id, error: burn.error });
   const { error } = await supabase.from("workouts").delete().eq("id", id).eq("user_id", user.id);
+  if (!error) await supabase.from("group_posts").delete().eq("user_id", user.id).eq("ref_id", id);
   if (error) {
     console.error("[deleteWorkout] failed", { id, error });
     return { ok: false, error: `Couldn't delete the workout: ${describe(error)}` };
@@ -284,6 +288,7 @@ export async function saveMeal(input: { date: string; raw_text: string; items: M
     if (e2) throw new Error(e2.message);
   }
   await rollupQuietly(supabase, user.id, [input.date]);
+  await postMealToSquads(supabase, user.id, meal.id as string, mealPostBody(items, input.raw_text), input.photo_path ?? null);
   revalidatePath("/", "layout");
 }
 
@@ -292,6 +297,7 @@ export async function deleteMeal(id: string) {
   const date = (await supabase.from("meals").select("date").eq("id", id).maybeSingle()).data?.date as string | undefined;
   const { error } = await supabase.from("meals").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw new Error(error.message);
+  await supabase.from("group_posts").delete().eq("user_id", user.id).eq("ref_id", id);
   await rollupQuietly(supabase, user.id, date ? [date] : []);
   revalidatePath("/", "layout");
 }
@@ -323,6 +329,10 @@ const PROFILE_KEYS: (keyof Profile)[] = [
   "rollover_calories",
   "water_goal_ml",
   "units",
+  "water_glass_ml",
+  "water_reminder_from",
+  "water_reminder_to",
+  "water_reminder_every_min",
 ];
 
 /** Upserts the given profile columns for the signed-in user (a partial patch is fine). */
@@ -331,6 +341,10 @@ export async function saveProfile(patch: Partial<Profile>) {
   const row: Record<string, unknown> = { id: user.id };
   for (const k of PROFILE_KEYS) if (k in patch) row[k] = patch[k];
   if (typeof row.name === "string") row.name = row.name.trim().slice(0, 40);
+  if ("water_reminder_every_min" in row && ![0, 30, 60, 120, 180, 240].includes(Number(row.water_reminder_every_min))) throw new Error("Pick a reminder interval from the list");
+  for (const k of ["water_reminder_from", "water_reminder_to"] as const) if (k in row && !/^\d{2}:\d{2}$/.test(String(row[k]))) throw new Error("Pick a valid time");
+  if ("water_glass_ml" in row) row.water_glass_ml = Math.max(50, Math.min(2000, Math.round(Number(row.water_glass_ml) || 250)));
+  if ("water_goal_ml" in row) row.water_goal_ml = Math.max(250, Math.min(10000, Math.round(Number(row.water_goal_ml) || 2500)));
   const { error } = await supabase.from("profiles").upsert(row);
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
@@ -545,15 +559,29 @@ export async function nudgeMember(groupId: string, toUser: string) {
 
 // ---- v2.3: water ----
 
-/** Log a glass / bottle of water for `date` (defaults to today, IST). */
-export async function logWater(ml: number, date?: string) {
+/** Log a glass / bottle of water for `date` (defaults to today, IST). One row per tap; returns it. */
+export async function logWater(ml: number, date?: string, vessel?: WaterVessel | null): Promise<WaterEntry> {
   const { supabase, user } = await userOrThrow();
   const amount = Math.round(Number(ml));
   if (!Number.isFinite(amount) || amount <= 0 || amount > 5000) throw new Error("Enter between 1 and 5000 mL");
   const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayIso();
-  const { error } = await supabase.from("water_log").insert({ user_id: user.id, date: day, ml: amount });
+  const v = vessel && ["glass", "bottle", "large", "custom"].includes(vessel) ? vessel : null;
+  const { data, error } = await supabase.from("water_log").insert({ user_id: user.id, date: day, ml: amount, vessel: v }).select("id, date, ml, created_at, vessel").single();
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
+  return { id: data.id as string, date: data.date as string, ml: Number(data.ml), created_at: data.created_at as string, vessel: (data.vessel as WaterVessel | null) ?? null };
+}
+
+/** The water page's −: removes the latest row logged for `date` (an undo). Returns its id, or null. */
+export async function undoLastWater(date?: string): Promise<string | null> {
+  const { supabase, user } = await userOrThrow();
+  const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayIso();
+  const { data } = await supabase.from("water_log").select("id").eq("user_id", user.id).eq("date", day).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (!data?.id) return null;
+  const { error } = await supabase.from("water_log").delete().eq("id", data.id).eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/", "layout");
+  return data.id as string;
 }
 
 export async function deleteWater(id: string) {
@@ -608,4 +636,197 @@ export async function joinPublicSquad(groupId: string): Promise<string> {
   if (error) throw new Error(error.message);
   revalidatePath("/squad");
   return groupId;
+}
+
+// ---- v2.6: squad feed auto-posts ----
+
+type Sb = Awaited<ReturnType<typeof createClient>>;
+
+/** Is the user in any squad and sharing more than streaks? (No squads → no posts, no photo copies.) */
+async function postsWanted(supabase: Sb, userId: string) {
+  const [{ data: member }, { data: prof }] = await Promise.all([
+    supabase.from("group_members").select("group_id").eq("user_id", userId).limit(1),
+    supabase.from("profiles").select("share_stats").eq("id", userId).maybeSingle(),
+  ]);
+  return !!member?.length && prof?.share_stats !== false;
+}
+
+/** "Ayaan logged Dal + 2 roti · 420 kcal" on every squad; the plate photo is copied into group-photos. Never throws. */
+async function postMealToSquads(supabase: Sb, userId: string, mealId: string, body: string, photoPath: string | null) {
+  try {
+    if (!(await postsWanted(supabase, userId))) return;
+    let groupPhoto: string | null = null;
+    if (photoPath) {
+      const dest = `${userId}/meal-${mealId}.jpg`;
+      const copy = await supabase.storage.from("meal-photos").copy(photoPath, dest, { destinationBucket: "group-photos" });
+      if (copy.error) console.error("[postMealToSquads] photo copy failed", copy.error);
+      else groupPhoto = dest;
+    }
+    const { error } = await supabase.rpc("post_to_my_groups", { p_kind: "meal", p_body: body, p_ref: mealId, p_photo: groupPhoto });
+    if (error) console.error("[postMealToSquads]", error);
+  } catch (e) {
+    console.error("[postMealToSquads] threw", e);
+  }
+}
+
+/** "Gym · 5 exercises · 42 min", plus a PR post when a lift beats every earlier session. Never throws. */
+async function postWorkoutToSquads(supabase: Sb, userId: string, workoutId: string, kind: WorkoutKind, exercises: WorkoutExercise[] | null, muscles: string[], minutes: number | null) {
+  try {
+    if (!(await postsWanted(supabase, userId))) return;
+    const { error } = await supabase.rpc("post_to_my_groups", { p_kind: "workout", p_body: workoutPostBody(kind, exercises, muscles, minutes), p_ref: workoutId, p_photo: null });
+    if (error) console.error("[postWorkoutToSquads]", error);
+    if (kind !== "gym" || !exercises?.length) return;
+    const { data: prev } = await supabase.from("workouts").select("exercises_json").eq("user_id", userId).eq("kind", "gym").neq("id", workoutId).order("date", { ascending: false }).limit(200);
+    const pr = prPostBody(exercises, (prev ?? []).map((r) => (r.exercises_json as WorkoutExercise[] | null) ?? null));
+    if (pr) {
+      const res = await supabase.rpc("post_to_my_groups", { p_kind: "pr", p_body: pr, p_ref: workoutId, p_photo: null });
+      if (res.error) console.error("[postWorkoutToSquads] pr", res.error);
+    }
+  } catch (e) {
+    console.error("[postWorkoutToSquads] threw", e);
+  }
+}
+
+// ---- v2.6: usernames ----
+
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
+export async function checkUsername(u: string): Promise<boolean> {
+  const { supabase } = await userOrThrow();
+  const clean = u.trim().toLowerCase();
+  if (!USERNAME_RE.test(clean)) return false;
+  const { data, error } = await supabase.rpc("username_available", { u: clean });
+  if (error) throw new Error(error.message);
+  return data === true;
+}
+
+export async function saveUsername(u: string): Promise<ActionResult> {
+  const { supabase, user } = await userOrThrow();
+  const clean = u.trim().toLowerCase();
+  if (!USERNAME_RE.test(clean)) return { ok: false, error: "3–20 characters: letters, numbers and _ only" };
+  const { error } = await supabase.from("profiles").update({ username: clean }).eq("id", user.id);
+  if (error) return { ok: false, error: error.code === "23505" ? "That username was just taken — try another" : describe(error) };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+// ---- v2.6: squads v2 ----
+
+/** Create flow: name + description + icon + public/private, then the new columns on the fresh row. */
+export async function createSquadV2(input: { name: string; description: string; icon: string | null; isPublic: boolean; coverUrl?: string | null }): Promise<{ id: string; code: string }> {
+  const { supabase, user } = await userOrThrow();
+  const clean = input.name.trim().slice(0, 40);
+  if (!clean) throw new Error("Give the squad a name");
+  const { data, error } = await supabase.rpc("create_group", { p_name: clean, p_display: await myDisplayName(supabase, user) });
+  if (error) throw new Error(error.message);
+  const row = (Array.isArray(data) ? data[0] : data) as { id: string; code: string } | null;
+  if (!row) throw new Error("Could not create the squad");
+  const { error: e2 } = await supabase
+    .from("groups")
+    .update({
+      description: input.description.trim().slice(0, 200) || null,
+      icon: input.icon,
+      cover_url: input.coverUrl ?? null,
+      is_public: input.isPublic,
+      join_policy: input.isPublic ? "open" : "request",
+      tagline: input.description.trim().slice(0, 80) || null,
+    })
+    .eq("id", row.id)
+    .eq("owner_id", user.id);
+  if (e2) console.error("[createSquadV2] details update failed", e2);
+  revalidatePath("/squad");
+  return row;
+}
+
+/** Owner only: edit name / description / icon / public-private. */
+export async function updateSquad(groupId: string, patch: { name?: string; description?: string; icon?: string | null; coverUrl?: string | null; isPublic?: boolean }) {
+  const { supabase, user } = await userOrThrow();
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) {
+    const n = patch.name.trim().slice(0, 40);
+    if (!n) throw new Error("Give the squad a name");
+    row.name = n;
+  }
+  if (patch.description !== undefined) {
+    row.description = patch.description.trim().slice(0, 200) || null;
+    row.tagline = patch.description.trim().slice(0, 80) || null;
+  }
+  if (patch.icon !== undefined) row.icon = patch.icon;
+  if (patch.coverUrl !== undefined) row.cover_url = patch.coverUrl;
+  if (patch.isPublic !== undefined) {
+    row.is_public = patch.isPublic;
+    row.join_policy = patch.isPublic ? "open" : "request";
+  }
+  const { data, error } = await supabase.from("groups").update(row).eq("id", groupId).eq("owner_id", user.id).select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("Only the owner can change this squad");
+  revalidatePath("/squad", "layout");
+}
+
+/** Join an open squad now, or ask to join a private one: "member" | "joined" | "requested". */
+export async function requestJoin(groupId: string): Promise<"member" | "joined" | "requested"> {
+  const { supabase } = await userOrThrow();
+  const { data, error } = await supabase.rpc("request_join", { g: groupId });
+  if (error) throw new Error(error.message);
+  revalidatePath("/squad", "layout");
+  return (data as "member" | "joined" | "requested") ?? "requested";
+}
+
+export async function approveJoin(requestId: string) {
+  const { supabase } = await userOrThrow();
+  const { error } = await supabase.rpc("approve_join", { req: requestId });
+  if (error) throw new Error(error.message);
+  revalidatePath("/squad", "layout");
+}
+
+export async function declineJoin(requestId: string) {
+  const { supabase } = await userOrThrow();
+  const { error } = await supabase.rpc("decline_join", { req: requestId });
+  if (error) throw new Error(error.message);
+  revalidatePath("/squad", "layout");
+}
+
+/** Chat (kinds = ["message"]) or Feed (the rest), newest first — the 5 s poll. */
+export async function loadSquadPosts(groupId: string, kinds: string[] | null, before: string | null = null): Promise<SquadPost[]> {
+  const { supabase } = await userOrThrow();
+  return fetchSquadPosts(supabase, groupId, kinds, before);
+}
+
+export async function sendSquadMessage(groupId: string, body: string): Promise<ActionResult> {
+  const { supabase, user } = await userOrThrow();
+  const text = body.trim().slice(0, 1000);
+  if (!text) return { ok: false, error: "Type a message first" };
+  const { data, error } = await supabase.from("group_posts").insert({ group_id: groupId, user_id: user.id, kind: "message", body: text }).select("id").single();
+  if (error) return { ok: false, error: describe(error) };
+  return { ok: true, id: data.id as string };
+}
+
+/** A photo post (<= 1280 px JPEG as bare base64) to one squad's feed, with an optional caption. */
+export async function postSquadPhoto(groupId: string, base64: string, caption: string): Promise<ActionResult> {
+  const { supabase, user } = await userOrThrow();
+  const bytes = Buffer.from(base64 || "", "base64");
+  if (bytes.length < 100) return { ok: false, error: "That photo looks empty — try another one." };
+  if (bytes.length > 3_000_000) return { ok: false, error: "That photo is too large." };
+  const path = `${user.id}/${groupId}-${Date.now()}.jpg`;
+  const up = await supabase.storage.from("group-photos").upload(path, bytes, { contentType: "image/jpeg", upsert: false });
+  if (up.error) return { ok: false, error: `Couldn't upload the photo: ${up.error.message}` };
+  const { error } = await supabase.from("group_posts").insert({ group_id: groupId, user_id: user.id, kind: "photo", body: caption.trim().slice(0, 300), photo_path: path });
+  if (error) {
+    await supabase.storage.from("group-photos").remove([path]);
+    return { ok: false, error: describe(error) };
+  }
+  return { ok: true };
+}
+
+export async function deleteSquadPost(id: string) {
+  const { supabase } = await userOrThrow();
+  const { error } = await supabase.from("group_posts").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function loadLeaderboard(groupId: string): Promise<LeaderRow[]> {
+  const { supabase } = await userOrThrow();
+  const { data, error } = await supabase.rpc("group_leaderboard", { g: groupId });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as LeaderRow[]).map((r) => ({ ...r, rank: Number(r.rank), flames: Number(r.flames ?? 0), week_points: Number(r.week_points ?? 0) }));
 }
