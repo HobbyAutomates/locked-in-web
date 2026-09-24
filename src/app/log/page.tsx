@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function LogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; mode?: string; workout?: string }>;
+  searchParams: Promise<{ date?: string; mode?: string; workout?: string; prefill?: string }>;
 }) {
   const { user } = await requireUser();
   if (!user) redirect("/login");
@@ -29,13 +29,14 @@ export default async function LogPage({
       existing={existing}
       last={last}
       date={existing?.date ?? sp.date ?? todayIso()}
-      startOnMeal={sp.mode === "meal"}
+      startOnMeal={sp.mode === "meal" || sp.prefill === "1"}
       startOnExercise={sp.mode === "exercise"}
       savedMeals={savedMeals}
       presets={presets}
       usage={usage}
       profile={profile}
       recentExercises={recentExercises}
+      prefill={sp.prefill === "1"}
     />
   );
 }

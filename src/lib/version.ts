@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.3";
+export const APP_VERSION = "2.4";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.4",
+    date: "2026-09-24",
+    lines: [
+      "Real food pictures everywhere: presets, search, your plate, meals on Home and Calendar, repeat meals and scan history — dal khichdi looks like dal khichdi, and branded food shows its own pack.",
+      "Scanning has its own tab and the bottom bar is down to five: Home, Squad, Scan, Progress, Profile. Calendar is the button at the top of Home. From a scan, Add to plate opens the meal with it already on.",
+      "Preferences are grouped: Appearance, Tracking (water and step goals, calorie rules, scan lens, kg or lb), Reminders, Privacy and Account.",
+    ],
+  },
   {
     version: "2.3",
     date: "2026-09-24",

@@ -21,6 +21,7 @@ export default function LogScreen({
   usage = {},
   profile,
   recentExercises = [],
+  prefill = false,
 }: {
   existing: Workout | null;
   /** The most recent workout, for "Same as last time" on a new one. */
@@ -34,6 +35,8 @@ export default function LogScreen({
   profile: Profile;
   /** v2.3: the last ~60 days of exercise rows, for the Exercise form's Recent row. */
   recentExercises?: ExerciseEntry[];
+  /** v2.4: opened from a scan's "Add to plate" — the Meal form starts with those items. */
+  prefill?: boolean;
 }) {
   const router = useRouter();
   const [seg, setSeg] = useState(startOnExercise ? 2 : startOnMeal ? 1 : 0);
@@ -62,7 +65,7 @@ export default function LogScreen({
       {existing || seg === 0 ? (
         <WorkoutForm existing={existing} last={existing ? null : last} initialDate={date} target={profile.weekly_workout_target} onClose={close} />
       ) : seg === 1 ? (
-        <MealForm date={date} savedMeals={savedMeals} presets={presets} usage={usage} onClose={close} />
+        <MealForm date={date} savedMeals={savedMeals} presets={presets} usage={usage} onClose={close} prefill={prefill} />
       ) : (
         <ExerciseForm date={date} weightKg={profile.weight_kg ?? null} onClose={close} recent={recentActivities(recentExercises, profile.weight_kg ?? null)} />
       )}

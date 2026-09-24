@@ -41,7 +41,7 @@ export default function RemindersScreen({ profile }: { profile: Profile }) {
   }
 
   return (
-    <SubPage title="Tracking reminders" back="/profile">
+    <SubPage title="Tracking reminders" back="/profile/preferences">
       <Rise index={0}>
         <p className="text-[13px] leading-[18px] muted">A quiet nudge at each meal so nothing goes unlogged. Tap a time to change it.</p>
       </Rise>

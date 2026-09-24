@@ -6,10 +6,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { deleteScan, saveMeal } from "@/lib/actions";
 import { today } from "@/lib/dates";
 import { decodeBarcode, makeThumb, postJson, toJpegBase64 } from "@/lib/image";
-import { mealItemFromPlate, type QuantityFood } from "@/lib/quantity";
+import { mealItemFromPlate, priceItem, type QuantityFood } from "@/lib/quantity";
 import { initialLens, type Fit, type LabelReport, type Lens, type MealItem, type PlateEstimate, type PlateItem, type Profile, type ScanHistoryItem } from "@/lib/types";
 import { Alert, Barcode, Camera, Check, ChevronDown, Close, Scan, Spinner, Spoon, Tag, Trash } from "./icons";
 import QuantitySheet from "./QuantitySheet";
+import FoodImage from "./FoodImage";
+import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
 import { Card, ErrorNote, Hair, MacroDot, PillButton, Ring, Rise, SPRING, fmt } from "./ui";
 
 const LENSES: { key: Lens; label: string }[] = [
@@ -286,6 +288,16 @@ const PER_100 = [
 ] as const;
 
 /** The scan report as a food the Quantity sheet can price: per-100 g from the label, one serving = serving_g. */
+/** v2.4 "Add to plate": hand the items to the meal flow (sessionStorage) and open it pre-filled. */
+function openOnPlate(router: ReturnType<typeof useRouter>, prefill: PlatePrefill) {
+  try {
+    sessionStorage.setItem(PLATE_PREFILL_KEY, JSON.stringify(prefill));
+  } catch {
+    // private mode: the meal flow simply opens empty
+  }
+  router.push(`/log?date=${today()}&mode=meal&prefill=1`);
+}
+
 function reportFood(r: LabelReport): QuantityFood | null {
   const p = r.per_100g ?? {};
   if (p.calories == null && p.protein_g == null) return null;
@@ -445,6 +457,18 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
       {food ? (
         <Rise index={3}>
           <PillButton onClick={() => setLogFood(food)}>Log 1 serving{r.serving_g ? ` · ${Math.round(r.serving_g)} g` : ""}</PillButton>
+          <PillButton
+            soft
+            height={46}
+            className="mt-2"
+            onClick={() => {
+              const serving = food.servings[0];
+              const item = priceItem(food, serving ? { unit: "serving", value: 1 } : { unit: "g", value: 100 });
+              openOnPlate(router, { items: [{ ...item, image_url: r.image_url ?? null }], label: `${r.product || "Scanned product"} (scan)`, kind: "product" });
+            }}
+          >
+            Add to plate with other food
+          </PillButton>
           {logged ? (
             <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-semibold" style={{ color: "var(--green)" }}>
               <Check size={14} />
@@ -882,6 +906,14 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
               {saving ? <Spinner size={18} /> : "Save as meal"}
             </PillButton>
           </div>
+          <button
+            type="button"
+            className="hit press mt-1 w-full py-2 text-center text-[13px] font-semibold muted"
+            disabled={!items.length}
+            onClick={() => openOnPlate(router, { items: items.map(mealItemFromPlate), label: plate.plate_note || "Plate photo", photo_path: plate.photo_path ?? null })}
+          >
+            Add to plate to change or add food
+          </button>
         </Rise>
       ) : null}
     </>
@@ -966,11 +998,14 @@ function HistoryThumb({ item }: { item: ScanHistoryItem }) {
       <img src={item.image_url} alt="" loading="lazy" onError={() => setBroken(true)} className="h-11 w-11 shrink-0 rounded-[12px] object-cover" style={{ background: "var(--card2)" }} />
     );
   }
-  return (
+  const icon = (
     <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: "var(--card2)", color: "var(--muted)" }} aria-hidden="true">
       {item.kind === "photo" ? <Camera size={20} /> : item.kind === "barcode" ? <Barcode size={20} /> : <Tag size={20} />}
     </span>
   );
+  // v2.4: a named product without its own photo gets the pack shot from the food-image service.
+  if (item.kind !== "photo" && item.product.trim()) return <FoodImage name={item.product} kind="product" size={44} fallback={icon} />;
+  return icon;
 }
 
 /** A stored scan, rendered read-only with the same views. */

@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { Bowl, CalendarIcon, Chart, Dumbbell, Glass, Home, People, Person, Plus, Run, Scale, Scan } from "./icons";
+import { Bowl, Chart, Dumbbell, Glass, Home, People, Person, Plus, Run, Scale, ScanFilled } from "./icons";
 import LogWaterSheet from "./LogWaterSheet";
 import { today } from "@/lib/dates";
 
+/** v2.4: five tabs. Calendar moved to a button in the Home header (the /calendar route stays). */
 const TABS = [
   { href: "/", label: "Home", Icon: Home },
   { href: "/squad", label: "Squad", Icon: People },
-  { href: "/calendar", label: "Calendar", Icon: CalendarIcon },
-  { href: "/scan", label: "Scan", Icon: Scan },
+  { href: "/scan", label: "Scan", Icon: ScanFilled },
   { href: "/progress", label: "Progress", Icon: Chart },
   { href: "/profile", label: "Profile", Icon: Person },
 ];
@@ -119,7 +119,8 @@ export default function BottomNav() {
             style={{ paddingRight: 76, paddingBottom: "calc(6px + env(safe-area-inset-bottom, 0px))" }}
           >
             {TABS.map(({ href, label, Icon }) => {
-              const active = href === "/" ? path === "/" : path.startsWith(href);
+              // Calendar is reached from Home, so Home stays lit there.
+              const active = href === "/" ? path === "/" || path.startsWith("/calendar") : path.startsWith(href);
               return (
                 <Link
                   key={href}

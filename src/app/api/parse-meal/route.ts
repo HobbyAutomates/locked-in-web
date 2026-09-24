@@ -1,8 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { apiUser } from "@/lib/apiAuth";
 import { chunksOf, describeHit, hasDevanagari, hindiToLatin, microsFor, searchFoods, type FoodHit } from "@/lib/foodSearch";
 import { matchFood } from "@/lib/foods";
+import { foodKey } from "@/lib/foodKey";
+import { cachedFoodImages, resolveFoodImage } from "@/lib/foodImage";
 import type { ParseResult, ParsedItem } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -139,7 +141,7 @@ function localHit(name: string): FoodHit | null {
 }
 
 export async function POST(req: Request) {
-  const { user } = await apiUser(req);
+  const { user, admin } = await apiUser(req);
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const { text, correction, previous } = (await req.json()) as { text?: string; correction?: string; previous?: unknown };
@@ -198,6 +200,17 @@ export async function POST(req: Request) {
     }
     items.push(priced(it, food));
   }
+
+  // v2.4: pictures from the shared cache so the plate shows photos with no extra round trip; the
+  // first few foods nobody has pictured yet are looked up after the response, for next time.
+  const imgs = await cachedFoodImages(admin, items.map((i) => i.name)).catch(() => new Map<string, string>());
+  const unpictured: string[] = [];
+  for (const it of items) {
+    const u = imgs.get(foodKey(it.name));
+    if (u) it.image_url = u;
+    else if (!unpictured.includes(it.name)) unpictured.push(it.name);
+  }
+  if (unpictured.length) after(() => Promise.all(unpictured.slice(0, 4).map((n) => resolveFoodImage(n, { admin }).catch(() => null))).then(() => undefined));
 
   const result: ParseResult = { items, assumptions: raw.assumptions ?? [], unparsed: raw.unparsed ?? [] };
   return NextResponse.json(result);

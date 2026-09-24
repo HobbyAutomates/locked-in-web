@@ -33,7 +33,7 @@ export default function BadgesScreen({ progress }: { progress: BadgeProgress }) 
   }
 
   return (
-    <SubPage title="Badges" back="/progress">
+    <SubPage title="Badges">
       <Rise index={0}>
         <Card padding={20}>
           <div className="flex items-center gap-4">

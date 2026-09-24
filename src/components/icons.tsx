@@ -72,6 +72,23 @@ export function Scan(p: P) {
   );
 }
 
+/** v2.4 Scan tab: a filled tile with the viewfinder knocked out, so it reads apart from the line icons. */
+export function ScanFilled({ size = 24, className, style }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" className={className} style={style}>
+      <rect x="2" y="2" width="20" height="20" rx="6.5" fill="currentColor" />
+      <path
+        d="M7 10V8.5A1.5 1.5 0 0 1 8.5 7H10M14 7h1.5A1.5 1.5 0 0 1 17 8.5V10M17 14v1.5a1.5 1.5 0 0 1-1.5 1.5H14M10 17H8.5A1.5 1.5 0 0 1 7 15.5V14M9 12h6"
+        fill="none"
+        stroke="var(--card)"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ThumbUp(p: P) {
   return (
     <Stroke {...p}>

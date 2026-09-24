@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { deleteWeight, logWeight } from "@/lib/actions";
 import { daysBetween, parseIso, shortDate, today as todayIso } from "@/lib/dates";
 import type { Profile, WeightEntry } from "@/lib/types";
+import { weightText } from "@/lib/display";
 import SubPage from "./SubPage";
 import { Plus, Scale, Trash } from "./icons";
 import { Card, ErrorNote, Hair, IconTile, NumberField, PillButton, Rise, fmt } from "./ui";
@@ -32,6 +33,8 @@ export default function WeightHistoryScreen({ profile, weights, openLog = false 
   const delta = latest != null && first ? latest - first.weight_kg : null;
   const tint = (d: number) => (d > 0.05 ? "var(--green)" : d < -0.05 ? "var(--blue)" : "var(--muted)");
   const signed = (d: number) => `${d > 0 ? "+" : ""}${fmt(Math.round(d * 10) / 10)}`;
+  // v2.4: shown in the Preferences → Weight units (stored in kg).
+  const signedWeight = (d: number) => `${d > 0 ? "+" : d < 0 ? "−" : ""}${weightText(Math.abs(d), profile.units)}`;
 
   async function remove(id: string) {
     setDeleting(id);
@@ -52,14 +55,14 @@ export default function WeightHistoryScreen({ profile, weights, openLog = false 
         <Card padding={20}>
           <p className="text-[13px] font-medium muted">Current weight</p>
           <p className="num mt-1.5 text-[44px] font-extrabold leading-[46px]" style={{ letterSpacing: "-0.04em" }}>
-            {latest != null ? `${fmt(latest)} kg` : "—"}
+            {weightText(latest, profile.units)}
           </p>
           {delta != null && first ? (
             <p className="text-sm font-semibold" style={{ color: tint(delta) }}>
-              {signed(delta)} kg since {monthYear(first.date)}
+              {signedWeight(delta)} since {monthYear(first.date)}
             </p>
           ) : null}
-          {profile.goal_weight_kg != null ? <p className="mt-0.5 text-xs muted">Goal {fmt(profile.goal_weight_kg)} kg</p> : null}
+          {profile.goal_weight_kg != null ? <p className="mt-0.5 text-xs muted">Goal {weightText(profile.goal_weight_kg, profile.units)}</p> : null}
         </Card>
       </Rise>
       <Rise index={1}>
@@ -88,7 +91,7 @@ export default function WeightHistoryScreen({ profile, weights, openLog = false 
                         <Scale size={22} />
                       </IconTile>
                       <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="num text-base font-bold">{fmt(r.weight_kg)} kg</span>
+                        <span className="num text-base font-bold">{weightText(r.weight_kg, profile.units)}</span>
                         <span className="truncate text-xs muted">
                           {relative(r.date)}
                           {r.note ? ` · ${r.note}` : ""}

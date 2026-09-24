@@ -281,6 +281,7 @@ const PROFILE_KEYS: (keyof Profile)[] = [
   "add_burned_to_goal",
   "rollover_calories",
   "water_goal_ml",
+  "units",
 ];
 
 /** Upserts the given profile columns for the signed-in user (a partial patch is fine). */
@@ -338,7 +339,7 @@ export async function listSavedMeals(): Promise<SavedMeal[]> {
   const { supabase, user } = await userOrThrow();
   const { data, error } = await supabase
     .from("saved_meals")
-    .select("id, name, items, calories, protein_g")
+    .select("id, name, items, calories, protein_g, image_url")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
@@ -348,6 +349,7 @@ export async function listSavedMeals(): Promise<SavedMeal[]> {
     items: ((r.items ?? []) as MealItem[]),
     calories: Number(r.calories ?? 0),
     protein_g: Number(r.protein_g ?? 0),
+    image_url: (r.image_url as string | null) ?? null,
   }));
 }
 

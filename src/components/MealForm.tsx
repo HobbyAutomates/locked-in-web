@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { createSavedMeal, saveMeal, searchFoodsForPicker } from "@/lib/actions";
-import { postJson, toJpegBase64, makeThumb } from "@/lib/image";
+import { postJson } from "@/lib/image";
 import { looksLikeSentence } from "@/lib/mealText";
-import { applyRestaurant, foodFromItem, mealItemFromPlate, priceItem, restaurantOil, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
+import { applyRestaurant, foodFromItem, priceItem, restaurantOil, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
 import { useDictation } from "@/lib/speech";
-import type { FoodPreset, FoodSearchHit, MealItem, ParseResult, PlateEstimate, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
-import { Camera, Close, Drop, Mic, Search, Spinner } from "./icons";
+import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
+import type { FoodPreset, FoodSearchHit, MealItem, ParseResult, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
+import { Close, Drop, Mic, Search, Spinner } from "./icons";
+import FoodImage, { FoodFallback, type FoodImageKind } from "./FoodImage";
 import QuantitySheet from "./QuantitySheet";
 import { saveWhenReady, type PlateJob } from "./PendingMeals";
 import { BottomSheet, ErrorNote, Hair, MacroDot, PillButton, fmt } from "./ui";
@@ -29,8 +31,11 @@ type Cat = PresetCategory | "yours";
 
 const SOURCE_LABEL: Record<string, string> = { dish: "INDB", ifct: "IFCT", usda: "USDA", custom: "Curated", off: "OFF" };
 
-/** One plate row: the priced item plus the serving sizes it came with (so the Quantity sheet can offer them again). */
-type Row = { key: number; item: MealItem; servings?: PresetServing[]; servingLabel?: string | null; category?: string | null };
+/**
+ * One plate row: the priced item plus the serving sizes it came with (so the Quantity sheet can
+ * offer them again). v2.4: `image` / `imageKind` are the row's picture (display only).
+ */
+type Row = { key: number; item: MealItem; servings?: PresetServing[]; servingLabel?: string | null; category?: string | null; image?: string | null; imageKind?: FoodImageKind };
 type Job = { id: number; kind: "parse" | "photo"; label: string };
 
 async function parseMeal(text: string, correction?: string, previous?: MealItem[]): Promise<ParseResult> {
@@ -86,8 +91,8 @@ function qtyText(r: Row): string {
 }
 
 /**
- * Add food — one screen. A search bar (type, or tap the mic and say it), a camera button, the
- * preset grid underneath, and the plate as a sticky panel at the bottom. Tapping a preset or a
+ * Add food — one screen. A search bar (type, or tap the mic and say it — v2.4: scanning lives only
+ * in the Scan tab), the preset grid underneath, and the plate as a sticky panel at the bottom. Tapping a preset or a
  * search hit adds it at its default serving; amounts are changed on the plate row. A sentence
  * ("2 roti, ek katori dal") gets a "Work it out" button that parses and appends. Saving while a
  * parse or photo is still running closes the form and finishes the save in the background.
@@ -99,6 +104,7 @@ export default function MealForm({
   usage,
   onClose,
   search = searchFoodsForPicker,
+  prefill = false,
 }: {
   date: string;
   savedMeals: SavedMeal[];
@@ -107,6 +113,8 @@ export default function MealForm({
   usage: Record<string, number>;
   onClose: () => void;
   search?: (q: string, limit?: number) => Promise<FoodSearchHit[]>;
+  /** Opened from a scan's "Add to plate": start with those items on the plate. */
+  prefill?: boolean;
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -129,7 +137,6 @@ export default function MealForm({
   const tapped = useRef<string[]>([]);
   const promises = useRef(new Map<number, Promise<PlateJob>>());
   const handedOff = useRef(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const barRef = useRef<HTMLInputElement>(null);
 
   const items = rows.map((r) => r.item);
@@ -146,6 +153,24 @@ export default function MealForm({
     return () => clearTimeout(t);
   }, [toast]);
 
+  // Scan → "Add to plate": the report's serving (or the plate's items) arrive on the plate.
+  useEffect(() => {
+    if (!prefill) return;
+    let data: PlatePrefill | null = null;
+    try {
+      data = JSON.parse(sessionStorage.getItem(PLATE_PREFILL_KEY) || "null") as PlatePrefill | null;
+      sessionStorage.removeItem(PLATE_PREFILL_KEY);
+    } catch {
+      data = null;
+    }
+    if (!data?.items?.length) return;
+    const d = data;
+    // Hydrating from storage once on mount is the point of this effect.
+    setRows((cur) => [...cur, ...d.items.map((item) => ({ item, key: seq.current++, image: item.image_url ?? null, imageKind: d.kind ?? "generic" }))]);
+    if (d.photo_path) setPhotoPath(d.photo_path);
+    tapped.current.push(d.label);
+  }, [prefill]);
+
   function addRows(next: Omit<Row, "key">[]) {
     setRows((cur) => [...cur, ...next.map((r) => ({ ...r, key: seq.current++ }))]);
     setError(null);
@@ -156,17 +181,17 @@ export default function MealForm({
   }
 
   /** Tap = on the plate at the default serving (a Restaurant preset as a restaurant portion). */
-  function addFood(f: QuantityFood, restaurant = false) {
+  function addFood(f: QuantityFood, restaurant = false, image: { src?: string | null; kind?: FoodImageKind } = {}) {
     const d = defaultOf(f);
     const base = priceItem(f, d.q);
     const item = restaurant ? applyRestaurant(base, restaurantOil(f.name, f.category)) : base;
-    addRows([{ item, servings: f.servings, servingLabel: d.label, category: f.category ?? null }]);
+    addRows([{ item, servings: f.servings, servingLabel: d.label, category: f.category ?? null, image: image.src ?? null, imageKind: image.kind ?? "generic" }]);
     tapped.current.push(f.name);
     say(`Added · ${d.label ?? "100 g"}${restaurant ? " · restaurant" : ""} · ${Math.round(item.calories)} kcal`);
   }
 
   function addSaved(sm: SavedMeal) {
-    addRows(sm.items.map((item) => ({ item })));
+    addRows(sm.items.map((item) => ({ item, image: item.image_url ?? null })));
     tapped.current.push(sm.name);
     say(`Added ${sm.name} · ${Math.round(sm.calories)} kcal`);
   }
@@ -177,7 +202,7 @@ export default function MealForm({
     setJobs((j) => [...j, { id, kind, label }]);
     p.then((r) => {
       if (handedOff.current) return;
-      addRows(r.items.map((item) => ({ item })));
+      addRows(r.items.map((item) => ({ item, image: item.image_url ?? null })));
       if (r.notes?.length) setNotes((n) => [...n, ...(r.notes ?? [])]);
       if (r.photo_path) setPhotoPath((pp) => pp ?? r.photo_path ?? null);
     })
@@ -210,25 +235,6 @@ export default function MealForm({
     else setText(next);
   });
 
-  async function onPhoto(file: File | undefined) {
-    if (!file) return;
-    setError(null);
-    try {
-      const [out, thumb] = await Promise.all([toJpegBase64(file, 1600, 0.85), makeThumb(file)]);
-      startJob(
-        "photo",
-        "Plate photo",
-        postJson<PlateEstimate>("/api/photo-meal", { image: out.base64, media_type: out.media_type, thumb: thumb ?? undefined }).then((p) => ({
-          items: p.items.map(mealItemFromPlate),
-          photo_path: p.photo_path ?? null,
-          notes: p.items.length ? p.notes : [p.plate_note || "Couldn't find food in that photo."],
-        })),
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not read that photo");
-    }
-  }
-
   async function save() {
     const raw = [...rawParts, ...tapped.current].join(", ") || items.map((i) => i.name).join(", ") || "Meal";
     if (promises.current.size) {
@@ -254,7 +260,7 @@ export default function MealForm({
     setError(null);
     try {
       const r = await parseMeal(rawParts.join(", ") || items.map((i) => i.name).join(", "), fixText, items);
-      setRows(plain(r.items).map((item) => ({ item, key: seq.current++ })));
+      setRows(plain(r.items).map((item) => ({ item, key: seq.current++, image: item.image_url ?? null })));
       setNotes([...r.assumptions, ...r.unparsed.map((u) => `Ignored: ${u}`)]);
       setFixText("");
       setFixOpen(false);
@@ -341,16 +347,6 @@ export default function MealForm({
               <Mic size={18} className={dictation.listening ? "flame-breathe" : undefined} />
             </button>
           </div>
-          <input ref={fileRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => { void onPhoto(e.target.files?.[0]); e.target.value = ""; }} />
-          <button
-            type="button"
-            aria-label="Photograph your plate"
-            onClick={() => fileRef.current?.click()}
-            className="press grid h-11 w-11 shrink-0 place-items-center rounded-full"
-            style={{ background: "var(--btn)", color: "var(--btn-ink)", boxShadow: "var(--shadow-sm)" }}
-          >
-            <Camera size={20} />
-          </button>
         </div>
         {dictation.listening ? <p className="-mt-1 px-1 text-xs muted">Listening in {dictation.lang === "hi-IN" ? "Hindi" : "English"}… tap the mic to stop.</p> : null}
         {dictation.error ? <p className="-mt-1 px-1 text-xs" style={{ color: "var(--orange)" }}>{dictation.error}</p> : null}
@@ -364,9 +360,9 @@ export default function MealForm({
         <ErrorNote text={error} />
 
         {typing ? (
-          <SearchResults key="results" query={text} search={search} sentence={sentence} onPick={(h) => addFood(hitFood(h))} onWorkItOut={() => workItOut(text)} />
+          <SearchResults key="results" query={text} search={search} sentence={sentence} onPick={(h) => addFood(hitFood(h), false, { src: h.image_url ?? null, kind: h.source === "off" ? "product" : "generic" })} onWorkItOut={() => workItOut(text)} />
         ) : (
-          <PresetGrid presets={presets} savedMeals={savedMeals} usage={usage} onPreset={(p) => addFood(presetFood(p), p.category === "restaurant")} onSaved={addSaved} onEmpty={() => barRef.current?.focus()} />
+          <PresetGrid presets={presets} savedMeals={savedMeals} usage={usage} onPreset={(p) => addFood(presetFood(p), p.category === "restaurant", { src: p.image_url ?? null, kind: "preset" })} onSaved={addSaved} onEmpty={() => barRef.current?.focus()} />
         )}
       </div>
 
@@ -492,6 +488,17 @@ export default function MealForm({
   );
 }
 
+/** The item that stands for a saved meal in its picture: the biggest one. */
+function topItem(sm: SavedMeal): MealItem | undefined {
+  return [...sm.items].sort((a, b) => Number(b.calories) - Number(a.calories))[0];
+}
+function topItemName(sm: SavedMeal): string {
+  return topItem(sm)?.name ?? sm.name;
+}
+function topItemImage(sm: SavedMeal): string | null {
+  return topItem(sm)?.image_url ?? null;
+}
+
 // ---- the preset grid (bar empty) ----
 
 function PresetGrid({
@@ -532,7 +539,7 @@ function PresetGrid({
   if (!presets.length && !savedMeals.length) {
     return (
       <div className="card flex flex-col items-start gap-3">
-        <p className="text-[15px]">Search for a food, say what you ate, or photograph your plate.</p>
+        <p className="text-[15px]">Search for a food or say what you ate.</p>
         <PillButton soft height={44} onClick={onEmpty}>
           Start typing
         </PillButton>
@@ -555,10 +562,13 @@ function PresetGrid({
       <div className="grid grid-cols-2 gap-2">
         {cat === "yours"
           ? savedMeals.map((sm) => (
-              <button key={sm.id} type="button" className="card press w-full text-left" style={{ padding: 12, borderRadius: 16, minHeight: 60 }} onClick={() => onSaved(sm)}>
-                <span className="block truncate text-[14px] font-semibold">{sm.name}</span>
-                <span className="block truncate text-[12px] muted">
-                  Repeat meal · {Math.round(sm.calories)} kcal · {fmt(sm.protein_g)} g P
+              <button key={sm.id} type="button" className="card press flex w-full items-center gap-2.5 text-left" style={{ padding: 10, borderRadius: 16, minHeight: 60 }} onClick={() => onSaved(sm)}>
+                <FoodImage name={topItemName(sm)} src={sm.image_url ?? topItemImage(sm)} size={40} fallback={<FoodFallback size={40} />} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold">{sm.name}</span>
+                  <span className="block truncate text-[12px] muted">
+                    Repeat meal · {Math.round(sm.calories)} kcal · {fmt(sm.protein_g)} g P
+                  </span>
                 </span>
               </button>
             ))
@@ -567,11 +577,14 @@ function PresetGrid({
           const def = p.servings.find((s) => s.label === p.default_serving) ?? p.servings[0];
           const kcal = Math.round((p.calories * (def?.grams ?? 100)) / 100);
           return (
-            <button key={p.id} type="button" className="card press w-full text-left" style={{ padding: 12, borderRadius: 16, minHeight: 60 }} onClick={() => onPreset(p)} aria-label={`Add ${p.label}, ${def?.label ?? "100 g"}, ${kcal} kcal`}>
-              <span className="block truncate text-[14px] font-semibold">{p.label}</span>
-              <span className="block truncate text-[12px] muted">
-                {p.label_hi ? `${p.label_hi} · ` : ""}
-                {def?.label ?? "100 g"} · {kcal} kcal
+            <button key={p.id} type="button" className="card press flex w-full items-center gap-2.5 text-left" style={{ padding: 10, borderRadius: 16, minHeight: 60 }} onClick={() => onPreset(p)} aria-label={`Add ${p.label}, ${def?.label ?? "100 g"}, ${kcal} kcal`}>
+              <FoodImage name={p.label} kind="preset" src={p.image_url} size={40} fallback={<FoodFallback size={40} category={p.category} />} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-semibold">{p.label}</span>
+                <span className="block truncate text-[12px] muted">
+                  {p.label_hi ? `${p.label_hi} · ` : ""}
+                  {def?.label ?? "100 g"} · {kcal} kcal
+                </span>
               </span>
             </button>
           );
@@ -641,6 +654,7 @@ function SearchResults({
             <div key={h.id}>
               {i > 0 ? <Hair /> : null}
               <button type="button" className="press flex min-h-[52px] w-full items-center gap-3 py-2.5 text-left" style={{ background: "none", border: 0, color: "var(--ink)" }} onClick={() => onPick(h)}>
+                <FoodImage name={h.name} kind={h.source === "off" ? "product" : "generic"} src={h.image_url} size={40} fallback={<FoodFallback size={40} />} />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[15px] font-semibold">
                     {h.name}
@@ -699,7 +713,8 @@ function PlateRow({
   return (
     <>
       {first ? null : <Hair />}
-      <div className="flex items-center gap-2 py-2.5">
+      <div className="flex items-center gap-2.5 py-2.5">
+        <FoodImage name={item.name} kind={row.imageKind ?? (item.source === "scan" ? "product" : "generic")} src={row.image ?? item.image_url} size={40} fallback={<FoodFallback size={40} category={row.category} />} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-[15px] font-semibold">
             {item.name}

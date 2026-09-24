@@ -48,3 +48,12 @@ export function avatarUrl(path: string | null | undefined): string | null {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://evizkfvltacrfngsgbuu.supabase.co";
   return `${base.replace(/\/$/, "")}/storage/v1/object/public/avatars/${path}`;
 }
+
+/** v2.4 Preferences → Weight units: "72.5 kg" or "159.8 lb" (weights are always stored in kg). */
+export function weightText(kg: number | null | undefined, units: "metric" | "imperial" = "metric", digits = 1): string {
+  if (kg == null || !Number.isFinite(Number(kg))) return "—";
+  const v = units === "imperial" ? Number(kg) * 2.20462 : Number(kg);
+  const f = 10 ** digits;
+  const n = Math.round(v * f) / f;
+  return `${Number.isInteger(n) ? n : n.toFixed(digits)} ${units === "imperial" ? "lb" : "kg"}`;
+}

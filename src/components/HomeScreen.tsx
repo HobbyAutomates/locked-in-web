@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { addDays, longDate, shortDate } from "@/lib/dates";
@@ -9,7 +10,7 @@ import { calorieBudget, totalsFor } from "@/lib/totals";
 import { logWater } from "@/lib/actions";
 import LogWaterSheet from "./LogWaterSheet";
 import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Nudge, type Profile, type WaterEntry, type Workout, type Wrap } from "@/lib/types";
-import { Check, ChevronRight, Close, Fist, Flame, Glass, Lock, MoonStar, Plus, Run, Share, Spinner } from "./icons";
+import { CalendarIcon, Check, ChevronRight, Close, Fist, Flame, Glass, Lock, MoonStar, Plus, Run, Share, Spinner } from "./icons";
 import { ExerciseRow, MealRow, WorkoutRow } from "./Rows";
 import { usePendingMeals, type Pending } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
@@ -90,13 +91,24 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
             <Lock size={26} />
             Locked In
           </h1>
-          <span
-            className="flex items-center gap-1.5 rounded-full py-1.5 pl-2.5 pr-3 text-sm font-bold"
-            style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)" }}
-            title={`${weekStreak} week streak`}
-          >
-            <BreathingFlame size={16} />
-            {weekStreak}
+          <span className="flex items-center gap-2">
+            <span
+              className="flex items-center gap-1.5 rounded-full py-1.5 pl-2.5 pr-3 text-sm font-bold"
+              style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)" }}
+              title={`${weekStreak} week streak`}
+            >
+              <BreathingFlame size={16} />
+              {weekStreak}
+            </span>
+            {/* v2.4: Calendar left the tab bar; it lives here, as on Android. */}
+            <Link
+              href="/calendar"
+              aria-label="Calendar"
+              className="press grid h-9 w-9 place-items-center rounded-full"
+              style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)", color: "var(--ink)" }}
+            >
+              <CalendarIcon size={19} />
+            </Link>
           </span>
         </div>
         {error ? <div className="mt-2"><ErrorNote text={error} /></div> : null}

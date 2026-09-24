@@ -9,6 +9,7 @@ import type { ExerciseEntry, Meal, Workout } from "@/lib/types";
 import { formatTime } from "@/lib/display";
 import { Bowl, ChevronDown, ChevronRight, Dumbbell, Run, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
 import { Hair, MacroDot, SPRING, fmt } from "./ui";
+import FoodImage, { FoodFallback } from "./FoodImage";
 
 /**
  * Logged rows on Home and Calendar: one line each (icon, title, kcal, time) and a chevron. Meals
@@ -99,6 +100,8 @@ export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: 
   const carbs = meal.items.reduce((a, i) => a + Number(i.carbs_g), 0);
   const fat = meal.items.reduce((a, i) => a + Number(i.fat_g), 0);
   const title = meal.items.map((i) => i.name).join(", ") || meal.raw_text || "Meal";
+  // v2.4: the biggest item stands for the meal in its picture.
+  const lead = [...meal.items].sort((a, b) => Number(b.calories) - Number(a.calories))[0];
 
   function vote(rating: "up" | "down") {
     setVoted(rating);
@@ -118,6 +121,8 @@ export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: 
           meal.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed Storage URL
             <img src={meal.photo_url} alt="" className="h-10 w-10 shrink-0 rounded-[12px] object-cover" />
+          ) : lead ? (
+            <FoodImage name={lead.name} kind={lead.source === "scan" ? "product" : "generic"} src={lead.image_url} size={40} fallback={<FoodFallback size={40} product={lead.source === "scan"} />} />
           ) : (
             <Tile tint="var(--orange)" bg="var(--orange-bg)">
               <Bowl size={22} />
@@ -136,7 +141,8 @@ export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: 
         <ul className="flex list-none flex-col gap-1.5 p-0">
           {meal.items.map((i, idx) => (
             <li key={i.id ?? idx} className="flex items-center justify-between gap-3 text-[13px]">
-              <span className="min-w-0 truncate">
+              <FoodImage name={i.name} kind={i.source === "scan" ? "product" : "generic"} src={i.image_url} size={28} radius={8} fallback={<FoodFallback size={28} product={i.source === "scan"} />} />
+              <span className="min-w-0 flex-1 truncate">
                 {i.name}
                 <span className="muted"> · {i.unit === "serving" && i.servings != null ? `${fmt(i.servings)} serving${i.servings === 1 ? "" : "s"}` : `${fmt(Math.round(Number(i.grams)))} g`}</span>
               </span>

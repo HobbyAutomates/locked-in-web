@@ -6,7 +6,7 @@ import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 import { scanName } from "./scanNames";
 
 const PROFILE_COLS =
-  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml";
+  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml, units";
 
 const num = (v: unknown): number | null => (v == null || v === "" ? null : Number(v));
 
@@ -40,6 +40,7 @@ export async function getProfile(): Promise<Profile> {
     add_burned_to_goal: d.add_burned_to_goal === true,
     rollover_calories: d.rollover_calories === true,
     water_goal_ml: num(d.water_goal_ml) ?? DEFAULT_PROFILE.water_goal_ml,
+    units: d.units === "imperial" ? "imperial" : "metric",
   };
 }
 
@@ -212,9 +213,9 @@ export async function getPresets(): Promise<FoodPreset[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("food_presets")
-    .select("id, food_id, label, label_hi, category, servings, default_serving, sort, icon, foods(name, calories, protein_g, carbs_g, fat_g, micros)")
+    .select("id, food_id, label, label_hi, category, servings, default_serving, sort, icon, image_url, foods(name, calories, protein_g, carbs_g, fat_g, micros)")
     .order("sort", { ascending: true });
-  type Row = { id: string; food_id: string; label: string; label_hi: string | null; category: string; servings: unknown; default_serving: string | null; sort: number | null; icon: string | null; foods: { name: string; calories: unknown; protein_g: unknown; carbs_g: unknown; fat_g: unknown; micros: unknown } | null };
+  type Row = { id: string; food_id: string; label: string; label_hi: string | null; category: string; servings: unknown; default_serving: string | null; sort: number | null; icon: string | null; image_url: string | null; foods: { name: string; calories: unknown; protein_g: unknown; carbs_g: unknown; fat_g: unknown; micros: unknown } | null };
   return ((data ?? []) as unknown as Row[])
     .filter((r) => r.foods)
     .map((r) => ({
@@ -233,6 +234,7 @@ export async function getPresets(): Promise<FoodPreset[]> {
       carbs_g: Number(r.foods?.carbs_g ?? 0),
       fat_g: Number(r.foods?.fat_g ?? 0),
       micros: (r.foods?.micros ?? {}) as Record<string, number>,
+      image_url: r.image_url ?? null,
     }));
 }
 

@@ -12,6 +12,7 @@ import { totalsFor } from "@/lib/totals";
 import { restByMuscle } from "@/lib/streaks";
 import { MUSCLE_COLOR, type Muscle } from "@/lib/muscles";
 import type { ExerciseEntry, Meal, Profile, ProgressPhoto, WeightEntry, Workout } from "@/lib/types";
+import { weightText } from "@/lib/display";
 import HexMedal from "./HexMedal";
 import { Camera, Close, Plus, Scale, Spinner, Trash } from "./icons";
 import { BreathingFlame, Card, Chevron, ErrorNote, Hair, MacroDot, PillButton, Rise, SPRING, Segmented, fmt } from "./ui";
@@ -157,8 +158,8 @@ function CurrentWeightCard({ profile, weights, today }: { profile: Profile; weig
         <div>
           <p className="text-[13px] font-medium muted">Current weight</p>
           <p className="num mt-1 text-[36px] font-extrabold leading-none" style={{ letterSpacing: "-0.04em" }}>
-            {current != null ? fmt(current) : "—"}
-            <span className="ml-1 text-[15px] font-semibold muted">kg</span>
+            {current != null ? weightText(current, profile.units).split(" ")[0] : "—"}
+            <span className="ml-1 text-[15px] font-semibold muted">{profile.units === "imperial" ? "lb" : "kg"}</span>
           </p>
         </div>
         <span className="num shrink-0 rounded-full px-3 py-1.5 text-[12px] font-bold" style={{ background: due === 0 ? "var(--btn)" : "var(--card2)", color: due === 0 ? "var(--btn-ink)" : "var(--ink)" }}>
@@ -172,11 +173,11 @@ function CurrentWeightCard({ profile, weights, today }: { profile: Profile; weig
           </div>
           <div className="mt-1.5 flex justify-between text-xs">
             <span className="muted">
-              Start <span className="num font-bold" style={{ color: "var(--ink)" }}>{fmt(start)} kg</span>
+              Start <span className="num font-bold" style={{ color: "var(--ink)" }}>{weightText(start, profile.units)}</span>
             </span>
             <span className="num font-semibold muted">{Math.round(fraction * 100)}%</span>
             <span className="muted">
-              Goal <span className="num font-bold" style={{ color: "var(--ink)" }}>{fmt(goal)} kg</span>
+              Goal <span className="num font-bold" style={{ color: "var(--ink)" }}>{weightText(goal, profile.units)}</span>
             </span>
           </div>
         </div>

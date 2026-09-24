@@ -31,6 +31,8 @@ export type MealItem = {
   servings?: number | null;
   /** v1.9: the fat preset id this dish was cooked in (the fat itself is a separate item). */
   cooked_in?: string | null;
+  /** v2.4: cached picture (public Storage URL) — display only, never written to meal_items. */
+  image_url?: string | null;
 };
 
 export type Meal = {
@@ -74,6 +76,8 @@ export type FoodPreset = {
   carbs_g: number;
   fat_g: number;
   micros: Record<string, number>;
+  /** v2.4: the preset's picture (bandlog.food_presets.image_url), filled by the prewarm script. */
+  image_url?: string | null;
 };
 
 /** A row of bandlog.foods as the food picker sees it (search_foods RPC, per 100 g). */
@@ -89,6 +93,7 @@ export type FoodSearchHit = {
   units: PresetServing[];
   micros: Record<string, number>;
   score: number;
+  image_url?: string | null;
 };
 
 /** One of the five meal reminders stored in `profiles.reminders`. */
@@ -127,7 +132,11 @@ export type Profile = {
   /** v2.3: up to 200 kcal left over from yesterday carries into today. */
   rollover_calories: boolean;
   water_goal_ml: number;
+  /** v2.4 Preferences → Tracking: how weights are shown (always stored in kg). */
+  units: Units;
 };
+
+export type Units = "metric" | "imperial";
 
 export const DEFAULT_PROFILE: Profile = {
   weekly_workout_target: 3,
@@ -153,6 +162,7 @@ export const DEFAULT_PROFILE: Profile = {
   add_burned_to_goal: false,
   rollover_calories: false,
   water_goal_ml: 2500,
+  units: "metric",
 };
 
 export const DEFAULT_FIBER_G = 30;
@@ -229,6 +239,8 @@ export type SavedMeal = {
   items: MealItem[];
   calories: number;
   protein_g: number;
+  /** v2.4: picture of its biggest item. */
+  image_url?: string | null;
 };
 
 export type LabelVerdict = "safe" | "caution" | "unsafe" | "misleading" | "fake";
