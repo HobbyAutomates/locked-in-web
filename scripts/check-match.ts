@@ -109,7 +109,7 @@ const liveCucumber = withMacros(hit("cucumber", "ai", 1, true), 15);
 const plainCucumber = withMacros(hit("Cucumber", "ifct", 0.9, true), 16);
 
 const plateCases: PlateCase[] = [
-  { why: "cucumber vs the soup row: rejected, falls back to the live lookup", item: plateItem("cucumber", 200), table: [soup], live: liveCucumber, expectSource: "table", expectFoodId: liveCucumber.id, expectKcal: 30, expectLiveCalls: 1 },
+  { why: "cucumber vs the soup row: rejected, falls back to the live lookup (AI numbers stay labelled estimated)", item: plateItem("cucumber", 200), table: [soup], live: liveCucumber, expectSource: "estimated", expectFoodId: null, expectKcal: 30, expectLiveCalls: 1 },
   { why: "cucumber vs the soup row, live lookup down: the model's own estimate stands", item: plateItem("cucumber", 200), table: [soup], live: null, expectSource: "estimated", expectFoodId: null, expectKcal: 999, expectLiveCalls: 1 },
   { why: "an acceptable table row wins without calling the live lookup", item: plateItem("cucumber", 100), table: [plainCucumber], live: liveCucumber, expectSource: "table", expectFoodId: plainCucumber.id, expectKcal: 16, expectLiveCalls: 0 },
 ];

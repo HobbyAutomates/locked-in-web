@@ -1,7 +1,7 @@
 /**
  * `npx tsx scripts/check-battle.ts` — offline check of src/lib/battle.ts's scoring against the
  * table in docs/food-battle-spec.md. No DB access. Mirrors bandlog.battle_score in
- * supabase/schema_v28.sql, so any change to either must keep both files in sync with these cases.
+ * supabase/schema_v29.sql, so any change to either must keep both files in sync with these cases.
  */
 import { battleScore, isEligible, isUnderFuelled, pointsToLead, rankBattle, ratio, scoreRow, type BattleGoal, type ScoredBattleRow } from "../src/lib/battle";
 

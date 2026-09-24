@@ -31,7 +31,7 @@ export async function crossValidatePlateItem(it: PlateItem, deps: PlateMatchDeps
     carbs_g: Math.round(match.carbs_g * k * 10) / 10,
     fat_g: Math.round(match.fat_g * k * 10) / 10,
     micros: { ...it.micros, ...microsFor(match, it.grams) },
-    source: "table",
-    food_id: match.id,
+    source: match.source === "ai" ? "estimated" : "table",
+    food_id: match.source === "ai" ? null : match.id,
   };
 }
