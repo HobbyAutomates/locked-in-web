@@ -7,6 +7,7 @@ import { countStep } from "@/lib/quantity";
 import { foodKey } from "@/lib/foodKey";
 import { cachedFoodImages, resolveFoodImage } from "@/lib/foodImage";
 import type { ParseResult, ParsedItem } from "@/lib/types";
+import { logUsage } from "@/lib/usage";
 
 export const runtime = "nodejs";
 
@@ -216,6 +217,7 @@ export async function POST(req: Request) {
     tool_choice: { type: "tool", name: "log_food_items" },
     messages: [{ role: "user", content: userContent }],
   });
+  logUsage("parse-meal", "claude-haiku-4-5-20251001", msg.usage);
 
   const block = msg.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") return NextResponse.json({ error: "Parser returned nothing" }, { status: 502 });

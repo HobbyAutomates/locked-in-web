@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/apiAuth";
-import { FlowError, barcodeFlow, classifyScan, labelFlow, mediaType, plateFlow, type Classified, type ScanKind } from "@/lib/scanFlows";
+import { FlowError, barcodeFlow, classifyScan, labelFlow, mediaType, plateFlow, plateFromEstimate, type Classified, type ScanKind } from "@/lib/scanFlows";
 
 export const runtime = "nodejs";
 export const maxDuration = 240;
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     if (image && !forced) {
       const c = await classify();
       if (c && (c.kind === "label" || c.hasLabel)) {
-        const l = await labelFlow({ ...base, image, transcript: c.transcript, text });
+        const l = await labelFlow({ ...base, image, transcript: c.transcript, text, extraUsage: [c.usage] });
         return { ...l, kind: "label", detected, fallback: "label", barcode: r.barcode ?? code };
       }
     }
@@ -75,11 +75,19 @@ export async function POST(req: Request) {
 
     const c = await classify();
     if (!c) throw new FlowError("No image", 400);
-    if (c.kind === "plate") return NextResponse.json({ ...(await plateFlow({ ...base, image: image as string })), kind: "plate", detected: "plate" });
+    if (c.kind === "plate") {
+      // v2.7: the classifier may have called plate_estimate directly — one vision call, not two.
+      const plate = c.plateRaw ? await plateFromEstimate({ ...base, image: image as string }, c.plateRaw, [c.usage]) : await plateFlow({ ...base, image: image as string, extraUsage: [c.usage] });
+      return NextResponse.json({ ...plate, kind: "plate", detected: "plate" });
+    }
     if (c.kind === "barcode") return NextResponse.json(await barcode(c.barcode.length >= 8 ? c.barcode : null, "barcode"));
-    if (c.kind === "label" || c.hasLabel) return NextResponse.json({ ...(await labelFlow({ ...base, image, transcript: c.transcript })), kind: "label", detected: "label" });
+    if (c.kind === "label" || c.hasLabel) return NextResponse.json({ ...(await labelFlow({ ...base, image, transcript: c.transcript, extraUsage: [c.usage] })), kind: "label", detected: "label" });
     // Neither: the label report's "couldn't read that" shape, with what the photo looked like.
-    return NextResponse.json({ ...(await labelFlow({ ...base, image, transcript: `NOT_A_LABEL ${c.summary || "That doesn't look like a food label, a barcode or a plate."}` })), kind: "label", detected: "label" });
+    return NextResponse.json({
+      ...(await labelFlow({ ...base, image, transcript: `NOT_A_LABEL ${c.summary || "That doesn't look like a food label, a barcode or a plate."}`, extraUsage: [c.usage] })),
+      kind: "label",
+      detected: "label",
+    });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Scan failed" }, { status: e instanceof FlowError ? e.status : 500 });
   }

@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { createHash } from "node:crypto";
 import type { AdminClient } from "@/lib/apiAuth";
+import { logUsage, type UsageEntry } from "@/lib/usage";
 
 /**
  * The analysis + structuring steps shared by /api/scan-label (OCR transcript or photo) and
@@ -222,12 +224,13 @@ function structureRules(targets: string, lens: Lens, compact: boolean) {
  *    brief notes and call the tool. Half the output tokens, one round trip — a typical barcode
  *    scan lands well under 25 s. Falls back to the two-call path if the tool wasn't called.
  */
-export async function analyseTranscript(input: AnalysisInput): Promise<{ report: Record<string, unknown>; analysis: string }> {
+export async function analyseTranscript(input: AnalysisInput): Promise<{ report: Record<string, unknown>; analysis: string; usage: UsageEntry[] }> {
   const { client, transcript, note, lens, profile } = input;
   const text = (m: Anthropic.Message) => m.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("\n");
   const targets = targetsLine(profile);
   const maxSearches = input.maxSearches ?? 2;
   const compact = input.kind === "barcode" && maxSearches <= 1;
+  const usage: UsageEntry[] = [];
   const provenance =
     input.kind === "barcode"
       ? " (this is a product record from Open Food Facts, contributed by volunteers — nutrition numbers are usually right, ingredient lists may be partial; say so if a field is missing)"
@@ -251,9 +254,10 @@ export async function analyseTranscript(input: AnalysisInput): Promise<{ report:
       tools: [webSearch, REPORT_TOOL],
       messages: [{ role: "user", content: `${userText}\n\nAnalyse it briefly, then call label_report.\n\n${structureRules(targets, lens, true)}` }],
     });
+    usage.push(logUsage(`${input.kind}:compact`, "claude-haiku-4-5-20251001", one.usage));
     analysis = text(one).trim();
     const block = one.content.find((b) => b.type === "tool_use" && b.name === "label_report");
-    if (block && block.type === "tool_use") return { report: block.input as Record<string, unknown>, analysis };
+    if (block && block.type === "tool_use") return { report: block.input as Record<string, unknown>, analysis, usage };
     // The model wrote prose but skipped the tool: structure what it wrote, below.
   } else {
     const a = await client.messages.create({
@@ -263,6 +267,7 @@ export async function analyseTranscript(input: AnalysisInput): Promise<{ report:
       tools: [webSearch],
       messages: [{ role: "user", content: `${userText}\n\nAnalyse it.` }],
     });
+    usage.push(logUsage(`${input.kind}:analyse`, "claude-haiku-4-5-20251001", a.usage));
     analysis = text(a).trim();
   }
 
@@ -281,10 +286,26 @@ export async function analyseTranscript(input: AnalysisInput): Promise<{ report:
       },
     ],
   });
+  usage.push(logUsage(`${input.kind}:structure`, "claude-haiku-4-5-20251001", s.usage));
   const block = s.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") throw new Error("Could not structure the report");
   const report = block.input as Record<string, unknown>;
-  return { report, analysis };
+  return { report, analysis, usage };
+}
+
+// ---- Barcode AI-report cache (v2.7: keyed on barcode + lens + a hash of the profile targets used
+//      in the prompt, stored inside barcode_cache.product so a repeat scan skips Haiku entirely) ----
+
+export type CachedReport = { report: Record<string, unknown>; analysis: string; cachedAt: string };
+export type ReportCache = Record<string, CachedReport>;
+
+/** Short, stable hash of the profile numbers that actually shape the report's wording and infographic. */
+export function reportCacheKey(lens: Lens, profile: ScanProfile): string {
+  const h = createHash("sha1")
+    .update(JSON.stringify({ p: profile.protein_target_g, c: profile.calorie_target, cb: profile.carb_target_g, f: profile.fat_target_g, g: profile.goal_type, w: profile.weekly_workout_target }))
+    .digest("hex")
+    .slice(0, 10);
+  return `${lens}:${h}`;
 }
 
 /** The "couldn't read that" report, in the same shape, so clients never special-case it. */
