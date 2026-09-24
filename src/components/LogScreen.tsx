@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "./icons";
 import { Segmented } from "./ui";
-import ExerciseForm from "./ExerciseForm";
+import ExerciseForm, { recentActivities } from "./ExerciseForm";
 import MealForm from "./MealForm";
 import WorkoutForm from "./WorkoutForm";
-import type { FoodPreset, Profile, SavedMeal, Workout } from "@/lib/types";
+import type { ExerciseEntry, FoodPreset, Profile, SavedMeal, Workout } from "@/lib/types";
 
 /** Full-screen Log page: Workout / Meal / Exercise segments (opened from the + FAB or a workout row). The Meal segment is Add food. */
 export default function LogScreen({
@@ -20,6 +20,7 @@ export default function LogScreen({
   presets,
   usage = {},
   profile,
+  recentExercises = [],
 }: {
   existing: Workout | null;
   /** The most recent workout, for "Same as last time" on a new one. */
@@ -31,6 +32,8 @@ export default function LogScreen({
   presets: FoodPreset[];
   usage?: Record<string, number>;
   profile: Profile;
+  /** v2.3: the last ~60 days of exercise rows, for the Exercise form's Recent row. */
+  recentExercises?: ExerciseEntry[];
 }) {
   const router = useRouter();
   const [seg, setSeg] = useState(startOnExercise ? 2 : startOnMeal ? 1 : 0);
@@ -61,7 +64,7 @@ export default function LogScreen({
       ) : seg === 1 ? (
         <MealForm date={date} savedMeals={savedMeals} presets={presets} usage={usage} onClose={close} />
       ) : (
-        <ExerciseForm date={date} weightKg={profile.weight_kg ?? null} onClose={close} />
+        <ExerciseForm date={date} weightKg={profile.weight_kg ?? null} onClose={close} recent={recentActivities(recentExercises, profile.weight_kg ?? null)} />
       )}
     </div>
   );

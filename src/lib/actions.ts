@@ -7,6 +7,8 @@ import { createClient } from "./supabase/server";
 import { ONBOARD_SKIP_COOKIE } from "./onboarding";
 import { bandCode, bandIntensity, bandKcal } from "./burn";
 import { rollupQuietly } from "./rollup";
+import { adminClient } from "./apiAuth";
+import { today as todayIso } from "./dates";
 import type { Activity, DescribedExercise, FoodSearchHit, MealItem, Profile, SavedMeal, SquadMember } from "./types";
 
 async function userOrThrow() {
@@ -126,6 +128,12 @@ export async function saveExercise(input: {
   intensity: "low" | "medium" | "high";
   kcal: number;
   source: "manual" | "describe";
+  /** v2.3 details: ISO timestamp, 0–100 slider, km, steps, free text. */
+  started_at?: string | null;
+  intensity_pct?: number | null;
+  distance_km?: number | null;
+  steps?: number | null;
+  note?: string;
 }) {
   const { supabase, user } = await userOrThrow();
   const { error } = await supabase.from("exercise_log").insert({
@@ -137,7 +145,11 @@ export async function saveExercise(input: {
     intensity: input.intensity,
     kcal: Math.round(input.kcal * 10) / 10,
     source: input.source,
-    note: "",
+    note: (input.note ?? "").trim().slice(0, 200),
+    started_at: input.started_at ?? null,
+    intensity_pct: input.intensity_pct == null ? null : Math.max(0, Math.min(100, Math.round(input.intensity_pct))),
+    distance_km: input.distance_km == null || !(input.distance_km > 0) ? null : Math.round(input.distance_km * 100) / 100,
+    steps: input.steps == null || !(input.steps > 0) ? null : Math.round(input.steps),
   });
   if (error) throw new Error(error.message);
   await rollupQuietly(supabase, user.id, [input.date]);
@@ -264,6 +276,11 @@ const PROFILE_KEYS: (keyof Profile)[] = [
   "reminders",
   "lens_default",
   "share_stats",
+  "fiber_target",
+  "sugar_target",
+  "add_burned_to_goal",
+  "rollover_calories",
+  "water_goal_ml",
 ];
 
 /** Upserts the given profile columns for the signed-in user (a partial patch is fine). */
@@ -481,4 +498,71 @@ export async function nudgeMember(groupId: string, toUser: string) {
   const { error } = await supabase.from("nudges").insert({ group_id: groupId, from_user: user.id, to_user: toUser, kind: "nudge" });
   if (error) throw new Error(error.message);
   return { already: false };
+}
+
+// ---- v2.3: water ----
+
+/** Log a glass / bottle of water for `date` (defaults to today, IST). */
+export async function logWater(ml: number, date?: string) {
+  const { supabase, user } = await userOrThrow();
+  const amount = Math.round(Number(ml));
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 5000) throw new Error("Enter between 1 and 5000 mL");
+  const day = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayIso();
+  const { error } = await supabase.from("water_log").insert({ user_id: user.id, date: day, ml: amount });
+  if (error) throw new Error(error.message);
+  revalidatePath("/", "layout");
+}
+
+export async function deleteWater(id: string) {
+  const { supabase, user } = await userOrThrow();
+  const { error } = await supabase.from("water_log").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/", "layout");
+}
+
+// ---- v2.3: progress photos ----
+
+/**
+ * Upload a progress photo (already resized to <= 1024 px JPEG in the browser, sent as bare base64)
+ * to progress-photos/<uid>/<date>-<ts>.jpg with the service-role client, then add the row.
+ */
+export async function uploadProgressPhoto(input: { base64: string; date?: string; note?: string }): Promise<ActionResult> {
+  const { supabase, user } = await userOrThrow();
+  const day = input.date && /^\d{4}-\d{2}-\d{2}$/.test(input.date) ? input.date : todayIso();
+  const bytes = Buffer.from(input.base64 || "", "base64");
+  if (bytes.length < 100) return { ok: false, error: "That photo looks empty — try another one." };
+  if (bytes.length > 3_000_000) return { ok: false, error: "That photo is too large." };
+  const path = `${user.id}/${day}-${Date.now()}.jpg`;
+  const admin = adminClient();
+  const up = await admin.storage.from("progress-photos").upload(path, bytes, { contentType: "image/jpeg", upsert: false });
+  if (up.error) {
+    console.error("[uploadProgressPhoto] storage failed", up.error);
+    return { ok: false, error: `Couldn't upload the photo: ${up.error.message}` };
+  }
+  const { error } = await supabase.from("progress_photos").insert({ user_id: user.id, date: day, path, note: (input.note ?? "").trim().slice(0, 120) || null });
+  if (error) {
+    await admin.storage.from("progress-photos").remove([path]);
+    return { ok: false, error: `Couldn't save the photo: ${describe(error)}` };
+  }
+  revalidatePath("/progress");
+  return { ok: true };
+}
+
+export async function deleteProgressPhoto(id: string) {
+  const { supabase, user } = await userOrThrow();
+  const { data } = await supabase.from("progress_photos").select("path").eq("id", id).eq("user_id", user.id).maybeSingle();
+  const { error } = await supabase.from("progress_photos").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  if (data?.path) await adminClient().storage.from("progress-photos").remove([data.path as string]);
+  revalidatePath("/progress");
+}
+
+// ---- v2.3: public squads ----
+
+export async function joinPublicSquad(groupId: string): Promise<string> {
+  const { supabase } = await userOrThrow();
+  const { error } = await supabase.rpc("join_public_group", { g: groupId });
+  if (error) throw new Error(error.message);
+  revalidatePath("/squad");
+  return groupId;
 }

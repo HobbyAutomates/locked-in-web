@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { CalendarIcon, Chart, Home, People, Person, Plus, Scan } from "./icons";
+import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
+import { Bowl, CalendarIcon, Chart, Dumbbell, Glass, Home, People, Person, Plus, Run, Scale, Scan } from "./icons";
+import LogWaterSheet from "./LogWaterSheet";
 import { today } from "@/lib/dates";
 
 const TABS = [
@@ -14,44 +17,126 @@ const TABS = [
   { href: "/profile", label: "Profile", Icon: Person },
 ];
 
-/** Fixed bottom bar + the black FAB that opens the full-screen Log route. */
+type DialKey = "meal" | "workout" | "exercise" | "water" | "weight";
+
+/** The speed-dial under the +, bottom-most first so Meal sits closest to the thumb. */
+const DIAL: { key: DialKey; label: string; Icon: (p: { size?: number }) => React.ReactNode; tint: string }[] = [
+  { key: "meal", label: "Meal", Icon: Bowl, tint: "var(--orange)" },
+  { key: "workout", label: "Workout", Icon: Dumbbell, tint: "var(--purple)" },
+  { key: "exercise", label: "Exercise", Icon: Run, tint: "var(--green)" },
+  { key: "water", label: "Water", Icon: Glass, tint: "var(--blue)" },
+  { key: "weight", label: "Weight", Icon: Scale, tint: "var(--ink)" },
+];
+
+/** Fixed bottom bar + the black FAB, which opens a speed-dial: Meal · Workout · Exercise · Water · Weight. */
 export default function BottomNav() {
   const path = usePathname();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [water, setWater] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  function go(key: DialKey) {
+    setOpen(false);
+    const d = today();
+    if (key === "water") return setWater(true);
+    if (key === "weight") return router.push("/profile/weight?log=1");
+    router.push(key === "meal" ? `/log?date=${d}&mode=meal` : key === "exercise" ? `/log?date=${d}&mode=exercise` : `/log?date=${d}`);
+  }
+
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40">
-      <div className="relative mx-auto w-full max-w-[480px]">
-        <Link
-          href={`/log?date=${today()}`}
-          aria-label="Log a workout or meal"
-          className="fab press absolute right-5 grid place-items-center rounded-full"
-          style={{ width: 60, height: 60, top: -30, background: "var(--btn)", color: "var(--btn-ink)" }}
-        >
-          <Plus size={28} />
-        </Link>
-      </div>
-      <nav aria-label="Main" style={{ background: "var(--card)" }}>
-        <div className="hair" />
-        <div
-          className="mx-auto flex w-full max-w-[480px] justify-between pt-2.5 pl-3"
-          style={{ paddingRight: 76, paddingBottom: "calc(6px + env(safe-area-inset-bottom, 0px))" }}
-        >
-          {TABS.map(({ href, label, Icon }) => {
-            const active = href === "/" ? path === "/" : path.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className="press flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1 text-[11px] font-semibold"
-                style={{ color: active ? "var(--ink)" : "var(--muted)" }}
+    <>
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            key="dial-backdrop"
+            className="fixed inset-0 z-40"
+            style={{ background: "rgba(0,0,0,0.38)" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+        ) : null}
+      </AnimatePresence>
+      <div className="fixed inset-x-0 bottom-0 z-40">
+        <div className="relative mx-auto w-full max-w-[480px]">
+          <AnimatePresence>
+            {open ? (
+              <motion.ul
+                key="dial"
+                className="absolute right-5 z-50 flex flex-col-reverse items-end gap-2.5"
+                style={{ bottom: 42 }}
+                role="menu"
+                aria-label="Log"
+                initial="closed"
+                animate="open"
+                exit="closed"
+                variants={{ open: { transition: { staggerChildren: 0.035 } }, closed: { transition: { staggerChildren: 0.02, staggerDirection: -1 } } }}
               >
-                <Icon size={24} />
-                {label}
-              </Link>
-            );
-          })}
+                {DIAL.map(({ key, label, Icon, tint }) => (
+                  <motion.li
+                    key={key}
+                    variants={{ open: { opacity: 1, y: 0, scale: 1 }, closed: { opacity: 0, y: 14, scale: 0.9 } }}
+                    transition={{ type: "spring", stiffness: 420, damping: 28 }}
+                  >
+                    <button type="button" role="menuitem" className="press flex items-center gap-2.5 rounded-full py-1.5 pl-4 pr-1.5 text-[15px] font-bold" style={{ background: "var(--card)", color: "var(--ink)", boxShadow: "var(--shadow-lg)", border: 0 }} onClick={() => go(key)}>
+                      {label}
+                      <span className="grid h-10 w-10 place-items-center rounded-full" style={{ background: "var(--card2)", color: tint }}>
+                        <Icon size={20} />
+                      </span>
+                    </button>
+                  </motion.li>
+                ))}
+              </motion.ul>
+            ) : null}
+          </AnimatePresence>
+          <button
+            type="button"
+            aria-label={open ? "Close the log menu" : "Log a meal, workout, exercise, water or weight"}
+            aria-expanded={open}
+            aria-haspopup="menu"
+            className="fab press absolute right-5 z-50 grid place-items-center rounded-full"
+            style={{ width: 60, height: 60, top: -30, background: "var(--btn)", color: "var(--btn-ink)", border: 0 }}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <motion.span className="grid place-items-center" animate={{ rotate: open ? 45 : 0 }} transition={{ type: "spring", stiffness: 380, damping: 24 }}>
+              <Plus size={28} />
+            </motion.span>
+          </button>
         </div>
-      </nav>
-    </div>
+        <nav aria-label="Main" style={{ background: "var(--card)" }}>
+          <div className="hair" />
+          <div
+            className="mx-auto flex w-full max-w-[480px] justify-between pt-2.5 pl-3"
+            style={{ paddingRight: 76, paddingBottom: "calc(6px + env(safe-area-inset-bottom, 0px))" }}
+          >
+            {TABS.map(({ href, label, Icon }) => {
+              const active = href === "/" ? path === "/" : path.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className="press flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1 text-[11px] font-semibold"
+                  style={{ color: active ? "var(--ink)" : "var(--muted)" }}
+                >
+                  <Icon size={24} />
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
+      <LogWaterSheet open={water} onClose={() => setWater(false)} />
+    </>
   );
 }

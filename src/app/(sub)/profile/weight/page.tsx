@@ -3,7 +3,7 @@ import WeightHistoryScreen from "@/components/WeightHistoryScreen";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page() {
-  const [profile, weights] = await Promise.all([getProfile(), getWeights()]);
-  return <WeightHistoryScreen profile={profile} weights={weights} />;
+export default async function Page({ searchParams }: { searchParams: Promise<{ log?: string }> }) {
+  const [profile, weights, sp] = await Promise.all([getProfile(), getWeights(), searchParams]);
+  return <WeightHistoryScreen profile={profile} weights={weights} openLog={sp.log === "1"} />;
 }

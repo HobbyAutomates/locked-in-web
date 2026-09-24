@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { getFoodUsage, getLatestWorkout, getPresets, getProfile, getWorkout } from "@/lib/data";
+import { getExercises, getFoodUsage, getLatestWorkout, getPresets, getProfile, getWorkout } from "@/lib/data";
 import { listSavedMeals } from "@/lib/actions";
-import { today as todayIso } from "@/lib/dates";
+import { addDays, today as todayIso } from "@/lib/dates";
 import LogScreen from "@/components/LogScreen";
 
 export const dynamic = "force-dynamic";
@@ -15,13 +15,14 @@ export default async function LogPage({
   const { user } = await requireUser();
   if (!user) redirect("/login");
   const sp = await searchParams;
-  const [profile, existing, savedMeals, presets, usage, last] = await Promise.all([
+  const [profile, existing, savedMeals, presets, usage, last, recentExercises] = await Promise.all([
     getProfile(),
     sp.workout ? getWorkout(sp.workout) : Promise.resolve(null),
     listSavedMeals().catch(() => []),
     getPresets().catch(() => []),
     getFoodUsage().catch(() => ({})),
     sp.workout ? Promise.resolve(null) : getLatestWorkout().catch(() => null),
+    getExercises(addDays(todayIso(), -60), todayIso()).catch(() => []),
   ]);
   return (
     <LogScreen
@@ -34,6 +35,7 @@ export default async function LogPage({
       presets={presets}
       usage={usage}
       profile={profile}
+      recentExercises={recentExercises}
     />
   );
 }

@@ -6,7 +6,7 @@ import { saveProfile } from "@/lib/actions";
 import { ageFrom, type Gender, type Profile } from "@/lib/types";
 import { nameFromEmail } from "@/lib/display";
 import SubPage from "./SubPage";
-import { CalendarIcon, Person, Ruler, Scale, Steps } from "./icons";
+import { CalendarIcon, Glass, Person, Ruler, Scale, Steps } from "./icons";
 import { Card, ErrorNote, Hair, NumberField, PillButton, Rise, Segmented, SettingRow, fmt } from "./ui";
 
 const GENDERS: Gender[] = ["male", "female", "other"];
@@ -25,6 +25,7 @@ export default function PersonalDetailsScreen({ profile, email = "" }: { profile
   const [dob, setDob] = useState(profile.dob ?? "");
   const [gender, setGender] = useState<Gender | null>(profile.gender);
   const [steps, setSteps] = useState(String(profile.step_goal));
+  const [water, setWater] = useState(String(profile.water_goal_ml));
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,11 +37,12 @@ export default function PersonalDetailsScreen({ profile, email = "" }: { profile
     dob: dob || null,
     gender,
     step_goal: Math.min(100_000, Math.max(500, Number(steps) || 8000)),
+    water_goal_ml: Math.min(8000, Math.max(250, Number(water) || 2500)),
   });
   const e = edited();
   const dirty =
     e.name !== profile.name.trim() ||
-    e.weight_kg !== profile.weight_kg || e.height_cm !== profile.height_cm || e.dob !== profile.dob || e.gender !== profile.gender || e.step_goal !== profile.step_goal;
+    e.weight_kg !== profile.weight_kg || e.height_cm !== profile.height_cm || e.dob !== profile.dob || e.gender !== profile.gender || e.step_goal !== profile.step_goal || e.water_goal_ml !== profile.water_goal_ml;
 
   const age = ageFrom(dob || null);
 
@@ -137,6 +139,10 @@ export default function PersonalDetailsScreen({ profile, email = "" }: { profile
             <Hair />
             <SettingRow icon={<Steps size={20} />} tint="var(--green)" label="Daily step goal">
               <NumberField value={steps} onChange={(v) => setSteps(v.slice(0, 6))} unit="steps" label="Daily step goal" />
+            </SettingRow>
+            <Hair />
+            <SettingRow icon={<Glass size={20} />} tint="var(--blue)" label="Daily water goal" subtitle="1 glass = 250 mL">
+              <NumberField value={water} onChange={(v) => setWater(v.slice(0, 4))} unit="mL" label="Daily water goal in millilitres" />
             </SettingRow>
           </div>
         </Card>

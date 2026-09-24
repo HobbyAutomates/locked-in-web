@@ -498,3 +498,138 @@ export function Alert(p: P) {
     </Stroke>
   );
 }
+
+// ---- v2.3: per-activity icons, water, help ----
+
+/** Walking figure. */
+export function Walk(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="13" cy="4" r="1.5" />
+      <path d="M9 21l2-6 3 3v3" />
+      <path d="M11 15l1-6-3 2-1 3" />
+      <path d="M12 9l2 3 3 1" />
+    </Stroke>
+  );
+}
+
+/** Cricket bat and ball. */
+export function Bat(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M14 4l6 6-8 8-3-3z" />
+      <path d="M9 15l-5 5" />
+      <circle cx="6" cy="6" r="2" />
+    </Stroke>
+  );
+}
+
+/** Shuttlecock for badminton. */
+export function Shuttle(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="12" cy="19" r="2.5" />
+      <path d="M10 17L6 5h12l-4 12" />
+      <path d="M9 5l1.5 12M15 5l-1.5 12M7.5 10h9" />
+    </Stroke>
+  );
+}
+
+/** Skipping rope. */
+export function Rope(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M5 3v6M19 3v6" />
+      <path d="M5 9c0 8 3 12 7 12s7-4 7-12" />
+    </Stroke>
+  );
+}
+
+/** Seated yoga figure. */
+export function Yoga(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="12" cy="5" r="1.8" />
+      <path d="M12 8v6" />
+      <path d="M6 11l6 2 6-2" />
+      <path d="M4 19c3-2 5-3 8-3s5 1 8 3" />
+    </Stroke>
+  );
+}
+
+/** Stairs. */
+export function Stairs(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M3 20h5v-5h5v-5h5V5h3" />
+    </Stroke>
+  );
+}
+
+/** Bicycle. */
+export function Bike(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="6" cy="16" r="3.5" />
+      <circle cx="18" cy="16" r="3.5" />
+      <path d="M6 16l4-7h6l2 7M10 9l3 7h-7M14 6h3" />
+    </Stroke>
+  );
+}
+
+/** A glass of water. */
+export function Glass(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M6 3h12l-1.5 17a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1z" />
+      <path d="M6.6 10h10.8" />
+    </Stroke>
+  );
+}
+
+/** A water bottle. */
+export function Bottle(p: P) {
+  return (
+    <Stroke {...p}>
+      <path d="M10 2h4v3l2 3v12a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V8l2-3z" />
+      <path d="M8 12h8" />
+    </Stroke>
+  );
+}
+
+/** Question mark in a circle ("How squads work"). */
+export function Help(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 0 1 4.8 1c0 1.6-2.3 2-2.3 3.5" />
+      <path d="M12 17h.01" />
+    </Stroke>
+  );
+}
+
+/** Key for "Join with code". */
+export function Key(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="8" cy="15" r="4" />
+      <path d="M11 12l9-9M17 6l3 3M15 8l2 2" />
+    </Stroke>
+  );
+}
+
+/** The right icon for an exercise row or quick pick, from its key, code or name. */
+export function ActivityIcon({ activity, size = 18 }: { activity: string; size?: number }) {
+  const a = activity.toLowerCase();
+  if (/band|li-band|resistance|weight|gym|strength|dumbbell/.test(a)) return <Dumbbell size={size} />;
+  if (/run|jog|12150/.test(a)) return <Run size={size} />;
+  if (/cycl|bicycl|bike|01015|02010/.test(a)) return <Bike size={size} />;
+  if (/walk|hik|17190|17200/.test(a)) return <Walk size={size} />;
+  if (/cricket/.test(a)) return <Bat size={size} />;
+  if (/badminton|tennis|squash|shuttle/.test(a)) return <Shuttle size={size} />;
+  if (/skip|rope|jump/.test(a)) return <Rope size={size} />;
+  if (/yoga|stretch|pilates/.test(a)) return <Yoga size={size} />;
+  if (/stair|climb/.test(a)) return <Stairs size={size} />;
+  if (/swim/.test(a)) return <Drop size={size} />;
+  return <Flame size={size} />;
+}

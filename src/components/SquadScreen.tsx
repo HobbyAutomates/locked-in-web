@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createSquad, joinSquad, leaveSquad, nudgeMember, renameSquad } from "@/lib/actions";
+import { createSquad, joinPublicSquad, joinSquad, leaveSquad, nudgeMember, renameSquad } from "@/lib/actions";
 import { addDays, weekStart } from "@/lib/dates";
-import type { Squad, SquadMember } from "@/lib/types";
-import { Check, Close, Copy, Fist, Pencil, Plus, Share } from "./icons";
+import type { PublicSquad, Squad, SquadMember } from "@/lib/types";
+import { Check, Close, Copy, Fist, Help, Key, Lock, Pencil, People, Plus, Share, Spinner } from "./icons";
 import { Avatar } from "./Avatar";
-import { BreathingFlame, Card, ChipRow, ErrorNote, PillButton, Rise } from "./ui";
+import { BottomSheet, BreathingFlame, Card, ChipRow, ErrorNote, PillButton, Rise } from "./ui";
 
 const APK_URL = "https://evizkfvltacrfngsgbuu.supabase.co/storage/v1/object/public/app/LockedIn-14.apk";
 const WEB_URL = "https://web-production-ff1cf.up.railway.app";
@@ -25,56 +25,192 @@ type Props = {
   board: SquadMember[];
   sentNudges: string[];
   shareStats: boolean;
+  /** v2.3: public squads anyone can join (`bandlog.public_groups()`). */
+  publicSquads?: PublicSquad[];
 };
 
 /**
- * The Squad tab: the board — who's locked in today, this week's dots, streaks, protein & calories
- * for members who share them, and a nudge pill for anyone who hasn't trained yet. Create / join
- * lives behind the "+" in the header once you're in a squad.
+ * The Squad tab: "Discover squads" (public ones anyone can join) above the board — who's locked in
+ * today, this week's dots, streaks, protein & calories for members who share them, and a nudge pill
+ * for anyone who hasn't trained yet. The "+" opens Create private squad / Join with code / How squads work.
  */
-export default function SquadScreen({ me, today, squads, selectedId, board, sentNudges, shareStats }: Props) {
+export default function SquadScreen({ me, today, squads, selectedId, board, sentNudges, shareStats, publicSquads = [] }: Props) {
   const router = useRouter();
-  const [adding, setAdding] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [adding, setAdding] = useState<null | "create" | "join">(null);
+  const [how, setHow] = useState(false);
   const selected = squads.find((s) => s.id === selectedId) ?? null;
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
+
+  const pickMenu = (k: "create" | "join" | "how") => {
+    setMenu(false);
+    if (k === "how") setHow(true);
+    else setAdding(k);
+  };
+
   return (
     <div className="flex flex-col gap-3.5">
       <Rise index={0}>
         <div className="flex items-center justify-between">
           <h1 className="screen-title">Squad</h1>
-          {squads.length ? (
+          <div className="relative" ref={menuRef}>
             <button
               type="button"
-              aria-label={adding ? "Close create or join" : "Create or join a squad"}
-              aria-expanded={adding}
+              aria-label={adding ? "Close" : "Squad options"}
+              aria-expanded={menu}
+              aria-haspopup="menu"
               className="press grid h-11 w-11 place-items-center rounded-full"
-              style={{ background: adding ? "var(--card2)" : "var(--btn)", color: adding ? "var(--ink)" : "var(--btn-ink)", boxShadow: "var(--shadow-sm)" }}
-              onClick={() => setAdding((v) => !v)}
+              style={{ background: adding || menu ? "var(--card2)" : "var(--btn)", color: adding || menu ? "var(--ink)" : "var(--btn-ink)", boxShadow: "var(--shadow-sm)", border: 0 }}
+              onClick={() => (adding ? setAdding(null) : setMenu((v) => !v))}
             >
-              {adding ? <Close size={18} /> : <Plus size={20} />}
+              {adding || menu ? <Close size={18} /> : <Plus size={20} />}
             </button>
-          ) : null}
+            {menu ? (
+              <div role="menu" className="absolute right-0 top-[52px] z-30 w-[236px] overflow-hidden rounded-2xl py-1.5" style={{ background: "var(--card)", boxShadow: "var(--shadow-lg)" }}>
+                <MenuItem icon={<Lock size={18} />} label="Create private squad" onClick={() => pickMenu("create")} />
+                <MenuItem icon={<Key size={18} />} label="Join with code" onClick={() => pickMenu("join")} />
+                <MenuItem icon={<Help size={18} />} label="How squads work" onClick={() => pickMenu("how")} />
+              </div>
+            ) : null}
+          </div>
         </div>
       </Rise>
 
-      {!squads.length || adding ? <StartCards first={!squads.length} onDone={() => setAdding(false)} /> : null}
+      {adding ? <StartCards key={adding} mode={adding} first={!squads.length} onDone={() => setAdding(null)} /> : null}
+
+      {publicSquads.length ? <Discover squads={publicSquads} /> : null}
+
+      {!squads.length && !adding ? <StartCards mode="create" first onDone={() => setAdding(null)} /> : null}
+
+      {squads.length ? (
+        <Rise index={2}>
+          <p className="px-1 text-[13px] font-bold muted">Your squads</p>
+        </Rise>
+      ) : null}
 
       {squads.length > 1 ? (
-        <Rise index={1}>
+        <Rise index={2}>
           <ChipRow options={squads.map((s) => ({ key: s.id, label: s.name }))} value={selectedId ?? ""} onChange={(id) => router.push(`/squad?g=${id}`)} label="Your squads" />
         </Rise>
       ) : null}
 
       {selected ? <Board key={selected.id} me={me} today={today} squad={selected} board={board} sentNudges={sentNudges} shareStats={shareStats} /> : null}
+
+      <BottomSheet open={how} title="How squads work" onClose={() => setHow(false)} primary={{ label: "Got it", onClick: () => setHow(false) }}>
+        <ul className="flex flex-col gap-3 text-[14px] leading-5">
+          <li>
+            <span className="font-bold">Public squads</span> <span className="muted">are open to everyone using Locked In. Tap + Join and you&apos;re on the board.</span>
+          </li>
+          <li>
+            <span className="font-bold">Private squads</span> <span className="muted">are invite-only: create one and share its 6-letter code with your friends.</span>
+          </li>
+          <li>
+            <span className="font-bold">The board</span> <span className="muted">shows who&apos;s locked in today, this week&apos;s training dots and everyone&apos;s week streak.</span>
+          </li>
+          <li>
+            <span className="font-bold">Nudges</span> <span className="muted">poke anyone who hasn&apos;t trained yet, one per person per day.</span>
+          </li>
+          <li>
+            <span className="font-bold">Privacy:</span> <span className="muted">squad-mates see your protein and calories only if &quot;Share with squads&quot; is on in Profile; otherwise just streaks.</span>
+          </li>
+        </ul>
+      </BottomSheet>
     </div>
   );
 }
 
+function MenuItem({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button type="button" role="menuitem" className="press flex w-full items-center gap-3 px-4 py-3 text-left text-[15px] font-semibold" style={{ background: "none", border: 0, color: "var(--ink)" }} onClick={onClick}>
+      <span className="muted inline-flex">{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+/** "Discover squads": every public squad with its cover, members, tagline and a + Join. */
+function Discover({ squads }: { squads: PublicSquad[] }) {
+  const router = useRouter();
+  const [joining, setJoining] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  async function join(g: PublicSquad) {
+    setJoining(g.id);
+    setError(null);
+    try {
+      await joinPublicSquad(g.id);
+      router.push(`/squad?g=${g.id}`);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not join");
+    } finally {
+      setJoining(null);
+    }
+  }
+  return (
+    <>
+      <Rise index={1}>
+        <p className="px-1 text-[13px] font-bold muted">Discover squads</p>
+      </Rise>
+      <Rise index={1}>
+        <Card padding={0}>
+          <div className="px-3.5">
+            {squads.map((g, i) => (
+              <div key={g.id} className="flex items-center gap-3 py-3" style={{ borderTop: i > 0 ? "1px solid var(--hair)" : "none" }}>
+                <span className="relative grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl" style={{ background: "var(--card2)", color: "var(--muted)" }}>
+                  <People size={22} />
+                  {g.cover_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={g.cover_url} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+                  ) : null}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[15px] font-bold">{g.name}</span>
+                  <span className="text-xs font-semibold muted">
+                    {g.member_count} member{g.member_count === 1 ? "" : "s"}
+                  </span>
+                  {g.tagline ? <span className="truncate text-xs muted">{g.tagline}</span> : null}
+                </span>
+                {g.joined ? (
+                  <button type="button" className="chip press shrink-0 gap-1 whitespace-nowrap" style={{ height: 34, padding: "0 12px", fontWeight: 700 }} onClick={() => router.push(`/squad?g=${g.id}`)}>
+                    <Check size={14} />
+                    Joined
+                  </button>
+                ) : (
+                  <button type="button" className="chip press shrink-0 gap-1 whitespace-nowrap" style={{ height: 34, padding: "0 12px", fontWeight: 700, background: "var(--btn)", color: "var(--btn-ink)" }} disabled={joining !== null} onClick={() => void join(g)} aria-label={`Join ${g.name}`}>
+                    {joining === g.id ? <Spinner size={14} /> : <Plus size={14} />}
+                    Join
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      </Rise>
+      {error ? <ErrorNote text={error} /> : null}
+    </>
+  );
+}
+
 /** Create a squad (one field, one button); "Have a code?" reveals the join field. */
-function StartCards({ first, onDone }: { first: boolean; onDone: () => void }) {
+function StartCards({ first, onDone, mode = "create" }: { first: boolean; onDone: () => void; mode?: "create" | "join" }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [joining, setJoining] = useState(false);
+  const [joining, setJoining] = useState(mode === "join");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [created, setCreated] = useState<{ id: string; code: string; name: string } | null>(null);
@@ -136,7 +272,8 @@ function StartCards({ first, onDone }: { first: boolean; onDone: () => void }) {
   return (
     <Rise index={1}>
       <Card padding={18}>
-        <p className="text-[15px]">{first ? "Train with friends: make a squad and share its 6-letter code." : "Make another squad, or join one with a code."}</p>
+        <p className="text-[15px]">{mode === "join" ? "Got a 6-letter code from a friend? Enter it to join their squad." : first ? "Train with friends: make a private squad and share its 6-letter code." : "Make a private squad and share its code."}</p>
+        {mode === "create" ? (
         <form
           className="mt-3 flex gap-2"
           onSubmit={(e) => {
@@ -149,6 +286,7 @@ function StartCards({ first, onDone }: { first: boolean; onDone: () => void }) {
             Create
           </PillButton>
         </form>
+        ) : null}
         {joining ? (
           <form
             className="mt-2.5 flex gap-2"

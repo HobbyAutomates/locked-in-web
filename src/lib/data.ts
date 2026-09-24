@@ -1,12 +1,12 @@
 import { addDays, today } from "./dates";
 import { createClient } from "./supabase/server";
-import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Nudge, type Profile, type ScanHistoryItem, type Squad, type SquadMember, type WeightEntry, type Workout } from "./types";
+import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Nudge, type Profile, type ProgressPhoto, type PublicSquad, type ScanHistoryItem, type Squad, type SquadMember, type WaterEntry, type WeightEntry, type Workout } from "./types";
 import { parse as parseReminders } from "./reminders";
 import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 import { scanName } from "./scanNames";
 
 const PROFILE_COLS =
-  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path";
+  "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml";
 
 const num = (v: unknown): number | null => (v == null || v === "" ? null : Number(v));
 
@@ -35,6 +35,11 @@ export async function getProfile(): Promise<Profile> {
     lens_default: (["protein", "goal", "snack", "cutting", "bulking"] as const).includes(d.lens_default as never) ? (d.lens_default as Profile["lens_default"]) : "protein",
     share_stats: d.share_stats !== false,
     avatar_path: typeof d.avatar_path === "string" && d.avatar_path ? d.avatar_path : null,
+    fiber_target: num(d.fiber_target),
+    sugar_target: num(d.sugar_target),
+    add_burned_to_goal: d.add_burned_to_goal === true,
+    rollover_calories: d.rollover_calories === true,
+    water_goal_ml: num(d.water_goal_ml) ?? DEFAULT_PROFILE.water_goal_ml,
   };
 }
 
@@ -78,12 +83,20 @@ export async function getExercises(from: string, to: string): Promise<ExerciseEn
   const supabase = await createClient();
   const { data } = await supabase
     .from("exercise_log")
-    .select("id, date, activity_code, name, minutes, intensity, kcal, source, note, created_at")
+    .select("id, date, activity_code, name, minutes, intensity, kcal, source, note, created_at, started_at, intensity_pct, distance_km, steps")
     .gte("date", from)
     .lte("date", to)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
-  return (data ?? []).map((r) => ({ ...r, kcal: Number(r.kcal), minutes: Number(r.minutes), note: r.note ?? "" })) as ExerciseEntry[];
+  return (data ?? []).map((r) => ({
+    ...r,
+    kcal: Number(r.kcal),
+    minutes: Number(r.minutes),
+    note: r.note ?? "",
+    intensity_pct: r.intensity_pct == null ? null : Number(r.intensity_pct),
+    distance_km: r.distance_km == null ? null : Number(r.distance_km),
+    steps: r.steps == null ? null : Number(r.steps),
+  })) as ExerciseEntry[];
 }
 
 export async function getWorkouts(from: string, to: string): Promise<Workout[]> {
@@ -158,6 +171,32 @@ export async function getMeals(from: string, to: string): Promise<(Meal & { phot
     for (const m of meals) if (m.photo_path) m.photo_url = byPath.get(m.photo_path) ?? null;
   }
   return meals;
+}
+
+/** v2.3: glasses / bottles logged between `from` and `to`, newest first. */
+export async function getWater(from: string, to: string): Promise<WaterEntry[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("water_log").select("id, date, ml, created_at").gte("date", from).lte("date", to).order("created_at", { ascending: false });
+  if (error) return [];
+  return (data ?? []).map((r) => ({ id: r.id as string, date: r.date as string, ml: Number(r.ml), created_at: r.created_at as string }));
+}
+
+/** v2.3: progress photos, newest first, each with a 1-hour signed URL (private bucket). */
+export async function getProgressPhotos(limit = 30): Promise<ProgressPhoto[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("progress_photos").select("id, date, path, note").order("date", { ascending: false }).order("created_at", { ascending: false }).limit(limit);
+  if (error || !data?.length) return [];
+  const { data: signed } = await supabase.storage.from("progress-photos").createSignedUrls(data.map((r) => r.path as string), 3600);
+  const byPath = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]));
+  return data.map((r) => ({ id: r.id as string, date: r.date as string, path: r.path as string, note: (r.note as string | null) ?? "", url: byPath.get(r.path as string) ?? null }));
+}
+
+/** v2.3: every public squad with its member count and whether I'm in it. */
+export async function getPublicSquads(): Promise<PublicSquad[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("public_groups");
+  if (error) return [];
+  return ((data ?? []) as PublicSquad[]).map((g) => ({ ...g, member_count: Number(g.member_count ?? 0), joined: !!g.joined }));
 }
 
 /** Everything the Today and Calendar screens need, in one round trip each. */

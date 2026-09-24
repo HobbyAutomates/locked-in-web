@@ -82,10 +82,10 @@ export function Chip({ label, selected, onClick }: { label: string; selected: bo
 }
 
 /**
- * Two or three mutually exclusive options on a grey track. Never more than three: anything with
- * four or more options is a `ChipRow` instead.
+ * Two to four short, mutually exclusive options on a grey track (four only for tight labels like
+ * Progress's "This wk / Last wk / 2 wk ago / 3 wk ago"); anything longer is a `ChipRow` instead.
  */
-export function Segmented({ options, selected, onSelect, label }: { options: [string, string] | [string, string, string]; selected: number; onSelect: (i: number) => void; label: string }) {
+export function Segmented({ options, selected, onSelect, label }: { options: [string, string] | [string, string, string] | [string, string, string, string]; selected: number; onSelect: (i: number) => void; label: string }) {
   return (
     <div className="seg" role="tablist" aria-label={label}>
       {options.map((o, i) => (

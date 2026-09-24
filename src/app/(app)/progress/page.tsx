@@ -1,12 +1,18 @@
-import { getBadgeProgress, getDashboard, getWeights } from "@/lib/data";
+import { getBadgeProgress, getDashboard, getExercises, getProgressPhotos, getWeights } from "@/lib/data";
+import { addDays } from "@/lib/dates";
 import { thisWeekCount, workoutWeekStreak } from "@/lib/streaks";
 import ProgressScreen from "@/components/ProgressScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProgressPage() {
-  const { profile, workouts, meals, exercises } = await getDashboard();
-  const [weights, badges] = await Promise.all([getWeights(10), getBadgeProgress(profile, workouts, meals)]);
+  const { today, profile, workouts, meals } = await getDashboard();
+  const [weights, badges, photos, exercises] = await Promise.all([
+    getWeights(),
+    getBadgeProgress(profile, workouts, meals),
+    getProgressPhotos().catch(() => []),
+    getExercises(addDays(today, -180), today),
+  ]);
   const dates = workouts.map((w) => w.date);
   return (
     <ProgressScreen
@@ -15,6 +21,7 @@ export default async function ProgressPage() {
       meals={meals}
       exercises={exercises}
       weights={weights}
+      photos={photos}
       badges={badges}
       weekStreak={workoutWeekStreak(dates, profile.weekly_workout_target)}
       thisWeek={thisWeekCount(dates)}

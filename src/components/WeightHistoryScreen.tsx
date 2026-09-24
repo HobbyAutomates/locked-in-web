@@ -22,9 +22,9 @@ function relative(date: string) {
 const monthYear = (iso: string) => parseIso(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 
 /** Big current number, the movement since the first weigh-in, and the full log. */
-export default function WeightHistoryScreen({ profile, weights }: { profile: Profile; weights: WeightEntry[] }) {
+export default function WeightHistoryScreen({ profile, weights, openLog = false }: { profile: Profile; weights: WeightEntry[]; openLog?: boolean }) {
   const router = useRouter();
-  const [showLog, setShowLog] = useState(false);
+  const [showLog, setShowLog] = useState(openLog);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const latest = weights[0]?.weight_kg ?? profile.weight_kg;

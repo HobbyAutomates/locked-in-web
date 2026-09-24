@@ -4,18 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveProfile } from "@/lib/actions";
 import { generate, missing, type Targets } from "@/lib/goals";
-import { carbTargetG, fatTargetG, type Profile } from "@/lib/types";
+import { DEFAULT_FIBER_G, DEFAULT_SUGAR_G, carbTargetG, fatTargetG, type Profile } from "@/lib/types";
 import SubPage from "./SubPage";
-import { ChevronRight } from "./icons";
-import { Card, ErrorNote, Hair, NumberField, PillButton, Rise, fmt } from "./ui";
+import { ChevronDown, ChevronRight, Flame } from "./icons";
+import { Card, ErrorNote, Hair, NumberField, PillButton, Ring, Rise, fmt } from "./ui";
 
 type Key = "p" | "c" | "f";
 type Split = Record<Key, number>;
 
 const MACROS: { key: Key; label: string; color: string; kcalPerG: number }[] = [
-  { key: "p", label: "Protein", color: "var(--red)", kcalPerG: 4 },
-  { key: "c", label: "Carbs", color: "var(--orange)", kcalPerG: 4 },
-  { key: "f", label: "Fat", color: "var(--blue)", kcalPerG: 9 },
+  { key: "p", label: "Protein", color: "#E9636B", kcalPerG: 4 },
+  { key: "c", label: "Carbs", color: "#E5A15B", kcalPerG: 4 },
+  { key: "f", label: "Fat", color: "#5B8DEF", kcalPerG: 9 },
 ];
 
 const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -74,12 +74,18 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [micros, setMicros] = useState(false);
+  const [fiber, setFiber] = useState(String(profile.fiber_target ?? DEFAULT_FIBER_G));
+  const [sugar, setSugar] = useState(String(profile.sugar_target ?? DEFAULT_SUGAR_G));
   const gaps = missing(profile);
+  const fiberG = Math.min(200, Math.max(1, Number(fiber) || DEFAULT_FIBER_G));
+  const sugarG = Math.min(500, Math.max(1, Number(sugar) || DEFAULT_SUGAR_G));
+  const microsDirty = fiberG !== (profile.fiber_target ?? DEFAULT_FIBER_G) || sugarG !== (profile.sugar_target ?? DEFAULT_SUGAR_G);
 
   const kcal = clampN(Number(calories) || 0, 0, 10_000);
   const kcalValid = kcal >= 800 && kcal <= 10_000;
   const next: Targets = exact && exact.calories === kcal ? exact : gramsFrom(kcal, split);
-  const dirty = next.calories !== current.calories || next.protein !== current.protein || next.carbs !== (profile.carb_target_g ?? -1) || next.fat !== (profile.fat_target_g ?? -1);
+  const dirty = microsDirty || next.calories !== current.calories || next.protein !== current.protein || next.carbs !== (profile.carb_target_g ?? -1) || next.fat !== (profile.fat_target_g ?? -1);
 
   function setPct(key: Key, value: number) {
     setSplit((s) => rebalance(s, key, value));
@@ -110,7 +116,7 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
     setSaved(false);
     setError(null);
     try {
-      await saveProfile({ calorie_target: next.calories, protein_target_g: next.protein, carb_target_g: next.carbs, fat_target_g: next.fat });
+      await saveProfile({ calorie_target: next.calories, protein_target_g: next.protein, carb_target_g: next.carbs, fat_target_g: next.fat, fiber_target: fiberG, sugar_target: sugarG });
       setSaved(true);
       setPreview(null);
       setExact(next);
@@ -163,9 +169,14 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
       <Rise index={1}>
         <Card padding={0}>
           <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-            <span className="flex flex-col">
-              <span className="text-[15px] font-bold">Calorie goal</span>
-              <span className="text-xs muted">Per day</span>
+            <span className="flex items-center gap-3">
+              <Ring fraction={1} color="var(--ink)" size={40} stroke={4}>
+                <Flame size={16} />
+              </Ring>
+              <span className="flex flex-col">
+                <span className="text-[15px] font-bold">Calorie goal</span>
+                <span className="text-xs muted">Per day</span>
+              </span>
             </span>
             <NumberField
               value={calories}
@@ -206,6 +217,25 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
         </Card>
       </Rise>
 
+      {/* ---- Micronutrients ---- */}
+      <Rise index={3}>
+        <Card padding={0}>
+          <button type="button" aria-expanded={micros} className="press flex w-full items-center justify-between px-4 py-3.5 text-[15px] font-bold" style={{ background: "none", border: 0, color: "var(--ink)" }} onClick={() => setMicros((v) => !v)}>
+            View micronutrients
+            <ChevronDown size={18} style={{ transform: micros ? "rotate(180deg)" : "none", transition: "transform 0.2s", color: "var(--muted)" }} />
+          </button>
+          {micros ? (
+            <div className="px-4 pb-2">
+              <Hair />
+              <MicroRow label="Fiber" sub="Goal: at least" color="var(--green)" value={fiber} onChange={(v) => { setFiber(v); setSaved(false); }} />
+              <Hair />
+              <MicroRow label="Sugar" sub="Limit: at most" color="var(--purple)" value={sugar} onChange={(v) => { setSugar(v); setSaved(false); }} />
+              <p className="pb-2 text-[11px] leading-4 muted">Defaults: {DEFAULT_FIBER_G} g fiber, {DEFAULT_SUGAR_G} g sugar a day. Scans and meals count these from food labels and the food table.</p>
+            </div>
+          ) : null}
+        </Card>
+      </Rise>
+
       <Rise index={3}>
         <ErrorNote text={error} />
       </Rise>
@@ -222,9 +252,9 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
 function BeforeAfter({ before, after }: { before: Targets; after: Targets }) {
   const rows: [string, number, number, string, string][] = [
     ["Calories", before.calories, after.calories, "kcal", "var(--ink)"],
-    ["Protein", before.protein, after.protein, "g", "var(--red)"],
-    ["Carbs", before.carbs, after.carbs, "g", "var(--orange)"],
-    ["Fat", before.fat, after.fat, "g", "var(--blue)"],
+    ["Protein", before.protein, after.protein, "g", "#E9636B"],
+    ["Carbs", before.carbs, after.carbs, "g", "#E5A15B"],
+    ["Fat", before.fat, after.fat, "g", "#5B8DEF"],
   ];
   return (
     <div className="mt-3 rounded-2xl px-3.5 py-2.5" style={{ background: "var(--card2)" }}>
@@ -253,8 +283,12 @@ function MacroRow({ label, color, pct, grams, onChange }: { label: string; color
   return (
     <div className="py-3">
       <div className="flex items-baseline justify-between">
-        <span className="flex items-center gap-2 text-[15px] font-semibold">
-          <span className="rounded-full" style={{ width: 10, height: 10, background: color }} />
+        <span className="flex items-center gap-2.5 text-[15px] font-semibold">
+          <Ring fraction={pct / 100} color={color} size={32} stroke={4}>
+            <span className="text-[10px] font-extrabold" style={{ color }}>
+              {label.charAt(0)}
+            </span>
+          </Ring>
           {label}
         </span>
         <span className="num text-[15px] font-extrabold">
@@ -280,6 +314,26 @@ function MacroRow({ label, color, pct, grams, onChange }: { label: string; color
           +
         </Step>
       </div>
+    </div>
+  );
+}
+
+/** Fiber / sugar: a ring, the label and a grams field. */
+function MicroRow({ label, sub, color, value, onChange }: { label: string; sub: string; color: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-3">
+      <span className="flex items-center gap-2.5">
+        <Ring fraction={0.72} color={color} size={32} stroke={4}>
+          <span className="text-[10px] font-extrabold" style={{ color }}>
+            {label.charAt(0)}
+          </span>
+        </Ring>
+        <span className="flex flex-col">
+          <span className="text-[15px] font-semibold">{label}</span>
+          <span className="text-[11px] muted">{sub}</span>
+        </span>
+      </span>
+      <NumberField value={value} onChange={(v) => onChange(v.slice(0, 3))} unit="g" label={`${label} goal in grams`} />
     </div>
   );
 }

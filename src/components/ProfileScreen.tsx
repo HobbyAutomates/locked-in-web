@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveProfile, signOut } from "@/lib/actions";
-import { setBurnedBack, useBurnedBack } from "@/lib/prefs";
 import { onCount } from "@/lib/reminders";
 import { THEME_MODES, setThemeMode, useThemeMode, type ThemeMode } from "@/lib/theme";
 import { LENS_DEFAULTS, ageFrom, type LensDefault, type Profile } from "@/lib/types";
@@ -28,13 +27,14 @@ export default function ProfileScreen({ profile, email, userId }: { profile: Pro
   const [invited, setInvited] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const theme = useThemeMode();
-  const burnedBack = useBurnedBack();
   const age = ageFrom(profile.dob);
   // Blank name → the email's first run of letters ("ayaan.khan@…" → "Ayaan"), like the signup trigger.
   const shownName = displayName(profile.name, email);
   const remindersOn = onCount(profile.reminders);
   const [lensDefault, setLensDefault] = useState<LensDefault>(profile.lens_default);
   const [shareStats, setShareStats] = useState(profile.share_stats);
+  const [addBurned, setAddBurned] = useState(profile.add_burned_to_goal);
+  const [rollover, setRollover] = useState(profile.rollover_calories);
 
   async function savePref(patch: Partial<Profile>) {
     setError(null);
@@ -161,8 +161,26 @@ export default function ProfileScreen({ profile, email, userId }: { profile: Pro
               />
             </SettingRow>
             <Hair />
-            <SettingRow icon={<Flame size={20} />} label="Add burned calories back" subtitle="Logged exercise raises today's budget">
-              <Toggle on={burnedBack} onChange={setBurnedBack} label="Add burned calories back" />
+            <SettingRow icon={<Flame size={20} />} label="Add burned calories to daily goal" subtitle="Logged exercise raises that day's goal">
+              <Toggle
+                on={addBurned}
+                onChange={(v) => {
+                  setAddBurned(v);
+                  void savePref({ add_burned_to_goal: v });
+                }}
+                label="Add burned calories to daily goal"
+              />
+            </SettingRow>
+            <Hair />
+            <SettingRow icon={<Refresh size={20} />} label="Rollover calories" subtitle="Up to 200 left from yesterday carry over">
+              <Toggle
+                on={rollover}
+                onChange={(v) => {
+                  setRollover(v);
+                  void savePref({ rollover_calories: v });
+                }}
+                label="Rollover calories"
+              />
             </SettingRow>
             <Hair />
             <SettingRow icon={<Bell size={20} />} label="Reminders" href="/profile/reminders">

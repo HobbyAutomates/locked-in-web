@@ -29,6 +29,7 @@ export const QUICK_ACTIVITIES: { key: string; label: string; name: string; code:
   { key: "bands", label: "Bands", name: "Bands", code: null, met: 5, band: true },
   { key: "run", label: "Run", name: "Running", code: RUN_CODE, met: RUN_MET },
   { key: "walk", label: "Walk", name: "Walking", code: "LI-17190", met: 3.5 },
+  { key: "cycle", label: "Cycle", name: "Cycling", code: "01015", met: 7.5 },
   { key: "cricket", label: "Cricket", name: "Cricket", code: "LI-15150", met: 4.8 },
   { key: "badminton", label: "Badminton", name: "Badminton", code: "LI-15030", met: 5.5 },
   { key: "skipping", label: "Skipping", name: "Jump rope", code: "LI-15551", met: 11.0 },
@@ -66,4 +67,44 @@ export function bandKcal(level: string, weightKg: number | null | undefined, min
 
 export function intensityLabel(intensity: string) {
   return intensity === "low" ? "Low" : intensity === "high" ? "High" : "Medium";
+}
+
+// ---- v2.3: Google-Fit-style intensity slider (0–100) ----
+
+/** The four bands under the slider, lowest first. */
+export const INTENSITY_BANDS: { upTo: number; label: string; sub: string }[] = [
+  { upTo: 25, label: "Easy", sub: "could sing" },
+  { upTo: 50, label: "Moderate", sub: "can talk in sentences" },
+  { upTo: 75, label: "Hard", sub: "heavy breathing, short sentences" },
+  { upTo: 101, label: "All out", sub: "can't talk" },
+];
+
+export function intensityBand(pct: number) {
+  const p = Math.max(0, Math.min(100, pct));
+  return INTENSITY_BANDS.find((b) => p < b.upTo) ?? INTENSITY_BANDS[INTENSITY_BANDS.length - 1];
+}
+
+/** 0 % → MET ×0.8, 100 % → MET ×1.3, linear in between (50 % ≈ ×1.05). */
+export function pctMultiplier(pct: number): number {
+  return 0.8 + (Math.max(0, Math.min(100, pct)) / 100) * 0.5;
+}
+
+/** The coarse low / medium / high the `intensity` column still stores (and Android reads). */
+export function pctToIntensity(pct: number): Intensity {
+  return pct < 34 ? "low" : pct < 67 ? "medium" : "high";
+}
+
+/** Burn with the slider's multiplier instead of the three-step one. */
+export function burnKcalPct(met: number, weightKg: number | null | undefined, minutes: number, pct: number): number {
+  return round1((met * pctMultiplier(pct) * (weightKg ?? DEFAULT_WEIGHT_KG) * Math.max(0, minutes)) / 60);
+}
+
+/** Band level from the slider, for band sessions logged here. */
+export function pctToBandLevel(pct: number) {
+  return bandLevel(pctToIntensity(pct));
+}
+
+/** Run / walk / cycle (and their table cousins) are the activities that get a Distance field. */
+export function hasDistance(nameOrKey: string): boolean {
+  return /\b(run|running|jog|walk|walking|hik|cycl|bicycl|bike)/i.test(nameOrKey);
 }

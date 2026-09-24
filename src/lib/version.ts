@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.2";
+export const APP_VERSION = "2.3";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.3",
+    date: "2026-09-24",
+    lines: [
+      "Progress, rebuilt: current weight with your next weigh-in and a start-to-goal bar, weight and exercise changes over 3 days to all time, daily calories split into protein, carbs and fat, your BMI, and private progress photos.",
+      "Log water from Home or the new + menu (Meal, Workout, Exercise, Water, Weight). Exercise gets recent picks, icons and a More section for start time, an intensity slider, distance, steps and notes.",
+      "Discover public squads and join in one tap. Nutrition goals gets fiber and sugar targets, and two new Preferences: add burned calories to your goal and roll over up to 200 unused calories.",
+    ],
+  },
   {
     version: "2.2",
     date: "2026-09-24",

@@ -119,6 +119,14 @@ export type Profile = {
   share_stats: boolean;
   /** v2.2: "<uid>/avatar.jpg?v=<ms>" in the public `avatars` bucket, or null (initials). */
   avatar_path: string | null;
+  /** v2.3: micronutrient goals (null = the defaults, 30 g fibre / 50 g sugar). */
+  fiber_target: number | null;
+  sugar_target: number | null;
+  /** v2.3: today's exercise burn widens the calorie goal. */
+  add_burned_to_goal: boolean;
+  /** v2.3: up to 200 kcal left over from yesterday carries into today. */
+  rollover_calories: boolean;
+  water_goal_ml: number;
 };
 
 export const DEFAULT_PROFILE: Profile = {
@@ -140,7 +148,15 @@ export const DEFAULT_PROFILE: Profile = {
   lens_default: "protein",
   share_stats: true,
   avatar_path: null,
+  fiber_target: null,
+  sugar_target: null,
+  add_burned_to_goal: false,
+  rollover_calories: false,
+  water_goal_ml: 2500,
 };
+
+export const DEFAULT_FIBER_G = 30;
+export const DEFAULT_SUGAR_G = 50;
 
 /** One row of `bandlog.weight_log`, newest first. */
 export type WeightEntry = {
@@ -173,7 +189,21 @@ export type ExerciseEntry = {
   /** For source=workout this holds the workout id so a delete can find its row. */
   note: string;
   created_at: string;
+  /** v2.3 Google-Fit-style details (all optional). */
+  started_at?: string | null;
+  intensity_pct?: number | null;
+  distance_km?: number | null;
+  steps?: number | null;
 };
+
+/** v2.3: one glass / bottle logged (`bandlog.water_log`). */
+export type WaterEntry = { id: string; date: string; ml: number; created_at: string };
+
+/** v2.3: a progress photo with a short-lived signed URL. */
+export type ProgressPhoto = { id: string; date: string; path: string; note: string; url: string | null };
+
+/** v2.3: a row of `bandlog.public_groups()`. */
+export type PublicSquad = { id: string; name: string; tagline: string | null; cover_url: string | null; member_count: number; joined: boolean };
 
 /** One activity Haiku pulled out of a free-text description (see /api/describe-exercise). */
 export type DescribedExercise = {

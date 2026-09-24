@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { addDays, longDate, shortDate } from "@/lib/dates";
 import { dismiss, useDismissed } from "@/lib/dismiss";
-import { useBurnedBack } from "@/lib/prefs";
-import { totalsFor } from "@/lib/totals";
-import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Nudge, type Profile, type Workout, type Wrap } from "@/lib/types";
-import { Check, ChevronRight, Close, Fist, Flame, Lock, MoonStar, Run, Share, Spinner } from "./icons";
+import { calorieBudget, totalsFor } from "@/lib/totals";
+import { logWater } from "@/lib/actions";
+import LogWaterSheet from "./LogWaterSheet";
+import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Nudge, type Profile, type WaterEntry, type Workout, type Wrap } from "@/lib/types";
+import { Check, ChevronRight, Close, Fist, Flame, Glass, Lock, MoonStar, Plus, Run, Share, Spinner } from "./icons";
 import { ExerciseRow, MealRow, WorkoutRow } from "./Rows";
 import { usePendingMeals, type Pending } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
@@ -31,9 +32,11 @@ type Props = {
   wrap: Wrap | null;
   /** Nudges from squad-mates in the last 24 h. */
   nudges: Nudge[];
+  /** v2.3: water logged over the last week (the week strip's range). */
+  water?: WaterEntry[];
 };
 
-export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges }: Props) {
+export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [] }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(today);
   const { pending, savedCount, error } = usePendingMeals();
@@ -74,10 +77,10 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   const trained = new Set(workouts.map((w) => w.date));
   const carbTarget = Math.max(1, carbTargetG(profile));
   const fatTarget = Math.max(1, fatTargetG(profile));
-  // "Add burned calories back": today's exercise burn widens the budget when the preference is on.
-  const burnedBack = useBurnedBack();
-  const burnedKcal = burnedBack && isToday ? burned : 0;
-  const caloriesLeft = Math.max(0, Math.round(profile.calorie_target + burnedKcal - totals.calories));
+  // v2.3 Preferences: "Add burned calories to daily goal" and "Rollover calories" (up to 200).
+  const budget = calorieBudget(profile, meals, exercises, selected);
+  const burnedKcal = budget.burned;
+  const caloriesLeft = Math.max(0, Math.round(budget.budget - totals.calories));
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -117,13 +120,18 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
               <p className="mt-1 flex items-center gap-2 text-sm font-medium muted">
                 {isToday ? "Calories left" : `Calories left · ${shortDate(selected)}`}
                 {burnedKcal > 0 ? (
-                  <span className="num rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }} title="Burned calories added back">
-                    +{Math.round(burnedKcal)}
+                  <span className="num rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }} title="Burned calories added to your goal">
+                    +{Math.round(burnedKcal)} burned
+                  </span>
+                ) : null}
+                {budget.rollover > 0 ? (
+                  <span className="num rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }} title="Left over from yesterday">
+                    +{budget.rollover} rollover
                   </span>
                 ) : null}
               </p>
             </div>
-            <Ring fraction={totals.calories / Math.max(1, profile.calorie_target)} color="var(--ink)" size={96} stroke={9}>
+            <Ring fraction={totals.calories / Math.max(1, budget.budget)} color="var(--ink)" size={96} stroke={9}>
               <Flame size={26} />
             </Ring>
           </div>
@@ -177,6 +185,10 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       </Rise>
 
       <Rise index={4}>
+        <WaterCard date={selected} isToday={isToday} ml={water.filter((w) => w.date === selected).reduce((a, w) => a + w.ml, 0)} goal={profile.water_goal_ml} />
+      </Rise>
+
+      <Rise index={4}>
         <h2 className="text-xl font-extrabold" style={{ letterSpacing: "-0.025em" }}>
           {isToday ? "Recently logged" : longDate(selected)}
         </h2>
@@ -213,6 +225,52 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         {celebrate ? <Celebration thisWeek={thisWeek} target={profile.weekly_workout_target} streakWeeks={weekStreak} /> : null}
       </AnimatePresence>
     </div>
+  );
+}
+
+/** v2.3 water: today's mL against the goal, a "+ Glass" quick action and the full Log water sheet. */
+function WaterCard({ date, isToday, ml, goal }: { date: string; isToday: boolean; ml: number; goal: number }) {
+  const router = useRouter();
+  const [sheet, setSheet] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const target = Math.max(250, goal || 2500);
+  const glasses = Math.round(ml / 250);
+  async function addGlass() {
+    setAdding(true);
+    setError(null);
+    try {
+      await logWater(250, date);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not log that");
+    } finally {
+      setAdding(false);
+    }
+  }
+  return (
+    <>
+      <div className="card flex items-center gap-3" style={{ padding: "12px 12px 12px 14px" }}>
+        <button type="button" className="press flex min-w-0 flex-1 items-center gap-3 text-left" style={{ background: "none", border: 0, padding: 0, color: "var(--ink)" }} onClick={() => setSheet(true)} aria-label={`Water: ${ml} of ${target} mL. Log water`}>
+          <Ring fraction={ml / target} color="var(--blue)" size={44} stroke={5}>
+            <span style={{ color: "var(--blue)" }}>
+              <Glass size={16} />
+            </span>
+          </Ring>
+          <span className="flex min-w-0 flex-col">
+            <span className="num text-xl font-extrabold leading-tight">
+              {ml.toLocaleString("en-IN")} <span className="text-[13px] font-semibold muted">/ {target.toLocaleString("en-IN")} mL</span>
+            </span>
+            <span className="truncate text-xs muted">{error ?? (ml >= target ? "Water goal hit" : `Water${isToday ? " today" : ""} · ${glasses} glass${glasses === 1 ? "" : "es"}`)}</span>
+          </span>
+        </button>
+        <button type="button" className="chip press shrink-0 gap-1 whitespace-nowrap" style={{ height: 36, padding: "0 12px", fontWeight: 700 }} disabled={adding} onClick={() => void addGlass()} aria-label="Add a 250 mL glass">
+          {adding ? <Spinner size={14} /> : <Plus size={15} />}
+          Glass
+        </button>
+      </div>
+      <LogWaterSheet open={sheet} onClose={() => setSheet(false)} date={date} />
+    </>
   );
 }
 
