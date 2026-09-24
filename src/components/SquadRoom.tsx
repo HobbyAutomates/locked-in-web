@@ -4,18 +4,27 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { deleteSquadPost, loadLeaderboard, loadSquadPosts, nudgeMember, postSquadPhoto, sendSquadMessage } from "@/lib/actions";
+import { deleteSquadPost, loadChallenges, loadLeaderboard, loadSquadPosts, nudgeMember, postSquadPhoto, sendSquadMessage } from "@/lib/actions";
 import { postStamp } from "@/lib/display";
 import { CHAT_KINDS, FEED_KINDS } from "@/lib/squadPosts";
 import { toJpegBase64 } from "@/lib/image";
-import type { LeaderRow, Squad, SquadPost } from "@/lib/types";
+import type { Challenge, ChallengeBoardRow, LeaderRow, Squad, SquadPost } from "@/lib/types";
 import { Avatar } from "./Avatar";
-import { ArrowLeft, Bowl, Chat, Check, Dumbbell, Fist, Flame, Medal, People, Photo, Plus, Send, Spinner, Trash } from "./icons";
+import { ArrowLeft, Bowl, Chat, Check, ChevronRight, Dumbbell, Fist, Flame, Medal, People, Photo, Plus, Send, Spinner, Target, Trash } from "./icons";
+import { ChallengesTab } from "./SquadChallenges";
+import { SquadRankRow } from "./SquadRankRow";
 import { SquadIcon } from "./SquadIcon";
 import { BottomSheet, BreathingFlame, ErrorNote } from "./ui";
 
 
-type Tab = "chat" | "feed" | "leaderboard";
+type Tab = "chat" | "challenges" | "feed" | "leaderboard";
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: "chat", label: "Chat" },
+  { key: "challenges", label: "Challenges" },
+  { key: "feed", label: "Feed" },
+  { key: "leaderboard", label: "Leaderboard" },
+];
 
 type Props = {
   me: string;
@@ -24,6 +33,8 @@ type Props = {
   chat: SquadPost[];
   feed: SquadPost[];
   leaderboard: LeaderRow[];
+  challenges: Challenge[];
+  proteinGoal: number | null;
   sentNudges: string[];
   shareStats: boolean;
   pendingRequests: number;
@@ -32,15 +43,17 @@ type Props = {
 
 /**
  * v2.6 squad page (Cal AI group): header with the squad's icon and a members button, then
- * Chat · Feed · Leaderboard. Chat and Feed poll every 5 s / 15 s while visible; meals, workouts
+ * Chat · Challenges (v2.7) · Feed · Leaderboard. Chat and Feed poll every 5 s / 15 s while visible; meals, workouts
  * and PRs arrive in the Feed by themselves (see actions.ts → post_to_my_groups).
  */
-export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, sentNudges, shareStats, pendingRequests, initialTab }: Props) {
+export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, challenges: challenges0, proteinGoal, sentNudges, shareStats, pendingRequests, initialTab }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [chat, setChat] = useState(chat0);
   const [feed, setFeed] = useState(feed0);
   const [board, setBoard] = useState(board0);
+  const [challenges, setChallenges] = useState(challenges0);
+  const [challengeBoards, setChallengeBoards] = useState<Record<string, ChallengeBoardRow[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [photoSheet, setPhotoSheet] = useState<null | { base64: string; preview: string }>(null);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -50,7 +63,11 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
       try {
         if (which === "chat") setChat(await loadSquadPosts(squad.id, CHAT_KINDS));
         else if (which === "feed") setFeed(await loadSquadPosts(squad.id, FEED_KINDS));
-        else setBoard(await loadLeaderboard(squad.id));
+        else if (which === "challenges") {
+          const res = await loadChallenges(squad.id);
+          setChallenges(res.challenges);
+          setChallengeBoards(res.boards);
+        } else setBoard(await loadLeaderboard(squad.id));
       } catch {
         // A missed poll is fine; the next one catches up.
       }
@@ -58,10 +75,11 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
     [squad.id],
   );
 
-  // Poll the open tab while the page is visible: chat 5 s, feed 15 s, leaderboard once on open.
+  // Poll the open tab while the page is visible: chat 5 s, feed 15 s, leaderboard and challenges
+  // once on open (opening Challenges also posts "🏆 completed" for anything just finished).
   useEffect(() => {
     const first = setTimeout(() => void refresh(tab), 0);
-    if (tab === "leaderboard") return () => clearTimeout(first);
+    if (tab === "leaderboard" || tab === "challenges") return () => clearTimeout(first);
     const every = tab === "chat" ? 5000 : 15000;
     const id = setInterval(() => {
       if (document.visibilityState === "visible") void refresh(tab);
@@ -110,17 +128,17 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           </Link>
         </div>
         <div className="flex" role="tablist" aria-label="Squad">
-          {(["chat", "feed", "leaderboard"] as const).map((t) => (
+          {TABS.map(({ key: t, label }) => (
             <button
               key={t}
               type="button"
               role="tab"
               aria-selected={tab === t}
-              className="press relative flex-1 py-3 text-[14px] font-bold"
+              className="press relative flex-1 px-0.5 py-3 text-[13px] font-bold"
               style={{ background: "none", border: 0, color: tab === t ? "var(--ink)" : "var(--muted)" }}
               onClick={() => setTab(t)}
             >
-              {t === "chat" ? "Chat" : t === "feed" ? "Feed" : "Leaderboard"}
+              {label}
               {tab === t ? <motion.span layoutId="squad-tab" className="absolute inset-x-3 bottom-0 h-[3px] rounded-full" style={{ background: "var(--ink)" }} /> : null}
             </button>
           ))}
@@ -136,8 +154,21 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
 
       {tab === "chat" ? (
         <ChatTab me={me} today={today} posts={chat} onPhoto={() => photoRef.current?.click()} onSent={() => void refresh("chat")} squadId={squad.id} setPosts={setChat} onError={setError} />
+      ) : tab === "challenges" ? (
+        <ChallengesTab
+          me={me}
+          today={today}
+          squadId={squad.id}
+          challenges={challenges}
+          boards={challengeBoards}
+          proteinGoal={proteinGoal}
+          onCreated={() => {
+            void refresh("challenges");
+            void refresh("feed");
+          }}
+        />
       ) : tab === "feed" ? (
-        <FeedTab me={me} today={today} posts={feed} shareStats={shareStats} isOwner={squad.owner_id === me} onPhoto={() => photoRef.current?.click()} onDeleted={(id) => setFeed((f) => f.filter((p) => p.id !== id))} onError={setError} />
+        <FeedTab me={me} today={today} squadId={squad.id} posts={feed} shareStats={shareStats} isOwner={squad.owner_id === me} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDeleted={(id) => setFeed((f) => f.filter((p) => p.id !== id))} onError={setError} />
       ) : (
         <LeaderboardTab me={me} squadId={squad.id} rows={board} sentNudges={sentNudges} onError={setError} />
       )}
@@ -162,7 +193,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           const res = await postSquadPhoto(squad.id, photoSheet.base64, caption);
           if (!res.ok) throw new Error(res.error);
           setPhotoSheet(null);
-          void refresh(tab === "leaderboard" ? "feed" : tab);
+          void refresh(tab === "chat" ? "chat" : "feed");
         }}
       />
     </div>
@@ -290,24 +321,32 @@ const KIND_META: Record<string, { verb: string; tint: string; Icon: (p: { size?:
   workout: { verb: "trained", tint: "var(--purple)", Icon: Dumbbell },
   pr: { verb: "hit a new PR", tint: "var(--flame)", Icon: Medal },
   photo: { verb: "shared a photo", tint: "var(--blue)", Icon: Photo },
+  challenge: { verb: "started a challenge", tint: "var(--flame)", Icon: Target },
 };
+
+/** v2.7: "🏆 completed ..." posts carry ref_id = challenge id; "🏁 started ..." ones don't. */
+const isCompletion = (p: SquadPost) => p.kind === "challenge" && p.body.startsWith("🏆");
 
 function FeedTab({
   me,
   today,
+  squadId,
   posts,
   shareStats,
   isOwner,
   onPhoto,
+  onChallenges,
   onDeleted,
   onError,
 }: {
   me: string;
   today: string;
+  squadId: string;
   posts: SquadPost[];
   shareStats: boolean;
   isOwner: boolean;
   onPhoto: () => void;
+  onChallenges: () => void;
   onDeleted: (id: string) => void;
   onError: (e: string | null) => void;
 }) {
@@ -354,6 +393,7 @@ function FeedTab({
         <AnimatePresence initial={false}>
           {posts.map((p) => {
             const meta = KIND_META[p.kind] ?? KIND_META.photo;
+            const verb = isCompletion(p) ? "crushed a challenge" : meta.verb;
             const canDelete = p.user_id === me || isOwner;
             return (
               <motion.article key={p.id} layout className="card" style={{ padding: 14 }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0, padding: 0 }}>
@@ -361,7 +401,7 @@ function FeedTab({
                   <Avatar path={p.author_avatar_path} name={p.author_name} size={40} />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-[14px]">
-                      <span className="font-bold">{p.user_id === me ? "You" : p.author_name}</span> <span className="muted">{meta.verb}</span>
+                      <span className="font-bold">{p.user_id === me ? "You" : p.author_name}</span> <span className="muted">{verb}</span>
                     </span>
                     <span className="truncate text-[11px] muted">
                       {p.author_username ? `@${p.author_username} · ` : ""}
@@ -380,6 +420,17 @@ function FeedTab({
                   <p className={`mt-2.5 whitespace-pre-wrap break-words ${p.kind === "photo" ? "text-[14px]" : "text-[16px] font-bold"}`} style={{ letterSpacing: p.kind === "photo" ? undefined : "-0.01em" }}>
                     {p.body}
                   </p>
+                ) : null}
+                {p.kind === "challenge" ? (
+                  p.ref_id ? (
+                    <Link href={`/squad/${squadId}/challenge/${p.ref_id}`} className="press mt-2 inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: "var(--ink)" }}>
+                      See the board <ChevronRight size={13} />
+                    </Link>
+                  ) : (
+                    <button type="button" className="press mt-2 inline-flex items-center gap-1 text-[12px] font-bold" style={{ background: "none", border: 0, padding: 0, color: "var(--ink)" }} onClick={onChallenges}>
+                      Open challenges <ChevronRight size={13} />
+                    </button>
+                  )
                 ) : null}
                 {canDelete ? (
                   <div className="mt-1 flex justify-end">
@@ -422,39 +473,36 @@ function LeaderboardTab({ me, squadId, rows, sentNudges, onError }: { me: string
         const isMe = r.user_id === me;
         const already = nudged.has(r.user_id);
         return (
-          <div key={r.user_id} className="card flex items-center gap-3" style={{ padding: "12px 14px", outline: isMe ? "2px solid var(--ink)" : "none" }}>
-            <span className="num w-8 shrink-0 text-[15px] font-extrabold" style={{ color: r.rank === 1 ? "var(--flame)" : "var(--ink)" }}>
-              #{r.rank}
-            </span>
-            <Avatar path={r.avatar_path} name={r.name} size={46} />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[15px] font-bold">
-                {r.name}
-                {isMe ? <span className="font-medium muted"> · you</span> : null}
-              </span>
-              <span className="truncate text-xs muted">{r.username ? `@${r.username}` : "no username yet"}</span>
-              <span className="num text-[11px] muted">{r.week_points} pts this week</span>
-            </span>
-            <span className="flex shrink-0 flex-col items-end gap-1.5">
-              <span className="flex items-center gap-1 text-[17px] font-extrabold" title={`${r.flames}-day streak`}>
-                {r.flames > 0 ? <BreathingFlame size={18} /> : <span className="muted inline-flex"><Flame size={18} /></span>}
-                <span className="num">{r.flames}</span>
-              </span>
-              {!isMe ? (
-                <button
-                  type="button"
-                  className="chip press"
-                  style={{ height: 28, padding: "0 10px", gap: 4, fontSize: 12, fontWeight: 700, background: already ? "var(--card2)" : "var(--btn)", color: already ? "var(--muted)" : "var(--btn-ink)" }}
-                  disabled={already}
-                  aria-label={already ? `Nudged ${r.name}` : `Nudge ${r.name}`}
-                  onClick={() => void nudge(r)}
-                >
-                  {already ? <Check size={12} /> : <Fist size={12} />}
-                  {already ? "Nudged" : "Nudge"}
-                </button>
-              ) : null}
-            </span>
-          </div>
+          <SquadRankRow
+            key={r.user_id}
+            rank={r.rank}
+            avatarPath={r.avatar_path}
+            name={r.name}
+            username={r.username}
+            isMe={isMe}
+            meta={`${r.week_points} pts this week`}
+            right={
+              <>
+                <span className="flex items-center gap-1 text-[17px] font-extrabold" title={`${r.flames}-day streak`}>
+                  {r.flames > 0 ? <BreathingFlame size={18} /> : <span className="muted inline-flex"><Flame size={18} /></span>}
+                  <span className="num">{r.flames}</span>
+                </span>
+                {!isMe ? (
+                  <button
+                    type="button"
+                    className="chip press"
+                    style={{ height: 28, padding: "0 10px", gap: 4, fontSize: 12, fontWeight: 700, background: already ? "var(--card2)" : "var(--btn)", color: already ? "var(--muted)" : "var(--btn-ink)" }}
+                    disabled={already}
+                    aria-label={already ? `Nudged ${r.name}` : `Nudge ${r.name}`}
+                    onClick={() => void nudge(r)}
+                  >
+                    {already ? <Check size={12} /> : <Fist size={12} />}
+                    {already ? "Nudged" : "Nudge"}
+                  </button>
+                ) : null}
+              </>
+            }
+          />
         );
       })}
       <p className="px-1 pt-1 text-center text-[12px] leading-snug muted">🔥 = days in a row with a meal, workout or exercise logged. Points this week: 10 per training day + 5 per day with meals.</p>

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getJoinRequests, getLeaderboard, getProfile, getSentNudges, getSquad, getSquadPosts } from "@/lib/data";
+import { getChallenges, getJoinRequests, getLeaderboard, getProfile, getSentNudges, getSquad, getSquadPosts } from "@/lib/data";
 import { today } from "@/lib/dates";
 import { requireUser } from "@/lib/supabase/server";
 import SquadRoom from "@/components/SquadRoom";
@@ -13,15 +13,16 @@ export default async function SquadRoomPage({ params, searchParams }: { params: 
   const [{ user }, squad] = await Promise.all([requireUser(), getSquad(id)]);
   // Not a member (RLS hides the row): back to the hub.
   if (!squad || !user) redirect("/squad");
-  const [chat, feed, leaderboard, sent, profile, requests] = await Promise.all([
+  const [chat, feed, leaderboard, challenges, sent, profile, requests] = await Promise.all([
     getSquadPosts(id, CHAT_KINDS),
     getSquadPosts(id, FEED_KINDS),
     getLeaderboard(id),
+    getChallenges(id),
     getSentNudges(),
     getProfile(),
     squad.owner_id === user.id ? getJoinRequests(id) : Promise.resolve([]),
   ]);
-  const tab = sp.tab === "feed" || sp.tab === "leaderboard" ? sp.tab : "chat";
+  const tab = sp.tab === "feed" || sp.tab === "leaderboard" || sp.tab === "challenges" ? sp.tab : "chat";
   return (
     <SquadRoom
       me={user.id}
@@ -30,6 +31,8 @@ export default async function SquadRoomPage({ params, searchParams }: { params: 
       chat={chat}
       feed={feed}
       leaderboard={leaderboard}
+      challenges={challenges}
+      proteinGoal={profile.protein_target_g ?? null}
       sentNudges={sent}
       shareStats={profile.share_stats}
       pendingRequests={requests.length}

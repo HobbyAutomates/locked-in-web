@@ -366,7 +366,7 @@ export type Squad = {
   member_count?: number;
 };
 
-export type SquadPostKind = "message" | "meal" | "workout" | "pr" | "photo";
+export type SquadPostKind = "message" | "meal" | "workout" | "pr" | "photo" | "challenge";
 
 /** One row of `bandlog.group_feed(g, before, n, kinds)`; `photo_url` is signed server-side. */
 export type SquadPost = {
@@ -386,6 +386,45 @@ export type SquadPost = {
 
 /** One row of `bandlog.group_leaderboard(g)`. */
 export type LeaderRow = { rank: number; user_id: string; name: string; username: string | null; avatar_path: string | null; flames: number; week_points: number; is_owner: boolean };
+
+// ---- v2.7: squad challenges ----
+
+export type ChallengeKind = "train_days" | "protein_days" | "log_days";
+/** Derived from the dates (Asia/Kolkata "today"), never stored. */
+export type ChallengeStatus = "upcoming" | "active" | "ended";
+
+/** One row of `bandlog.group_challenge_list(g)`. `leader_*` is the board's #1 (may have 0 progress). */
+export type Challenge = {
+  id: string;
+  kind: ChallengeKind;
+  title: string;
+  target_days: number;
+  protein_target: number | null;
+  starts_on: string;
+  ends_on: string;
+  created_by: string;
+  creator_name: string;
+  status: ChallengeStatus;
+  my_progress: number;
+  leader_name: string | null;
+  leader_progress: number;
+  participants: number;
+  completed_count: number;
+  /** The board's #1 (appended to the RPC after the first draft of the spec). */
+  leader_user_id: string | null;
+};
+
+/** One row of `bandlog.challenge_board(c)`. */
+export type ChallengeBoardRow = {
+  user_id: string;
+  name: string;
+  username: string | null;
+  avatar_path: string | null;
+  progress: number;
+  completed: boolean;
+  completed_on: string | null;
+  rank: number;
+};
 
 /** One row of `bandlog.group_members_detail(g)`. */
 export type SquadMemberDetail = { id: string; name: string; username: string | null; avatar_path: string | null; is_owner: boolean; flames: number; joined_at: string };

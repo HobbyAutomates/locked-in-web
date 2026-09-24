@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, today } from "./dates";
 import { workoutWeekStreak } from "./streaks";
+import { checkChallengeCompletions } from "./challenges";
 
 /**
  * The per-user daily rollup the squad board reads (`bandlog.daily_stats`), recomputed from the
@@ -71,5 +72,8 @@ export async function rollupQuietly(supabase: AnyClient, userId: string, dates: 
     await recomputeRollup(supabase, userId, [...dates, today()]);
   } catch {
     // The squad board just shows the previous numbers until the next save or refresh.
+    return;
   }
+  // v2.7: fresh daily_stats may have just finished a squad challenge. Never throws.
+  await checkChallengeCompletions(supabase, userId);
 }

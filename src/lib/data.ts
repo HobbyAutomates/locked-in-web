@@ -1,6 +1,7 @@
 import { addDays, today } from "./dates";
 import { createClient } from "./supabase/server";
-import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Nudge, type Profile, type ProgressPhoto, type PublicSquad, type ScanHistoryItem, type Squad, type SquadMember, type WaterEntry, type WeightEntry, type Workout, type JoinRequest, type LeaderRow, type SquadInvite, type SquadMemberDetail, type SquadPost } from "./types";
+import { DEFAULT_PROFILE, type ExerciseEntry, type FoodPreset, type Meal, type MealItem, type Nudge, type Profile, type ProgressPhoto, type PublicSquad, type ScanHistoryItem, type Squad, type SquadMember, type WaterEntry, type WeightEntry, type Workout, type JoinRequest, type LeaderRow, type SquadInvite, type SquadMemberDetail, type SquadPost, type Challenge, type ChallengeBoardRow } from "./types";
+import { normalizeBoard, normalizeChallenge } from "./challenges";
 import { parse as parseReminders } from "./reminders";
 import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 import { scanName } from "./scanNames";
@@ -442,6 +443,46 @@ export async function getSquadByCode(code: string): Promise<SquadInvite | null> 
   if (error) return null;
   const row = (Array.isArray(data) ? data[0] : data) as SquadInvite | undefined;
   return row ? { ...row, member_count: Number(row.member_count ?? 0), join_policy: row.join_policy === "request" ? "request" : "open" } : null;
+}
+
+// ---- v2.7: squad challenges ----
+
+/** Upcoming + active + ended-in-the-last-30-days challenges of a squad, newest first. */
+export async function fetchChallenges(supabase: Client, groupId: string): Promise<Challenge[]> {
+  const { data, error } = await supabase.rpc("group_challenge_list", { g: groupId });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Challenge[]).map(normalizeChallenge);
+}
+
+/** The ranked board of one challenge (every squad member). */
+export async function fetchChallengeBoard(supabase: Client, challengeId: string): Promise<ChallengeBoardRow[]> {
+  const { data, error } = await supabase.rpc("challenge_board", { c: challengeId });
+  if (error) throw new Error(error.message);
+  return normalizeBoard((data ?? []) as ChallengeBoardRow[]);
+}
+
+export async function getChallenges(groupId: string): Promise<Challenge[]> {
+  const supabase = await createClient();
+  try {
+    return await fetchChallenges(supabase, groupId);
+  } catch {
+    return [];
+  }
+}
+
+/** One challenge (RLS: squad members only) as a list row, or null. */
+export async function getChallenge(groupId: string, challengeId: string): Promise<Challenge | null> {
+  const list = await getChallenges(groupId);
+  return list.find((c) => c.id === challengeId) ?? null;
+}
+
+export async function getChallengeBoard(challengeId: string): Promise<ChallengeBoardRow[]> {
+  const supabase = await createClient();
+  try {
+    return await fetchChallengeBoard(supabase, challengeId);
+  } catch {
+    return [];
+  }
 }
 
 export { totalsFor } from "./totals";

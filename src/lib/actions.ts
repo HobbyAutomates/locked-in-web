@@ -9,9 +9,10 @@ import { bandCode, bandIntensity, bandKcal, burnKcal } from "./burn";
 import { rollupQuietly } from "./rollup";
 import { adminClient } from "./apiAuth";
 import { today as todayIso } from "./dates";
-import type { Activity, DescribedExercise, FoodSearchHit, LeaderRow, MealItem, Profile, SavedMeal, SquadMember, SquadPost, WaterEntry, WaterVessel, WorkoutExercise, WorkoutKind } from "./types";
+import type { Activity, Challenge, ChallengeBoardRow, ChallengeKind, DescribedExercise, FoodSearchHit, LeaderRow, MealItem, Profile, SavedMeal, SquadMember, SquadPost, WaterEntry, WaterVessel, WorkoutExercise, WorkoutKind } from "./types";
 import { mealPostBody, prPostBody, workoutPostBody } from "./squadPosts";
-import { fetchSquadPosts } from "./data";
+import { fetchChallengeBoard, fetchChallenges, fetchSquadPosts } from "./data";
+import { checkChallengeCompletions } from "./challenges";
 
 /** v2.5: Compendium rows for the auto-burn of gym / bodyweight sessions. */
 const LIFT_BURN: Record<"gym" | "bodyweight", { code: string; met: number; label: string }> = {
@@ -829,4 +830,58 @@ export async function loadLeaderboard(groupId: string): Promise<LeaderRow[]> {
   const { data, error } = await supabase.rpc("group_leaderboard", { g: groupId });
   if (error) throw new Error(error.message);
   return ((data ?? []) as LeaderRow[]).map((r) => ({ ...r, rank: Number(r.rank), flames: Number(r.flames ?? 0), week_points: Number(r.week_points ?? 0) }));
+}
+
+// ---- v2.7: squad challenges ----
+
+/**
+ * The Challenges tab: first post "🏆 completed" for anything I've just finished, then the list and
+ * each challenge's board (leader avatars on the cards, finishers under Past). Squads are small.
+ */
+export async function loadChallenges(groupId: string): Promise<{ challenges: Challenge[]; boards: Record<string, ChallengeBoardRow[]> }> {
+  const { supabase, user } = await userOrThrow();
+  await checkChallengeCompletions(supabase, user.id);
+  const challenges = await fetchChallenges(supabase, groupId);
+  const boards: Record<string, ChallengeBoardRow[]> = {};
+  await Promise.all(
+    challenges.map(async (c) => {
+      try {
+        boards[c.id] = await fetchChallengeBoard(supabase, c.id);
+      } catch {
+        // The card falls back to initials / a count.
+      }
+    }),
+  );
+  return { challenges, boards };
+}
+
+export async function loadChallengeBoard(challengeId: string): Promise<ChallengeBoardRow[]> {
+  const { supabase } = await userOrThrow();
+  return fetchChallengeBoard(supabase, challengeId);
+}
+
+/** Start a challenge (bandlog.create_challenge checks the rules and posts "🏁 started" to the feed). */
+export async function createChallenge(input: { groupId: string; kind: ChallengeKind; title: string; targetDays: number; proteinTarget: number | null; startsOn: string; endsOn: string }): Promise<ActionResult> {
+  const { supabase } = await userOrThrow();
+  const { data, error } = await supabase.rpc("create_challenge", {
+    g: input.groupId,
+    kind: input.kind,
+    title: input.title.trim().slice(0, 60),
+    target_days: Math.round(input.targetDays),
+    protein_target: input.kind === "protein_days" ? Math.round(input.proteinTarget ?? 100) : null,
+    starts_on: input.startsOn,
+    ends_on: input.endsOn,
+  });
+  if (error) return { ok: false, error: error.message };
+  revalidatePath(`/squad/${input.groupId}`);
+  return { ok: true, id: data as string };
+}
+
+/** Creator or squad owner only (RLS); nothing deleted means neither. */
+export async function deleteChallenge(challengeId: string): Promise<ActionResult> {
+  const { supabase } = await userOrThrow();
+  const { data, error } = await supabase.from("group_challenges").delete().eq("id", challengeId).select("id");
+  if (error) return { ok: false, error: describe(error) };
+  if (!data?.length) return { ok: false, error: "Only whoever started it or the squad owner can delete this" };
+  return { ok: true };
 }

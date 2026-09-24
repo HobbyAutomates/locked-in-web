@@ -3,6 +3,7 @@ import { createClient as createSupabase } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, today } from "@/lib/dates";
 import { recomputeRollup } from "@/lib/rollup";
+import { checkChallengeCompletions } from "@/lib/challenges";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,8 @@ export async function POST(req: Request) {
 
   try {
     const rows = await recomputeRollup(supabase, user.id, valid);
+    // v2.7: post "🏆 completed" for any squad challenge these rows just finished (idempotent).
+    await checkChallengeCompletions(supabase, user.id);
     return NextResponse.json({ rows });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Rollup failed" }, { status: 500 });
