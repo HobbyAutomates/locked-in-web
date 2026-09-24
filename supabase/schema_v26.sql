@@ -393,3 +393,10 @@ select json_build_object(
   'no_username', (select count(*) from bandlog.profiles where username is null),
   'sample_usernames', (select json_agg(username) from (select username from bandlog.profiles where username is not null limit 5) s)
 ) as result;
+do $$ declare c record; begin
+  for c in select conname from pg_constraint where conrelid = 'bandlog.water_log'::regclass and contype = 'c' and pg_get_constraintdef(oid) ilike '%vessel%' loop
+    execute format('alter table bandlog.water_log drop constraint %I', c.conname);
+  end loop;
+end $$;
+alter table bandlog.water_log add constraint water_log_vessel_check check (vessel is null or vessel in ('glass','bottle','large','custom','reminder','widget'));
+select conname, pg_get_constraintdef(oid) as def from pg_constraint where conrelid = 'bandlog.water_log'::regclass and contype='c';
