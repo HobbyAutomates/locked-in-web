@@ -9,9 +9,11 @@ import { ANALYTICS_ON } from "@/lib/analytics";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user } = await requireAdmin();
   return (
-    <main className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 px-4" style={{ paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 40 }}>
-      <header>
-        <h1 className="screen-title">Admin</h1>
+    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 md:px-8 xl:px-12" style={{ paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", paddingBottom: 48 }}>
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h1 className="m-0 text-[26px] font-extrabold md:text-[30px]" style={{ letterSpacing: "-0.03em" }}>
+          Locked In · Admin
+        </h1>
         <p className="text-xs muted">
           {user.email} · beta analytics {ANALYTICS_ON ? "on" : "off"}
         </p>

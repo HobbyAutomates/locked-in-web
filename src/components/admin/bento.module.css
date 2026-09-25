@@ -1,0 +1,313 @@
+/*
+ * v2.12 admin bento (AdminBento / UserBento designs). Component-local on purpose: colours come from
+ * the app tokens in globals.css (so light/dark follow prefers-color-scheme AND the app's data-theme
+ * switch), plus a few derived shades defined here. Motion is CSS-only (server components) and is
+ * switched off under prefers-reduced-motion.
+ */
+
+.root {
+  --b-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --b-green-ink: color-mix(in srgb, var(--green) 62%, #000);
+  --b-red-ink: color-mix(in srgb, var(--red) 82%, #000);
+  --b-orange-ink: color-mix(in srgb, var(--orange) 70%, #000);
+  --b-blue-ink: color-mix(in srgb, var(--blue) 82%, #000);
+  --b-soft-green: color-mix(in srgb, var(--green) 50%, var(--card));
+  --b-on-accent: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: var(--ink);
+}
+
+:global(:root[data-theme="dark"]) .root {
+  --b-green-ink: color-mix(in srgb, var(--green) 80%, #fff);
+  --b-red-ink: color-mix(in srgb, var(--red) 85%, #fff);
+  --b-orange-ink: var(--orange);
+  --b-blue-ink: color-mix(in srgb, var(--blue) 80%, #fff);
+  --b-soft-green: color-mix(in srgb, var(--green) 55%, var(--card));
+  --b-on-accent: #000000;
+}
+@media (prefers-color-scheme: dark) {
+  :global(:root:not([data-theme="light"])) .root {
+    --b-green-ink: color-mix(in srgb, var(--green) 80%, #fff);
+    --b-red-ink: color-mix(in srgb, var(--red) 85%, #fff);
+    --b-orange-ink: var(--orange);
+    --b-blue-ink: color-mix(in srgb, var(--blue) 80%, #fff);
+    --b-soft-green: color-mix(in srgb, var(--green) 55%, var(--card));
+    --b-on-accent: #000000;
+  }
+}
+
+/* ---- layout ---- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+}
+.s1 { grid-column: span 1; }
+.s2 { grid-column: span 2; }
+.s3 { grid-column: span 3; }
+.s4 { grid-column: span 4; }
+.s6 { grid-column: span 6; }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 1100px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 800px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .grid > * { grid-column: auto; }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+}
+
+.tile {
+  background: var(--card);
+  border-radius: 24px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+@media (max-width: 800px) {
+  .tile { padding: 18px; border-radius: 20px; }
+}
+.risk { box-shadow: inset 0 0 0 2px var(--red); }
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.note { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.big { font-size: 46px; font-weight: 800; letter-spacing: -2px; line-height: 1; font-variant-numeric: tabular-nums; }
+.mid { font-size: 30px; font-weight: 800; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
+.sub { font-size: 13px; font-weight: 600; }
+.h2 { margin: 0; font-size: 20px; font-weight: 700; }
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-top: 6px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--card2);
+  color: var(--muted);
+}
+.pillGreen { background: var(--green-bg); color: var(--b-green-ink); }
+.pillRed { background: var(--red-bg); color: var(--b-red-ink); }
+.pillOrange { background: var(--orange-bg); color: var(--b-orange-ink); }
+.pillBlue { background: var(--blue-bg); color: var(--b-blue-ink); }
+.pillInk { background: var(--card2); color: var(--ink); }
+.pillCard { background: var(--card); color: var(--ink); }
+
+.inkGreen { color: var(--b-green-ink); }
+.inkRed { color: var(--b-red-ink); }
+.inkOrange { color: var(--b-orange-ink); }
+.inkBlue { color: var(--b-blue-ink); }
+.inkMuted { color: var(--muted); }
+
+.well {
+  background: var(--card2);
+  border-radius: 14px;
+  padding: 12px;
+  min-width: 0;
+}
+
+.avatar {
+  border-radius: 50%;
+  background: var(--card2);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.link {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--b-blue-ink);
+  text-decoration: none;
+}
+.link:hover { text-decoration: underline; }
+
+.back {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+/* ---- charts ---- */
+
+.vbars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.vbar {
+  flex: 1;
+  min-width: 0;
+  border-radius: 4px;
+  transform-origin: bottom;
+}
+.axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.hrow {
+  display: grid;
+  grid-template-columns: minmax(80px, 34%) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+}
+.hrow > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.htrack { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+.hfill { height: 8px; border-radius: 4px; transform-origin: left; }
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  min-width: 0;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.stack {
+  display: flex;
+  height: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  gap: 2px;
+}
+.stack > span { height: 100%; transform-origin: left; }
+
+.strip { display: flex; gap: 2px; }
+.strip > span { flex: 1; height: 8px; border-radius: 2px; }
+
+/* last-14-days calendar */
+.cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+.calHead { font-size: 11px; font-weight: 600; color: var(--muted); text-align: center; }
+.calCell {
+  height: 60px;
+  border-radius: 12px;
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+.calToday { outline: 2px solid var(--ink); outline-offset: 2px; }
+.calDate { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 800; }
+.calDots { display: flex; gap: 3px; flex-wrap: wrap; }
+.calDots > span { width: 5px; height: 5px; border-radius: 50%; }
+@media (max-width: 420px) {
+  .calCell { height: 52px; padding: 6px; }
+}
+
+/* weekday × hour heat */
+.heat {
+  display: grid;
+  grid-template-columns: 30px repeat(24, minmax(0, 1fr));
+  gap: 3px;
+  align-items: center;
+}
+.heat > i {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  display: block;
+}
+.heatLab { font-size: 10.5px; color: var(--muted); font-style: normal; }
+
+/* feature × week matrix */
+.matrixWrap { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+.matrix {
+  display: grid;
+  gap: 5px;
+  align-items: center;
+  min-width: 560px;
+}
+.mcell {
+  height: 26px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* tables inside tiles */
+.tableWrap { overflow-x: auto; margin: 0 -8px; padding: 0 8px; }
+
+/* ---- motion ---- */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes growY {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes growX {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.rise { animation: rise 0.95s var(--b-ease) both; animation-delay: var(--d, 0ms); }
+.growY { animation: growY 0.9s var(--b-ease) both; animation-delay: calc(var(--d, 0ms) + 180ms + var(--i, 0) * 16ms); }
+.growX { animation: growX 1s var(--b-ease) both; animation-delay: calc(var(--d, 0ms) + 200ms + var(--i, 0) * 40ms); }
+.draw { stroke-dasharray: 1 1; animation: draw 1.2s var(--b-ease) both; animation-delay: calc(var(--d, 0ms) + 200ms + var(--i, 0) * 90ms); }
+.fade { animation: fade 0.8s ease-out both; animation-delay: calc(var(--d, 0ms) + 150ms + var(--i, 0) * 14ms); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .growY,
+  .growX,
+  .draw,
+  .fade {
+    animation: none;
+  }
+}
