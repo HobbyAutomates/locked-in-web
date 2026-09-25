@@ -18,7 +18,7 @@ type Res = { data: unknown; error: { message: string; code?: string } | null };
 
 const PAGE = 1000;
 
-async function pages(make: (from: number, to: number) => PromiseLike<Res>, cap = 20000): Promise<{ rows: Row[]; error: Res["error"] }> {
+export async function pages(make: (from: number, to: number) => PromiseLike<Res>, cap = 20000): Promise<{ rows: Row[]; error: Res["error"] }> {
   const rows: Row[] = [];
   for (let from = 0; from < cap; from += PAGE) {
     const { data, error } = await make(from, from + PAGE - 1);
@@ -139,7 +139,7 @@ export type AdminUser = {
   events: number;
 };
 
-async function allAuthUsers(db: AdminDb): Promise<User[]> {
+export async function allAuthUsers(db: AdminDb): Promise<User[]> {
   const out: User[] = [];
   for (let page = 1; page <= 20; page++) {
     const { data, error } = await db.auth.admin.listUsers({ page, perPage: 1000 });
@@ -161,15 +161,18 @@ export function profileName(p: Row | undefined): { username: string; name: strin
   return { username: str(p.username), name: str(p.name), onboarded: !needsOnboarding(p as unknown as Profile) };
 }
 
-export async function loadUsers(db: AdminDb): Promise<{ users: AdminUser[]; eventsAvailable: boolean }> {
-  const [auth, prof, ev] = await Promise.all([
-    allAuthUsers(db),
-    pages((a, b) => db.from("profiles").select("*").range(a, b)),
-    events(db, { since: addDays(today(), -90), cols: "user_id, platform, app_version, created_at" }),
-  ]);
-  const profiles = new Map(prof.rows.map((p) => [str(p.id), p]));
+/**
+ * The users table's base columns from rows already read (the insights Dataset: auth users,
+ * profiles and the last 90 days of app events), so /admin/users makes one set of queries.
+ */
+export function buildAdminUsers(
+  auth: { id: string; email?: string | null; created_at: string; last_sign_in_at?: string | null }[],
+  profileRows: Row[],
+  eventRows: { user_id: string; platform: string | null; app_version: string | null; created_at: string }[],
+): AdminUser[] {
+  const profiles = new Map(profileRows.map((p) => [str(p.id), p]));
   const per = new Map<string, { platforms: Set<string>; version: string; versionAt: string; last: string; n: number }>();
-  for (const e of ev.rows) {
+  for (const e of eventRows) {
     const s = per.get(e.user_id) ?? { platforms: new Set<string>(), version: "", versionAt: "", last: "", n: 0 };
     if (e.platform) s.platforms.add(e.platform);
     if (e.app_version && e.created_at > s.versionAt) {
@@ -180,7 +183,7 @@ export async function loadUsers(db: AdminDb): Promise<{ users: AdminUser[]; even
     s.n++;
     per.set(e.user_id, s);
   }
-  const users = auth.map((u) => {
+  return auth.map((u) => {
     const p = profileName(profiles.get(u.id));
     const s = per.get(u.id);
     return {
@@ -195,7 +198,6 @@ export async function loadUsers(db: AdminDb): Promise<{ users: AdminUser[]; even
       events: s?.n ?? 0,
     };
   });
-  return { users, eventsAvailable: ev.available };
 }
 
 // ---------------------------------------------------------------------------------------------

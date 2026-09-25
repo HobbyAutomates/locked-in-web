@@ -9,15 +9,19 @@ import { decodeBarcode, makeThumb, postJson, toJpegBase64 } from "@/lib/image";
 import { mealItemFromPlate, priceItem, type QuantityFood } from "@/lib/quantity";
 import { initialLens, type Fit, type LabelReport, type Lens, type MealItem, type PlateEstimate, type PlateItem, type Profile, type ScanHistoryItem } from "@/lib/types";
 import { applyFollowUpEffect, gramsRangeLabel, totalKcalRange } from "@/lib/scanFollowUp";
-import { Alert, Barcode, Camera, Check, ChevronDown, Close, Scan, Spinner, Spoon, Tag, Trash } from "./icons";
+import { Alert, Barcode, Camera, Check, ChevronDown, Close, Spinner, Spoon, Tag, Trash } from "./icons";
 import QuantitySheet from "./QuantitySheet";
 import FoodImage from "./FoodImage";
 import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
-import { Card, ErrorNote, Hair, MacroDot, PillButton, Ring, Rise, SPRING, fmt } from "./ui";
+import { Card, ErrorNote, Hair, MacroDot, PillButton, Rise, SPRING, fmt } from "./ui";
 import { InfoButton, SourceSheet, VariantChips } from "./SourceSheet";
 import { needsCheck, reportSourceInfo, sourceInfoFor } from "@/lib/sourceInfo";
 import { swapToVariant, type FoodVariant } from "@/lib/variants";
 import { track } from "@/lib/track";
+import { defaultMealType } from "@/lib/mealType";
+import CameraStage, { ScanIcon, type ScanMode } from "./scan/CameraStage";
+import PhotoStage from "./scan/PhotoStage";
+import sc from "./scan/scan.module.css";
 
 const LENSES: { key: Lens; label: string }[] = [
   { key: "protein", label: "Protein" },
@@ -78,6 +82,9 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
   const [res, setRes] = useState<ScanResult | null>(null);
   const [opened, setOpened] = useState<Record<string, unknown> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // v2.12: the gallery picker (no capture) and the viewfinder's mode, which only frames the shot.
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<ScanMode>("food");
 
   function reset() {
     setError(null);
@@ -145,73 +152,86 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
 
   const code = digits.replace(/\D/g, "");
 
+  /** Back to the live viewfinder (v2.12): clears the photo and the result, nothing else. */
+  function toCamera() {
+    reset();
+    setPreview(null);
+    setPayload(null);
+  }
+
+  const onCamera = !preview && !res && !opened;
+  // A plate with items and its photo: the photo, chips and the whole sheet live in PlateReview.
+  const plateSheet = !!(res?.plate && res.plate.items.length && preview);
+  const digitsAndNote = (
+    <>
+      {showDigits ? (
+        <div className="mt-1 flex gap-2">
+          <input className="field num" inputMode="numeric" value={digits} aria-label="Barcode digits" onChange={(e) => setDigits(e.target.value.replace(/[^\d]/g, "").slice(0, 14))} placeholder="The digits under the bars" />
+          <PillButton height={48} className="!w-auto shrink-0 !px-5" disabled={busy || code.length < 8} onClick={() => { setPreview(null); setPayload(null); void run({ kind: "barcode", barcode: code }, null); }}>
+            Look up
+          </PillButton>
+        </div>
+      ) : null}
+      {showNote ? (
+        <div className="mt-1 flex gap-2">
+          <input className="field" value={note} aria-label="Note" onChange={(e) => setNote(e.target.value)} placeholder={res?.kind === "plate" ? "e.g. the dal has ghee, two rotis" : "What is it / what do you want to know"} />
+          <PillButton height={48} className="!w-auto shrink-0 !px-5" disabled={busy || !note.trim() || (!payload && code.length < 8)} onClick={() => void run({ kind: res?.kind, barcode: code.length >= 8 ? code : undefined })}>
+            Redo
+          </PillButton>
+        </div>
+      ) : null}
+    </>
+  );
+  const resultTitle = res?.kind === "plate" ? "Your plate" : res?.kind === "barcode" ? "Barcode" : res ? "Label check" : busy ? "Reading…" : "Your photo";
+
   return (
     <div className="flex flex-col gap-3.5">
-      <Rise index={0}>
-        <h1 className="screen-title">Scan</h1>
-        <p className="text-[13px] muted">A barcode, a nutrition label or your plate</p>
-      </Rise>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={galleryRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
 
-      <Rise index={1}>
-        <Card>
-          {preview ? (
-            // eslint-disable-next-line @next/next/no-img-element -- a local canvas data URL, not a remote asset
-            <img src={preview} alt="What you scanned" className="mb-3 h-[190px] w-full rounded-[14px] object-cover" />
-          ) : (
-            <div className="mb-3 flex items-center gap-3">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)" }}>
-                <Scan size={22} />
-              </span>
-              <p className="text-[13px] leading-snug muted">Point it at a pack&apos;s barcode, its nutrition label, or your plate — it works out which.</p>
-            </div>
-          )}
-          <input ref={fileRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-hidden="true" onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} />
-          <PillButton disabled={busy} onClick={() => fileRef.current?.click()}>
-            <span className="inline-flex items-center gap-2">
-              <Scan size={18} />
-              {preview ? "Scan another" : "Scan"}
-            </span>
-          </PillButton>
-          {busy ? (
-            <>
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
-                <div className="shimmer h-full w-1/2 rounded-full" style={{ background: "var(--ink)" }} />
-              </div>
-              <p className="mt-1.5 text-xs muted">{stage}</p>
-            </>
-          ) : null}
-          <div className="mt-2 flex flex-wrap items-center gap-x-4">
-            <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showDigits} onClick={() => setShowDigits((v) => !v)}>
-              Type barcode digits
-            </button>
-            {res || preview ? (
-              <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showNote} onClick={() => setShowNote((v) => !v)}>
-                Add a note
+      {onCamera ? (
+        <CameraStage
+          mode={mode}
+          onMode={setMode}
+          busy={busy}
+          stage={stage}
+          onPhoto={(f) => void pick(f)}
+          onNativeCamera={() => fileRef.current?.click()}
+          onGallery={() => galleryRef.current?.click()}
+          onClose={() => router.push("/")}
+          onTypeDigits={() => setShowDigits(true)}
+        />
+      ) : preview && !plateSheet ? (
+        <PhotoStage src={preview} title={resultTitle} onClose={toCamera} busy={busy} stage={stage} mode={mode} short={!!res && !busy} />
+      ) : null}
+
+      {plateSheet ? null : (
+        <Rise index={1}>
+          <Card padding={12}>
+            <div className="flex flex-wrap items-center gap-x-4">
+              {!onCamera ? (
+                <button type="button" className="hit press inline-flex items-center gap-1.5 py-2 text-[13px] font-semibold" disabled={busy} onClick={toCamera}>
+                  <ScanIcon name="camera" size={16} />
+                  Scan another
+                </button>
+              ) : null}
+              <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showDigits} onClick={() => setShowDigits((v) => !v)}>
+                Type barcode digits
               </button>
-            ) : null}
-          </div>
-          {showDigits ? (
-            <div className="mt-1 flex gap-2">
-              <input className="field num" inputMode="numeric" value={digits} aria-label="Barcode digits" onChange={(e) => setDigits(e.target.value.replace(/[^\d]/g, "").slice(0, 14))} placeholder="The digits under the bars" />
-              <PillButton height={48} className="!w-auto shrink-0 !px-5" disabled={busy || code.length < 8} onClick={() => { setPreview(null); setPayload(null); void run({ kind: "barcode", barcode: code }, null); }}>
-                Look up
-              </PillButton>
+              {res || preview ? (
+                <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showNote} onClick={() => setShowNote((v) => !v)}>
+                  Add a note
+                </button>
+              ) : null}
             </div>
-          ) : null}
-          {showNote ? (
-            <div className="mt-1 flex gap-2">
-              <input className="field" value={note} aria-label="Note" onChange={(e) => setNote(e.target.value)} placeholder={res?.kind === "plate" ? "e.g. the dal has ghee, two rotis" : "What is it / what do you want to know"} />
-              <PillButton height={48} className="!w-auto shrink-0 !px-5" disabled={busy || !note.trim() || (!payload && code.length < 8)} onClick={() => void run({ kind: res?.kind, barcode: code.length >= 8 ? code : undefined })}>
-                Redo
-              </PillButton>
-            </div>
-          ) : null}
-        </Card>
-      </Rise>
+            {digitsAndNote}
+          </Card>
+        </Rise>
+      )}
 
       <ErrorNote text={error} />
 
-      {res && payload ? (
+      {res && payload && !plateSheet ? (
         <Rise index={2}>
           <KindChips kind={res.kind} onPick={(k) => void run({ kind: k, barcode: k === "barcode" && code.length >= 8 ? code : undefined })} disabled={busy} />
         </Rise>
@@ -221,7 +241,7 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
           <Card>
             <p className="text-[15px]">{res.notFound}</p>
             <div className="mt-3">
-              <PillButton soft height={46} onClick={() => fileRef.current?.click()}>
+              <PillButton soft height={46} onClick={toCamera}>
                 Scan again
               </PillButton>
             </div>
@@ -229,7 +249,29 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
         </Rise>
       ) : null}
       {res?.report ? <ReportView key={String(res.report.id ?? res.report.product)} report={res.report} initialLens={lens} /> : null}
-      {res?.plate ? <PlateReview key={String(res.plate.id ?? "plate")} plate={res.plate} onSaved={() => setRes(null)} /> : null}
+      {res?.plate ? (
+        <PlateReview
+          key={String(res.plate.id ?? "plate")}
+          plate={res.plate}
+          photo={preview}
+          onClose={toCamera}
+          onSaved={() => setRes(null)}
+          extra={
+            <>
+              <div className="flex flex-wrap items-center gap-x-4">
+                <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showNote} onClick={() => setShowNote((v) => !v)}>
+                  Add a note
+                </button>
+                <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showDigits} onClick={() => setShowDigits((v) => !v)}>
+                  Type barcode digits
+                </button>
+              </div>
+              {digitsAndNote}
+              {payload ? <KindChips kind={res.kind} onPick={(k) => void run({ kind: k, barcode: k === "barcode" && code.length >= 8 ? code : undefined })} disabled={busy} /> : null}
+            </>
+          }
+        />
+      ) : null}
       {opened ? <OpenedScan data={opened} onClose={() => setOpened(null)} /> : null}
 
       <History items={history} onOpen={open} />
@@ -429,29 +471,28 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
 
   return (
     <>
-      {/* ---- hero ---- */}
+      {/* ---- hero: the product card (v2.12 Scan 3 / Scan 4) ---- */}
       <Rise index={2}>
-        <Card padding={18}>
-          <div className="flex items-start gap-3">
+        <Card padding={16}>
+          <div className="flex items-center gap-3">
             {r.image_url || r.thumb_url ? (
               // eslint-disable-next-line @next/next/no-img-element -- Open Food Facts product photo, or the scan's own signed thumbnail
-              <img src={(r.image_url || r.thumb_url) as string} alt="" className="h-16 w-16 shrink-0 rounded-[12px] object-cover" style={{ background: "var(--card2)" }} />
-            ) : null}
+              <img src={(r.image_url || r.thumb_url) as string} alt="" className="h-12 w-12 shrink-0 rounded-[12px] object-cover" style={{ background: "var(--card2)" }} />
+            ) : (
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[12px]" style={{ background: "var(--card2)", color: "var(--muted)" }} aria-hidden="true">
+                {r.kind === "barcode" ? <Barcode size={22} /> : <Tag size={22} />}
+              </span>
+            )}
             <div className="min-w-0 flex-1">
-              <p className="text-[18px] font-extrabold leading-snug" style={{ overflowWrap: "anywhere", letterSpacing: "-0.02em" }}>
+              <p className="text-[16px] font-bold leading-snug" style={{ overflowWrap: "anywhere" }}>
                 {r.product || "Unnamed label"}
+                {r.serving_g ? <span className="font-semibold muted"> · {Math.round(r.serving_g)} g serving</span> : null}
               </p>
-              {info?.one_liner ? <p className="mt-1 text-[13px] leading-snug muted">{info.one_liner}</p> : null}
+              <p className="mt-0.5 text-xs muted">{sourceLine(r)}</p>
             </div>
-            {score != null ? (
-              <Ring fraction={score / 10} color={scoreColor} size={62} stroke={7}>
-                <span className="flex flex-col items-center leading-none">
-                  <span className="num text-[20px] font-extrabold">{score}</span>
-                  <span className="text-[9px] font-semibold muted">/ 10</span>
-                </span>
-              </Ring>
-            ) : null}
           </div>
+          {score != null ? <ScoreDial score={score} color={scoreColor} caption={[eat ? `Eat it? ${eat.label}` : null, TRUST[r.verdict]?.label ?? null].filter(Boolean).join(" · ")} /> : null}
+          {info?.one_liner ? <p className={`${score != null ? "mt-1.5" : "mt-3"} text-center text-[13px] leading-snug muted`}>{info.one_liner}</p> : null}
           {eat || fit ? (
             <div className="mt-3.5 rounded-2xl px-3.5 py-3" style={{ background: "var(--card2)" }}>
               {eat ? (
@@ -472,6 +513,8 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
 
       <ValidationBanner flags={r.validation} />
       <SummaryGrid r={r} />
+      <TrafficLights r={r} />
+      <ClaimsCheck claims={r.claims} />
 
       {food ? (
         <Rise index={3}>
@@ -505,7 +548,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
           <button type="button" aria-expanded={details} className="press flex min-h-[52px] w-full items-center justify-between px-4 text-left" onClick={() => setDetails((d) => !d)}>
             <span className="text-[15px] font-bold">Details</span>
             <span className="flex items-center gap-1.5 text-xs muted">
-              {details ? "Hide" : "Trust, macros, ingredients, claims"}
+              {details ? "Hide" : "Trust, serving, ingredients, more"}
               <motion.span animate={{ rotate: details ? 180 : 0 }} transition={SPRING} className="inline-flex">
                 <ChevronDown size={18} />
               </motion.span>
@@ -534,23 +577,27 @@ function ValidationBanner({ flags }: { flags?: { field: string; issue: string; s
   if (!flags || !flags.length) return null;
   return (
     <Rise index={2}>
-      <Card padding={14}>
+      <div className={sc.check} role="note">
         <div className="flex items-start gap-2.5">
-          <span style={{ color: "var(--orange)" }}>
+          <span className="mt-px shrink-0" style={{ color: "var(--orange)" }}>
             <Alert size={18} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-bold">Check this 👀</p>
-            <ul className="mt-1 list-none p-0">
-              {flags.map((f, i) => (
-                <li key={i} className="mt-1 text-[13px] leading-relaxed muted">
-                  {f.issue}
-                </li>
-              ))}
-            </ul>
+            <b>Check this:</b>{" "}
+            {flags.length === 1 ? (
+              flags[0].issue
+            ) : (
+              <ul className="mt-1 list-none p-0">
+                {flags.map((f, i) => (
+                  <li key={i} className="mt-1 leading-relaxed">
+                    {f.issue}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
-      </Card>
+      </div>
     </Rise>
   );
 }
@@ -581,13 +628,13 @@ function SummaryGrid({ r }: { r: LabelReport }) {
   const at = (v: number | undefined) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v) * k);
   const protein = hasServing && r.protein?.per_serving_g != null ? Number(r.protein.per_serving_g) : at(p.protein_g);
   const cells: { label: string; value: number | null; unit: string; color: string }[] = [
-    { label: "Protein", value: protein, unit: "g", color: "var(--red)" },
-    { label: "Calories", value: at(p.calories), unit: "kcal", color: "var(--ink)" },
-    { label: "Sugar", value: at(p.sugar_g), unit: "g", color: "var(--orange)" },
-    { label: "Fat", value: at(p.fat_g), unit: "g", color: "var(--blue)" },
+    { label: "kcal", value: at(p.calories), unit: "", color: "var(--ink)" },
+    { label: "protein", value: protein, unit: "g", color: "var(--red)" },
+    { label: "carbs", value: at(p.carbs_g), unit: "g", color: "var(--orange)" },
+    { label: "fat", value: at(p.fat_g), unit: "g", color: "var(--blue)" },
   ];
   if (cells.every((c) => c.value == null)) return null;
-  const show = (v: number, unit: string) => (unit === "kcal" || v >= 10 ? String(Math.round(v)) : fmt(Math.round(v * 10) / 10));
+  const show = (v: number, unit: string) => (unit === "" || v >= 10 ? String(Math.round(v)) : fmt(Math.round(v * 10) / 10));
   const isEstimate = !!meta.nutrition_source && meta.nutrition_source !== "label";
   return (
     <Rise index={3}>
@@ -600,20 +647,134 @@ function SummaryGrid({ r }: { r: LabelReport }) {
             </span>
           ) : null}
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className={`mt-2 ${sc.macroGrid}`}>
           {cells.map((c) => (
-            <div key={c.label} className="rounded-2xl px-3.5 py-3" style={{ background: "var(--card2)" }}>
-              <p className="num text-[26px] font-extrabold leading-none" style={{ letterSpacing: "-0.03em", color: c.value == null ? "var(--muted)" : "var(--ink)" }}>
-                {c.value == null ? "—" : show(c.value, c.unit)}
-                <span className="ml-0.5 text-[13px] font-bold muted">{c.value == null ? "" : c.unit}</span>
+            <div key={c.label} className={sc.macroCell}>
+              <p className="num text-[17px] font-extrabold leading-tight" style={{ color: c.value == null ? "var(--muted)" : "var(--ink)" }}>
+                {c.value == null ? "—" : `${show(c.value, c.unit)}${c.unit ? ` ${c.unit}` : ""}`}
               </p>
-              <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold muted">
+              <p className="mt-0.5 flex items-center justify-center gap-1 text-[11px] muted">
                 <span className="rounded-full" style={{ width: 6, height: 6, background: c.color }} />
                 {c.label}
               </p>
             </div>
           ))}
         </div>
+      </Card>
+    </Rise>
+  );
+}
+
+/** "Found on Open Food Facts · numbers checked" and friends: where the numbers came from. */
+function sourceLine(r: LabelReport): string {
+  const meta = withMeta(r);
+  const flagged = !!r.validation?.length;
+  const src =
+    meta.nutrition_source === "openfoodfacts"
+      ? "Found on Open Food Facts"
+      : meta.nutrition_source === "label"
+        ? "Read from the label"
+        : meta.nutrition_source === "web_estimate"
+          ? "Estimated from the web"
+          : r.kind === "barcode"
+            ? "Barcode lookup"
+            : "Label scan";
+  if (meta.needs_back_of_pack) return `${src} · no nutrition table yet`;
+  return `${src} · ${flagged ? "one thing to check" : "numbers checked"}`;
+}
+
+/** Half-circle score meter (score out of 10), drawing in once. */
+function ScoreDial({ score, color, caption }: { score: number; color: string; caption: string }) {
+  const f = Math.max(0.001, Math.min(1, score / 10));
+  const a = Math.PI * (1 - f);
+  const x = 120 + 90 * Math.cos(a);
+  const y = 110 - 90 * Math.sin(a);
+  return (
+    <svg className={sc.dial} width={240} height={130} viewBox="0 0 240 130" role="img" aria-label={`Score ${score} out of 10${caption ? `, ${caption}` : ""}`}>
+      <path d="M30 110 A90 90 0 0 1 210 110" fill="none" stroke="var(--track)" strokeWidth={16} strokeLinecap="round" />
+      <path className={sc.dialArc} d={`M30 110 A90 90 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}`} pathLength={1} fill="none" stroke={color} strokeWidth={16} strokeLinecap="round" />
+      <text x={120} y={98} textAnchor="middle" fontSize={40} fontWeight={800} fill="var(--ink)">
+        {score}
+        <tspan fontSize={15} fontWeight={600} fill="var(--muted)">
+          {" "}
+          / 10
+        </tspan>
+      </text>
+      <text x={120} y={124} textAnchor="middle" fontSize={12} fill="var(--muted)">
+        {caption}
+      </text>
+    </svg>
+  );
+}
+
+/**
+ * Traffic lights per 100 g from the parsed label (v2.12 Scan 4). Thresholds follow the UK FSA
+ * front-of-pack scheme for sugar, fat and salt (sodium = salt / 2.5); fibre and protein are "more is
+ * better" (6 g fibre = "high fibre", 3 g = "source of"; 10 g protein green, 5 g amber, else grey).
+ */
+function TrafficLights({ r }: { r: LabelReport }) {
+  if (withMeta(r).needs_back_of_pack) return null;
+  const p = r.per_100g ?? {};
+  const G = "var(--green)";
+  const A = "var(--orange)";
+  const R = "var(--red)";
+  const N = "var(--muted)";
+  const rows: { name: string; v: number | undefined; unit: string; color: (v: number) => string }[] = [
+    { name: "Sugar", v: p.sugar_g, unit: "g", color: (v) => (v <= 5 ? G : v <= 22.5 ? A : R) },
+    { name: "Fat", v: p.fat_g, unit: "g", color: (v) => (v <= 3 ? G : v <= 17.5 ? A : R) },
+    { name: "Sodium", v: p.sodium_mg, unit: "mg", color: (v) => (v <= 120 ? G : v <= 600 ? A : R) },
+    { name: "Fibre", v: p.fiber_g, unit: "g", color: (v) => (v >= 6 ? G : v >= 3 ? A : N) },
+    { name: "Protein", v: p.protein_g, unit: "g", color: (v) => (v >= 10 ? G : v >= 5 ? A : N) },
+  ];
+  const shown = rows.filter((x) => x.v != null && Number.isFinite(Number(x.v)));
+  if (!shown.length) return null;
+  return (
+    <Rise index={3}>
+      <Card padding={16}>
+        <p className="mb-1.5 text-[14px] font-bold">Per 100 g</p>
+        {shown.map((x) => {
+          const v = Number(x.v);
+          return (
+            <div key={x.name} className={sc.light}>
+              <span className={sc.lightDot} style={{ background: x.color(v) }} aria-hidden="true" />
+              {x.name}
+              <span className="num ml-auto muted">
+                {x.unit === "mg" || v >= 10 ? Math.round(v) : fmt(Math.round(v * 10) / 10)} {x.unit}
+              </span>
+            </div>
+          );
+        })}
+      </Card>
+    </Rise>
+  );
+}
+
+/** "Claims check": what the pack says against what the label shows. */
+function ClaimsCheck({ claims }: { claims?: LabelReport["claims"] }) {
+  if (!claims?.length) return null;
+  return (
+    <Rise index={3}>
+      <Card padding={16}>
+        <p className="text-[14px] font-bold">Claims check</p>
+        {claims.map((c, i) => {
+          const color = c.status === "supported" ? "var(--green)" : c.status === "unclear" ? "var(--orange)" : "var(--red)";
+          return (
+            <div key={i} className="mt-2.5 flex items-start gap-2.5">
+              <span className="mt-px grid h-5 w-5 shrink-0 place-items-center" style={{ color }} aria-label={c.status}>
+                {c.status === "supported" ? <Check size={20} /> : c.status === "unclear" ? <Alert size={20} /> : <Close size={20} />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex-1 text-sm font-semibold">&ldquo;{c.claim}&rdquo;</span>
+                  <span className="shrink-0 whitespace-nowrap text-xs font-bold" style={{ color }}>
+                    {c.status}
+                  </span>
+                </div>
+                <p className="text-[13px] muted">{c.why}</p>
+              </div>
+            </div>
+          );
+        })}
       </Card>
     </Rise>
   );
@@ -778,31 +939,6 @@ function Details({ r }: { r: LabelReport }) {
       </Section>,
     );
   }
-  if (r.claims?.length) {
-    sections.push(
-      <Section key="claims" title="Claims on the pack">
-        {r.claims.map((c, i) => {
-          const color = c.status === "supported" ? "var(--green)" : c.status === "unclear" ? "var(--orange)" : "var(--red)";
-          return (
-            <div key={i} className={`flex items-start gap-2.5${i ? " mt-2.5" : ""}`}>
-              <span className="mt-px grid h-5 w-5 shrink-0 place-items-center" style={{ color }} aria-label={c.status}>
-                {c.status === "supported" ? <Check size={20} /> : c.status === "unclear" ? <Alert size={20} /> : <Close size={20} />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex-1 text-sm font-semibold">&ldquo;{c.claim}&rdquo;</span>
-                  <span className="shrink-0 whitespace-nowrap text-xs font-bold" style={{ color }}>
-                    {c.status}
-                  </span>
-                </div>
-                <p className="text-[13px] muted">{c.why}</p>
-              </div>
-            </div>
-          );
-        })}
-      </Section>,
-    );
-  }
   if (r.suggestions?.length) sections.push(<Bullets key="for-you" title="For you" lines={r.suggestions} strong />);
   if (r.research?.length) sections.push(<Bullets key="web" title="What the web says" lines={r.research} />);
   if (r.alternatives?.length) sections.push(<Bullets key="alt" title="Better options" lines={r.alternatives} />);
@@ -898,7 +1034,14 @@ function GramsInput({ original, current, onScale }: { original: PlateItem; curre
   );
 }
 
-export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate; onSaved?: () => void; readOnly?: boolean }) {
+/**
+ * The plate estimate (v2.12 "Scan 2 · meal result"): with a `photo`, the photo fills the top with
+ * floating Calories / Protein chips and everything else sits in a sheet that rises over it: the
+ * total with its ± range, the follow-up question, each item with its gram range, confidence, the
+ * sources button and the "Which one?" picker, then "Log as <meal>". The logic (edits, variants,
+ * follow-up effects, saving) is unchanged from v2.9.
+ */
+export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }: { plate: PlateEstimate; onSaved?: () => void; readOnly?: boolean; photo?: string | null; onClose?: () => void; extra?: React.ReactNode }) {
   const router = useRouter();
   const [items, setItems] = useState<PlateItem[]>(plate.items);
   // The un-scaled estimate for each row, kept in lockstep with `items` (including removals) so a
@@ -914,6 +1057,7 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
   // v2.9: the row whose "Where's this from?" sheet is open, and rows whose variant the user picked.
   const [infoIdx, setInfoIdx] = useState<number | null>(null);
   const [confirmed, setConfirmed] = useState<Set<number>>(() => new Set());
+  const listRef = useRef<HTMLDivElement>(null);
   const kcalTotal = totalKcalRange(items);
   const prot = items.reduce((a, i) => a + i.protein_g, 0);
 
@@ -945,99 +1089,147 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
     setOriginals((cur) => applyFollowUpEffect(cur, effect, plate.follow_up?.question));
   }
 
-  return (
+  const totalText = kcalTotal.plusMinus > 0 ? `~${kcalTotal.center}` : `${kcalTotal.center}`;
+  const toItems = () => {
+    listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    listRef.current?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+  };
+  const meal = defaultMealType();
+
+  const body = (
     <>
-      <Rise index={3}>
-        <Card>
-          <p className="text-[15px] font-bold">{plate.plate_note || "Your plate"}</p>
-          <p className="mt-0.5 text-xs muted">This is an estimate — edit anything.</p>
-          {plate.portion_hint === "restaurant" ? (
-            <p className="mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: "var(--orange-bg)", color: "var(--orange)" }}>
-              Restaurant portion · ×1.4 + hidden oil
-            </p>
-          ) : null}
-        </Card>
-      </Rise>
-      <Rise index={4}>
-        <Card padding={0}>
-          <div className="px-4">
-            {order.map((idx, pos) => {
-              const it = items[idx];
-              const c = CONF_STYLE[it.confidence];
-              const low = it.confidence === "low";
-              const micros = MICRO_LABELS.filter(([k]) => it.micros[k] != null);
-              return (
-                <div key={idx} style={low ? { outline: `1px solid ${c.color}`, outlineOffset: -1, borderRadius: 12, background: "color-mix(in srgb, var(--orange) 5%, transparent)" } : undefined}>
-                  {pos > 0 ? <Hair /> : null}
-                  <div className="flex items-center gap-2 py-3 px-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-[15px] font-semibold">
-                          {it.name}
-                          {it.source === "estimated" ? " ~" : ""}
-                        </span>
-                        <span className="badge shrink-0" style={{ background: `color-mix(in srgb, ${c.color} 16%, transparent)`, color: c.color, fontSize: 10 }}>
-                          {c.label}
-                        </span>
-                        <InfoButton name={it.name} check={!confirmed.has(idx) && needsCheck(it)} onClick={() => setInfoIdx(idx)} />
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap gap-2 text-xs muted">
-                        <span>{it.calories} kcal</span>
-                        <span style={{ color: "var(--red)" }}>{fmt(it.protein_g)}g P</span>
-                        <span style={{ color: "var(--orange)" }}>{fmt(it.carbs_g)}g C</span>
-                        <span style={{ color: "var(--blue)" }}>{fmt(it.fat_g)}g F</span>
-                        {micros.length ? (
-                          <button type="button" className="press underline" onClick={() => setOpen(open === idx ? null : idx)}>
-                            Micros
-                          </button>
-                        ) : null}
-                      </div>
-                      {it.grams_low != null && it.grams_high != null ? <p className="mt-0.5 text-[11px] muted">{gramsRangeLabel(it)}</p> : null}
-                      {it.uncertainties?.length ? <p className="mt-0.5 text-[11px]" style={{ color: "var(--orange)" }}>{it.uncertainties.join(" · ")}</p> : null}
-                      {!readOnly && it.variants && it.variants.length > 1 ? <VariantChips variants={it.variants} currentId={it.food_id} onPick={(v) => pickVariant(idx, v)} /> : null}
-                      {open === idx ? (
-                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs muted">
-                          {micros.map(([k, label, unit]) => (
-                            <span key={k}>
-                              {label} {fmt(it.micros[k] as number)} {unit}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                    {!readOnly ? (
-                      <>
-                        <GramsInput
-                          key={`${idx}-${items.length}`}
-                          original={originals[idx]}
-                          current={it}
-                          onScale={(next) => setItems(items.map((x, i) => (i === idx ? next : x)))}
-                        />
-                        <span className="text-xs muted">g</span>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${it.name}`}
-                          className="hit press grid h-8 w-8 place-items-center rounded-full"
-                          style={{ color: "var(--muted)" }}
-                          onClick={() => {
-                            setItems(items.filter((_, i) => i !== idx));
-                            setOriginals(originals.filter((_, i) => i !== idx));
-                            setConfirmed((cur) => new Set([...cur].filter((i) => i !== idx).map((i) => (i > idx ? i - 1 : i))));
-                          }}
-                        >
-                          <Trash size={16} />
-                        </button>
-                      </>
-                    ) : (
-                      <span className="num text-sm font-bold">{Math.round(it.grams)} g</span>
-                    )}
-                  </div>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="num text-[30px] font-extrabold leading-none" style={{ letterSpacing: "-0.03em" }}>
+          {totalText} <span className="text-[14px] font-semibold muted">kcal{kcalTotal.plusMinus > 0 ? ` ±${kcalTotal.plusMinus}` : ""}</span>
+        </span>
+        <span className="text-[13px]">
+          <b style={{ color: "var(--blue)" }}>{fmt(Math.round(prot * 10) / 10)} g</b> protein
+        </span>
+      </div>
+      <div>
+        <p className="text-[15px] font-bold">{plate.plate_note || "Your plate"}</p>
+        <p className="mt-0.5 text-xs muted">This is an estimate — edit anything.</p>
+        {plate.portion_hint === "restaurant" ? (
+          <p className="mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: "var(--orange-bg)", color: "var(--orange)" }}>
+            Restaurant portion · ×1.4 + hidden oil
+          </p>
+        ) : null}
+      </div>
+      {plate.follow_up && plate.follow_up.options.length ? (
+        <div className={sc.followUp}>
+          <span className="mr-auto text-[13px] font-semibold">{plate.follow_up.question}</span>
+          <span className="flex flex-wrap gap-2">
+            {plate.follow_up.options.map((o) => (
+              <button key={o.effect + o.label} type="button" aria-pressed={pickedEffect === o.effect} className={`press ${sc.qChip}${pickedEffect === o.effect ? ` ${sc.qChipOn}` : ""}`} onClick={() => pickFollowUp(o.effect)}>
+                {o.label}
+              </button>
+            ))}
+          </span>
+        </div>
+      ) : null}
+      <div ref={listRef} className="flex flex-col gap-2" style={{ scrollMarginTop: 16 }}>
+        {order.map((idx) => {
+          const it = items[idx];
+          const c = CONF_STYLE[it.confidence];
+          const low = it.confidence === "low";
+          const micros = MICRO_LABELS.filter(([k]) => it.micros[k] != null);
+          return (
+            <div key={idx} className={`${sc.item}${low ? ` ${sc.itemLow}` : ""}`}>
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 truncate text-[14px] font-bold">
+                  {it.name}
+                  {it.source === "estimated" ? " ~" : ""}
+                </span>
+                <span className={sc.confDot} style={{ background: low ? "var(--red)" : c.color }} aria-hidden="true" />
+                <span className="shrink-0 text-[11px] muted">{it.confidence}</span>
+                <span className="num ml-auto shrink-0 text-[15px] font-extrabold">
+                  {it.calories} <span className="text-[11px] font-semibold muted">kcal</span>
+                </span>
+                <InfoButton name={it.name} check={!confirmed.has(idx) && needsCheck(it)} onClick={() => setInfoIdx(idx)} />
+              </div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs muted">
+                <span style={{ color: "var(--ink)" }}>{gramsRangeLabel(it)}</span>
+                <span style={{ color: "var(--red)" }}>{fmt(it.protein_g)}g P</span>
+                <span style={{ color: "var(--orange)" }}>{fmt(it.carbs_g)}g C</span>
+                <span style={{ color: "var(--blue)" }}>{fmt(it.fat_g)}g F</span>
+                {micros.length ? (
+                  <button type="button" className="press underline" aria-expanded={open === idx} onClick={() => setOpen(open === idx ? null : idx)}>
+                    Micros
+                  </button>
+                ) : null}
+              </div>
+              {it.uncertainties?.length ? <p className="text-[11px]" style={{ color: "var(--orange)" }}>{it.uncertainties.join(" · ")}</p> : null}
+              {!readOnly && it.variants && it.variants.length > 1 ? <VariantChips variants={it.variants} currentId={it.food_id} onPick={(v) => pickVariant(idx, v)} /> : null}
+              {open === idx ? (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs muted">
+                  {micros.map(([k, label, unit]) => (
+                    <span key={k}>
+                      {label} {fmt(it.micros[k] as number)} {unit}
+                    </span>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        </Card>
-      </Rise>
+              ) : null}
+              {!readOnly ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs muted">Amount</span>
+                  <GramsInput key={`${idx}-${items.length}`} original={originals[idx]} current={it} onScale={(next) => setItems(items.map((x, i) => (i === idx ? next : x)))} />
+                  <span className="text-xs muted">g</span>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${it.name}`}
+                    className="hit press ml-auto grid h-8 w-8 place-items-center rounded-full"
+                    style={{ color: "var(--muted)" }}
+                    onClick={() => {
+                      setItems(items.filter((_, i) => i !== idx));
+                      setOriginals(originals.filter((_, i) => i !== idx));
+                      setConfirmed((cur) => new Set([...cur].filter((i) => i !== idx).map((i) => (i > idx ? i - 1 : i))));
+                    }}
+                  >
+                    <Trash size={16} />
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      {plate.notes.length ? <p className="px-1 text-xs muted">{plate.notes.join(" · ")}</p> : null}
+      <ErrorNote text={error} />
+      {!readOnly ? (
+        <div>
+          <PillButton
+            disabled={saving || !items.length}
+            onClick={() =>
+              startSave(async () => {
+                try {
+                  await saveMeal({
+                    date: today(),
+                    raw_text: plate.plate_note || items.map((i) => i.name).join(", "),
+                    photo_path: plate.photo_path ?? null,
+                    items: items.map(mealItemFromPlate),
+                  });
+                  track("meal_logged", { method: "photo", items: items.length, from: "scan" });
+                  onSaved?.();
+                  router.push("/");
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Could not save");
+                }
+              })
+            }
+          >
+            {saving ? <Spinner size={18} /> : `Log as ${meal}`}
+          </PillButton>
+          <button
+            type="button"
+            className="hit press mt-1 w-full py-2 text-center text-[13px] font-semibold muted"
+            disabled={!items.length}
+            onClick={() => openOnPlate(router, { items: items.map(mealItemFromPlate), label: plate.plate_note || "Plate photo", photo_path: plate.photo_path ?? null })}
+          >
+            Add to plate to change or add food
+          </button>
+        </div>
+      ) : null}
+      {extra}
       <SourceSheet
         item={infoIdx !== null ? (items[infoIdx] ?? null) : null}
         onClose={() => setInfoIdx(null)}
@@ -1051,78 +1243,47 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
         }
         onPickAnother={readOnly ? undefined : () => openOnPlate(router, { items: items.map(mealItemFromPlate), label: plate.plate_note || "Plate photo", photo_path: plate.photo_path ?? null })}
       />
-      {plate.follow_up && plate.follow_up.options.length ? (
-        <Rise index={5}>
-          <p className="px-1 text-xs font-semibold muted">{plate.follow_up.question}</p>
-          <div className="mt-1.5 flex flex-wrap gap-2">
-            {plate.follow_up.options.map((o) => (
-              <button
-                key={o.effect + o.label}
-                type="button"
-                className="hit press rounded-full px-3.5 py-2 text-[13px] font-semibold"
-                style={
-                  pickedEffect === o.effect
-                    ? { background: "var(--ink)", color: "var(--card)" }
-                    : { background: "var(--card2)", color: "var(--ink)" }
-                }
-                onClick={() => pickFollowUp(o.effect)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </Rise>
-      ) : null}
-      {plate.notes.length ? (
-        <Rise index={5}>
-          <p className="px-1 text-xs muted">{plate.notes.join(" · ")}</p>
-        </Rise>
-      ) : null}
-      <ErrorNote text={error} />
-      {!readOnly ? (
-        <Rise index={6}>
-          <div className="flex items-center gap-3">
-            <div>
-              <span className="num block text-[20px] font-extrabold tracking-tight">
-                {kcalTotal.plusMinus > 0 ? `~${kcalTotal.center} kcal ±${kcalTotal.plusMinus}` : `${kcalTotal.center} kcal`}
-              </span>
-              <span className="block text-xs muted">{fmt(prot)} g protein</span>
-            </div>
-            <PillButton
-              className="flex-1"
-              disabled={saving || !items.length}
-              onClick={() =>
-                startSave(async () => {
-                  try {
-                    await saveMeal({
-                      date: today(),
-                      raw_text: plate.plate_note || items.map((i) => i.name).join(", "),
-                      photo_path: plate.photo_path ?? null,
-                      items: items.map(mealItemFromPlate),
-                    });
-                    track("meal_logged", { method: "photo", items: items.length, from: "scan" });
-                    onSaved?.();
-                    router.push("/");
-                  } catch (e) {
-                    setError(e instanceof Error ? e.message : "Could not save");
-                  }
-                })
-              }
-            >
-              {saving ? <Spinner size={18} /> : "Save as meal"}
-            </PillButton>
-          </div>
-          <button
-            type="button"
-            className="hit press mt-1 w-full py-2 text-center text-[13px] font-semibold muted"
-            disabled={!items.length}
-            onClick={() => openOnPlate(router, { items: items.map(mealItemFromPlate), label: plate.plate_note || "Plate photo", photo_path: plate.photo_path ?? null })}
-          >
-            Add to plate to change or add food
-          </button>
-        </Rise>
-      ) : null}
     </>
+  );
+
+  if (photo !== undefined) {
+    return (
+      <div>
+        <PhotoStage src={photo} title="Your plate" onClose={onClose}>
+          <FloatChip label="Calories" value={totalText} tint="#f5dd7f" rot={-5} style={{ right: 16, top: "30%" }} onClick={toItems} />
+          <FloatChip label="Protein" value={`${fmt(Math.round(prot))} g`} tint="#a898f5" rot={4} style={{ left: 16, top: "52%", animationDelay: "0.12s" }} onClick={toItems} />
+        </PhotoStage>
+        <div className={sc.sheet}>
+          <div className={sc.handle} />
+          {body}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <Rise index={3}>
+      <Card>
+        <div className="flex flex-col gap-3">{body}</div>
+      </Card>
+    </Rise>
+  );
+}
+
+/** A glass chip floating over the plate photo; tapping it jumps to the editable items. */
+function FloatChip({ label, value, tint, rot, style, onClick }: { label: string; value: string; tint: string; rot: number; style: React.CSSProperties; onClick: () => void }) {
+  return (
+    <button type="button" className={sc.chip} style={{ ...style, transform: `rotate(${rot}deg)`, ["--rot" as string]: `${rot}deg` } as React.CSSProperties} onClick={onClick} aria-label={`${label} ${value}. Edit the items`}>
+      <span className={sc.chipIcon} style={{ background: tint }}>
+        <ScanIcon name="food" />
+      </span>
+      <span>
+        <span className={sc.chipLabel}>{label}</span>
+        <span className={sc.chipValue}>{value}</span>
+      </span>
+      <span style={{ color: "#555" }}>
+        <ScanIcon name="pen" size={16} />
+      </span>
+    </button>
   );
 }
 

@@ -22,6 +22,20 @@ export function num(n: number | null | undefined): string {
   return n == null ? "—" : n.toLocaleString("en-IN");
 }
 
+/** A 0–1 share as a whole percent ("—" when unknown). */
+export function pct(v: number | null | undefined): string {
+  return v == null ? "—" : `${Math.round(v * 100)}%`;
+}
+
+/** A signed change, e.g. "+40%" / "−25%", or a word for the no-baseline cases. */
+export function trendText(trend: string, p: number | null): string {
+  if (trend === "none") return "—";
+  if (trend === "new") return "new";
+  if (p == null) return "—";
+  const v = Math.round(p * 100);
+  return v > 0 ? `+${v}%` : v < 0 ? `−${Math.abs(v)}%` : "0%";
+}
+
 export function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <div className="card" style={{ padding: 14 }}>
@@ -96,6 +110,46 @@ export function HBars({ rows, color = "var(--blue)" }: { rows: { label: string; 
   );
 }
 
+/** 24 bars for an IST hour histogram (00–23). Same minimal SVG as <Bars>. */
+export function HourBars({ hours, color = "var(--blue)", height = 56 }: { hours: number[]; color?: string; height?: number }) {
+  const max = Math.max(1, ...hours);
+  const w = 10;
+  const gap = 3;
+  const width = 24 * (w + gap) - gap;
+  return (
+    <figure className="flex flex-col gap-1">
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" width="100%" height={height} role="img" aria-label="Activity by hour of day (IST)">
+        <line x1={0} x2={width} y1={height - 0.5} y2={height - 0.5} stroke="var(--hair)" strokeWidth={1} />
+        {hours.map((v, i) => {
+          const h = v > 0 ? Math.max(2, (v / max) * (height - 4)) : 0;
+          return (
+            <rect key={i} x={i * (w + gap)} y={height - h} width={w} height={h} rx={2} fill={color}>
+              <title>{`${String(i).padStart(2, "0")}:00: ${v}`}</title>
+            </rect>
+          );
+        })}
+      </svg>
+      <figcaption className="flex justify-between text-[10px] muted">
+        <span>00</span>
+        <span>06</span>
+        <span>12</span>
+        <span>18</span>
+        <span>23</span>
+      </figcaption>
+    </figure>
+  );
+}
+
+/** A table cell tinted by a 0–1 value (retention grid, feature × week matrix). */
+export function HeatCell({ value, label, color = "var(--green)" }: { value: number | null; label: string; color?: string }) {
+  const a = value == null ? 0 : Math.round(Math.min(1, Math.max(0, value)) * 70);
+  return (
+    <td className="num text-center" style={value == null ? undefined : { background: `color-mix(in srgb, ${color} ${a}%, transparent)` }}>
+      {label}
+    </td>
+  );
+}
+
 /** A scroll-inside-the-card table, so wide tables never scroll the page sideways on a phone. */
 export function TableWrap({ children }: { children: React.ReactNode }) {
   return (
@@ -105,7 +159,7 @@ export function TableWrap({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function AdminNav({ active }: { active: "overview" | "users" }) {
+export function AdminNav({ active }: { active: "overview" | "features" | "users" }) {
   const tab = (href: string, key: typeof active, label: string) => (
     <Link href={href} className="chip press" aria-current={active === key ? "page" : undefined} style={active === key ? { height: 32, background: "var(--btn)", color: "var(--btn-ink)" } : { height: 32 }}>
       {label}
@@ -114,6 +168,7 @@ export function AdminNav({ active }: { active: "overview" | "users" }) {
   return (
     <nav className="flex gap-2">
       {tab("/admin", "overview", "Overview")}
+      {tab("/admin/features", "features", "Features")}
       {tab("/admin/users", "users", "Users")}
     </nav>
   );
