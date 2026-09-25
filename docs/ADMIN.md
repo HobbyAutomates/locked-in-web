@@ -12,8 +12,20 @@ Anyone else, whether signed in or not, gets a normal 404, so the panel's existen
 
 Pages:
 - `/admin`: overview. Total users, new users per day, DAU/WAU/MAU, rows logged per day per table, scans by kind, app events by name, and estimated AI cost from the `usage` saved on scan reports. Prices are in `src/lib/admin/pricing.ts`.
-- `/admin/users`: every auth user joined with `bandlog.profiles`. Sortable by any column.
-- `/admin/users/<id>`: one user's timeline, counts per feature, squads and recent app events.
+  Also (v2.12): auto-generated plain-English insights, a feature-usage summary, the activation funnel (signed up → finished onboarding → first meal → logged on 3+ days → joined a squad → active on 7+ days; nested steps), weekly retention by signup week, DAU/WAU and DAU/MAU stickiness, the logging-method mix and the most-logged foods.
+- `/admin/features` (v2.12): every feature ranked by 30-day adoption (users who used it ÷ users active at all in the same 7 or 30 days), uses per active user per week, this week vs. last week (rolling 7-day windows), a status (core / used / rare / never / not measured) and which source each number came from.
+- `/admin/users`: every auth user joined with `bandlog.profiles`. Sortable by any column, including (v2.12) days active in the last 7 days, meals in the last 7 days, top feature (30 days), last event name, last active day and at risk (no activity in 3+ days).
+- `/admin/users/<id>`: one user's timeline, counts per feature, squads and recent app events. Also (v2.12): a profile summary (age band, goal, targets, platform, app version), engagement (days active of the last 14 and 30, current streak, sessions per day from `app_open`, an IST hour-of-day histogram), a feature × week matrix, what they track (meals per day, meal-type mix, average kcal and protein against targets, % of logged days hitting protein, top 10 foods, logging-method mix, water and weight frequency, workouts by kind), social (squads, chat messages, feed shares, reactions given and received, challenges, battle wins, squad opens) and the `error_shown` events they saw, with screens.
+
+### How the v2.12 insights are counted
+
+The code is in `src/lib/admin/insights/`: `load.ts` reads the data (service role, server only), and the other files are pure functions that turn it into plain JSON view models the pages render (`scripts/check-insights.ts` tests them offline).
+
+- **Window.** Every query is bounded to the last 90 days (squad memberships and profiles are current state). One paged query per table for everyone, or per table for one user on the user page, never a query per user. A missing table or column reads as empty and is listed at the bottom of the page.
+- **Active.** A user is active on an IST day if they sent any app event or created any logged row that day.
+- **Sources.** `app_events` are used wherever an event exists. For each user, domain-table rows from *before their first event* fill in earlier history, so nothing is counted twice. Chat messages and feed shares come only from `group_posts` (there is no event for them). Meal editing, the logging method and the Progress screen come only from events. Calorie battle counts both battle-tab meal snaps (events) and days won (`battle_wins`). The Source column on `/admin/features` shows which applied.
+- **Not measured.** Nothing reports the goals and science screens yet (the web tracker only sends the six main screens), so that row reads "not measured" rather than "never used".
+- **Privacy.** The date of birth is turned into an age band on the server (`profile.ts`) and never appears in any view model or page. Everything stays server-side behind `requireAdmin()` and `src/proxy.ts`.
 
 ## What is collected
 

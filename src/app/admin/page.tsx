@@ -1,6 +1,10 @@
 import { requireAdmin } from "@/lib/admin/auth";
+import Link from "next/link";
 import { loadOverview } from "@/lib/admin/data";
-import { AdminNav, Bars, HBars, Section, Stat, TableWrap, num, usd } from "@/components/admin/AdminUi";
+import { loadDataset } from "@/lib/admin/insights/load";
+import { buildOverview } from "@/lib/admin/insights/build";
+import { AdminNav, Bars, HBars, Section, Stat, TableWrap, num, pct, usd } from "@/components/admin/AdminUi";
+import { FeatureTable, FunnelView, InsightList, RetentionGrid } from "@/components/admin/InsightsUi";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +12,9 @@ const TINTS = ["var(--orange)", "var(--orange)", "var(--green)", "var(--green)",
 
 export default async function AdminOverview() {
   const { db } = await requireAdmin();
-  const o = await loadOverview(db);
+  const [o, ds] = await Promise.all([loadOverview(db), loadDataset(db)]);
+  const ins = buildOverview(ds);
+  const st = ins.stickiness;
   const new30 = o.newUsers.reduce((a, d) => a + d.value, 0);
   return (
     <>
@@ -20,6 +26,73 @@ export default async function AdminOverview() {
         <Stat label="WAU" value={num(o.wau)} hint="last 7 days" />
         <Stat label="MAU" value={num(o.mau)} hint="last 30 days" />
       </div>
+
+      <Section title="Insights" note="Generated from the numbers below (last 30 days unless stated). Activity = any app event or logged row.">
+        <InsightList items={ins.insights} />
+      </Section>
+
+      <Section
+        title="Feature usage"
+        note={
+          <>
+            Top features by 30-day adoption. Full table, trends and sources on <Link href="/admin/features" className="underline">Features</Link>.
+          </>
+        }
+      >
+        <FeatureTable rows={ins.features.filter((f) => f.users30 > 0).slice(0, 8)} />
+      </Section>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Section title="Activation funnel" note="Nested steps over every sign-up; meals, logging days and active days counted in the last 90 days. 7-day active = active on 7+ different days.">
+          <FunnelView steps={ins.funnel} />
+        </Section>
+        <Section title="Stickiness" note="DAU/WAU = average daily actives over the last 7 days ÷ weekly actives. 14% ≈ one day a week, 100% = every day.">
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="DAU/WAU" value={pct(st.dauWau)} hint={`avg DAU ${st.dauAvg7} · WAU ${st.wau}`} />
+            <Stat label="DAU/MAU" value={pct(st.dauMau)} hint={`MAU ${st.mau}`} />
+            <Stat label="Active 7d / 30d" value={`${ins.active7} / ${ins.active30}`} />
+          </div>
+          <Bars data={st.series.map((p) => ({ day: p.day, value: Math.round((p.ratio ?? 0) * 100) }))} color="var(--blue)" format={(v) => `${v}%`} />
+        </Section>
+      </div>
+
+      <Section title="Weekly retention by signup week" note="Share of each signup-week cohort active in the Nth week after signing up (W0 = the signup week). Monday-start weeks, IST.">
+        <RetentionGrid r={ins.retention} />
+      </Section>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Section
+          title="Logging-method mix"
+          note={`meal_logged events in 30 days, by method. ${ins.methods.untracked ? `${num(ins.methods.untracked)} earlier meals from the meals table have no method recorded (they predate app events).` : ""}${ins.methods.unknown ? ` ${num(ins.methods.unknown)} events had no method.` : ""}`}
+        >
+          <HBars rows={ins.methods.methods.map((m) => ({ label: m.label, value: m.count }))} color="var(--orange)" />
+        </Section>
+        <Section title="Most-logged foods" note="meal_items over the last 90 days, by name (case and spacing ignored).">
+          {ins.topFoods.length ? (
+            <TableWrap>
+              <thead>
+                <tr>
+                  <th>Food</th>
+                  <th className="text-right">Times</th>
+                  <th className="text-right">Users</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ins.topFoods.map((f) => (
+                  <tr key={f.name}>
+                    <td>{f.name}</td>
+                    <td className="num text-right">{num(f.count)}</td>
+                    <td className="num text-right">{num(f.users)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </TableWrap>
+          ) : (
+            <p className="text-sm muted">Nothing logged yet.</p>
+          )}
+        </Section>
+      </div>
+      {ins.readErrors.length ? <p className="text-xs muted">Couldn&apos;t read: {ins.readErrors.map((e) => `${e.table} (${e.message})`).join("; ")}. Those numbers read as zero.</p> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Section title="New users per day" note="Sign-ups (auth.users.created_at), IST days.">
