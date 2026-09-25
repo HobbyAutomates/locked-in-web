@@ -6,13 +6,13 @@ import { AnimatePresence, motion } from "motion/react";
 import { createSavedMeal, deleteMeal, logWater, saveMeal, searchFoodsForPicker, undoLastWater, updateMeal } from "@/lib/actions";
 import { postJson } from "@/lib/image";
 import { looksLikeSentence } from "@/lib/mealText";
-import { MEAL_TYPES, defaultMealType, mealTypeOf, type MealType } from "@/lib/mealType";
+import { MEAL_TYPES, aiLogged, defaultMealType, mealTypeOf, type MealType } from "@/lib/mealType";
 import { applyRestaurant, countLabel, foodFromItem, itemQtyLabel, oneTap, priceItem, restaurantOil, savedUnitOf, snapCount, unitFor, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
 import { today as todayIso } from "@/lib/dates";
 import { useDictation } from "@/lib/speech";
 import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
 import type { FoodPreset, FoodSearchHit, Meal, MealItem, ParsedWater, ParseResult, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
-import { Close, Drop, Mic, Search, Spinner, Trash } from "./icons";
+import { Close, Drop, Mic, Search, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
 import FoodImage, { FoodFallback, type FoodImageKind } from "./FoodImage";
 import QuantitySheet from "./QuantitySheet";
 import { saveWhenReady, type PlateJob } from "./PendingMeals";
@@ -133,6 +133,7 @@ export default function MealForm({
   const [type, setType] = useState<MealType>(() => (existing ? mealTypeOf(existing) : mealType ?? defaultMealType()));
   const [day, setDay] = useState(existing?.date ?? date);
   const [deleting, setDeleting] = useState(false);
+  const [voted, setVoted] = useState<"up" | "down" | null>(null);
   const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [notes, setNotes] = useState<string[]>([]);
   const [rawParts, setRawParts] = useState<string[]>([]);
@@ -349,6 +350,19 @@ export default function MealForm({
         });
     }, 5000);
   }
+  /** 👍 / 👎 on an AI-logged meal: the same best-effort /api/feedback write the old Home row used. */
+  function vote(rating: "up" | "down") {
+    if (!existing) return;
+    setVoted(rating);
+    void fetch("/api/feedback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ meal_id: existing.id, raw_text: existing.raw_text, rating }),
+    }).catch(() => {
+      // Feedback never blocks the editor.
+    });
+  }
+
   function undoDelete() {
     if (deleteTimer.current) clearTimeout(deleteTimer.current);
     deleteTimer.current = null;
@@ -574,7 +588,23 @@ export default function MealForm({
                 </button>
               </div>
             ) : (
-              <div className="flex justify-center px-4 pt-1">
+              <div className="flex items-center justify-between gap-2 px-4 pt-1">
+                {aiLogged(existing) ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="mr-1 text-xs muted">{voted === null ? "AI right?" : "Thanks"}</span>
+                    {(["up", "down"] as const).map((r) => {
+                      const sel = voted === r;
+                      const Icon = r === "up" ? ThumbUp : ThumbDown;
+                      return (
+                        <button key={r} type="button" disabled={voted !== null} onClick={() => vote(r)} aria-label={r === "up" ? "The AI got this right" : "The AI got this wrong"} className="hit press grid h-9 w-9 place-items-center rounded-full" style={{ background: sel ? "var(--btn)" : "var(--card2)", color: sel ? "var(--btn-ink)" : "var(--muted)" }}>
+                          <Icon size={15} />
+                        </button>
+                      );
+                    })}
+                  </span>
+                ) : (
+                  <span />
+                )}
                 <button type="button" className="press inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold" style={{ background: "var(--red-bg)", color: "var(--red)" }} disabled={saving} onClick={startDelete}>
                   <Trash size={15} />
                   Delete

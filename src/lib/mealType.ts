@@ -57,12 +57,13 @@ export function hourOfTimestamp(createdAt: string | null | undefined): number | 
   return d ? istHour(d) : null;
 }
 
-const TIME = new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
-
-/** "9:15 pm" (India time) for a meal's created_at; "" when unreadable. */
-export function mealTime(createdAt: string | null | undefined): string {
-  const d = parseTimestamp(createdAt);
-  return d ? TIME.format(d) : "";
+/**
+ * v2.8: whether a meal came from the AI (a parsed sentence, a plate photo or a scan) — only those
+ * ask "AI right?" in the editor. Preset / search taps are table rows at confidence 1; parsed rows carry the model's confidence (or none).
+ */
+export function aiLogged(meal: Pick<Meal, "items"> & { photo_path?: string | null }): boolean {
+  if (meal.photo_path) return true;
+  return meal.items.some((i) => i.source === "estimated" || i.source === "scan" || i.confidence == null || Number(i.confidence) < 1);
 }
 
 /** The default type for a meal being logged now. */

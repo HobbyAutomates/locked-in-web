@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { groupMeals, mealTime, type MealType } from "@/lib/mealType";
+import { formatTime } from "@/lib/display";
+import { groupMeals, type MealType } from "@/lib/mealType";
 import { itemQtyLabel } from "@/lib/quantity";
 import type { Meal } from "@/lib/types";
 import { Bowl, ChevronRight, Plus } from "./icons";
@@ -95,7 +96,7 @@ function MealLine({ meal, href }: { meal: ShownMeal; href: string }) {
         <span className="truncate text-[15px] font-semibold">{title}</span>
         <span className="truncate text-xs muted">
           {detail} · {fmt(Math.round(protein * 10) / 10)} g protein
-          {mealTime(meal.created_at) ? ` · ${mealTime(meal.created_at)}` : ""}
+          {formatTime(meal.created_at) ? ` · ${formatTime(meal.created_at)}` : ""}
         </span>
       </span>
       <span className="num shrink-0 text-[14px] font-bold">{Math.round(calories)} kcal</span>

@@ -12,19 +12,29 @@ const LOCALE = "en-IN";
 const TIME = new Intl.DateTimeFormat(LOCALE, { hour: "numeric", minute: "2-digit", timeZone: ZONE });
 const ISO_DAY = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: ZONE });
 
+/**
+ * A Postgres timestamptz as a Date. Handles "…Z", "…+00:00" (what PostgREST sends), "… +00" and
+ * "…+0530"; a bare timestamp is UTC. v2.8: "+00:00" used to get a second "Z" and turned into Invalid Date.
+ */
+function parseStamp(createdAt: string): Date {
+  const raw = (createdAt || "").trim().replace(" ", "T");
+  const m = /(Z|[+-]\d\d(:?\d\d)?)$/i.exec(raw);
+  if (!m) return new Date(`${raw}Z`);
+  // "+00" → "+00:00", "+0530" → "+05:30".
+  const zone = m[1].toUpperCase() === "Z" ? "Z" : m[1].length === 3 ? `${m[1]}:00` : m[1].includes(":") ? m[1] : `${m[1].slice(0, 3)}:${m[1].slice(3)}`;
+  return new Date(raw.slice(0, raw.length - m[1].length) + zone);
+}
+
 /** "9:15 pm" for a Postgres timestamptz, in the display zone. */
 export function formatTime(createdAt: string): string {
   if (!createdAt) return "";
-  const raw = createdAt.replace(" ", "T");
-  const withZone = /([Z+]|-\d\d:\d\d)$/.test(raw) ? raw : `${raw}Z`;
-  const d = new Date(withZone);
+  const d = parseStamp(createdAt);
   return Number.isNaN(d.getTime()) ? "" : TIME.format(d);
 }
 
 /** v2.6: the display-zone ISO day of a timestamptz ("2026-09-24"). */
 export function dayOf(createdAt: string): string {
-  const raw = (createdAt || "").replace(" ", "T");
-  const d = new Date(/([Z+]|-\d\d:\d\d)$/.test(raw) ? raw : `${raw}Z`);
+  const d = parseStamp(createdAt);
   return Number.isNaN(d.getTime()) ? "" : ISO_DAY.format(d);
 }
 

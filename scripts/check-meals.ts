@@ -5,7 +5,8 @@
  *  - B2: single-piece counting (unitFor, a port of Android's Counting.unitFor) and what one tap adds,
  *  - B4: restaurant portions stored by grams, and how rows read.
  */
-import { groupMeals, mealTypeForHour, mealTypeOf, type MealType } from "../src/lib/mealType";
+import { formatTime } from "../src/lib/display";
+import { aiLogged, groupMeals, mealTypeForHour, mealTypeOf, type MealType } from "../src/lib/mealType";
 import { applyRestaurant, itemQtyLabel, oneTap, priceItem, rescaleItem, toGrams, unitFor, type QuantityFood } from "../src/lib/quantity";
 import type { Meal, MealItem } from "../src/lib/types";
 
@@ -119,6 +120,19 @@ check("saved roti row reads 2 roti", itemQtyLabel(item("Roti", 80, 240, 8, { uni
 check("saved katori row reads 1½ serving", itemQtyLabel(item("Dal tadka", 225, 270, 13, { unit: "serving", servings: 1.5 })) === "1½ servings", itemQtyLabel(item("Dal tadka", 225, 270, 13, { unit: "serving", servings: 1.5 })));
 check("gram row reads grams", itemQtyLabel(item("Paneer", 180, 480, 32, { unit: "g", servings: 0.9 })) === "180 g");
 check("odd count reads grams", itemQtyLabel(item("Roti", 55, 160, 5, { unit: "serving", servings: 1.37 })) === "55 g");
+
+// ---- formatTime (display.ts): every timestamptz shape PostgREST sends ----
+for (const ts of ["2026-09-24T08:15:00+00:00", "2026-09-24T08:15:00.123456+00:00", "2026-09-24 08:15:00+00", "2026-09-24T08:15:00Z", "2026-09-24T13:45:00+05:30", "2026-09-24T08:15:00"]) {
+  check(`formatTime ${ts}`, /^1:45\s?pm$/i.test(formatTime(ts)), JSON.stringify(formatTime(ts)));
+}
+
+// ---- "AI right?" only for AI-logged meals ----
+check("preset meal not AI", !aiLogged({ items: [item("Roti", 40, 120, 4)] }));
+check("no-confidence parsed row is AI", aiLogged({ items: [item("Poha", 150, 250, 5, { confidence: null })] }));
+check("estimated item is AI", aiLogged({ items: [item("Curry", 200, 300, 10, { source: "estimated", confidence: 0.6 })] }));
+check("scan is AI", aiLogged({ items: [item("Bar", 40, 180, 10, { source: "scan", confidence: 0.9 })] }));
+check("parsed table match is AI", aiLogged({ items: [item("Dal", 150, 180, 9, { confidence: 0.85 })] }));
+check("plate photo is AI", aiLogged({ items: [item("Rice", 150, 190, 4)], photo_path: "u/p.jpg" }));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
