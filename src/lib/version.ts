@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.8";
+export const APP_VERSION = "2.9";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.9",
+    date: "2026-09-25",
+    lines: [
+      "Deleting a meal or workout now removes its post from your squads too, and you can delete any of your own squad posts from the ⋯ menu (with Undo).",
+      "You decide what gets shared: Privacy → Squad sharing has switches for meals, workouts and PRs, and each squad has its own Auto-post switch.",
+      "When a food could be a few things (wheat roti or maida roti?), we ask with one tap, and the ⓘ on every item shows where the numbers come from, with a link to check.",
+    ],
+  },
   {
     version: "2.8",
     date: "2026-09-25",
