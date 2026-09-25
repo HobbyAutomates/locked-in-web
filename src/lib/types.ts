@@ -166,6 +166,10 @@ export type Profile = {
   water_reminder_every_min: number;
   /** v2.9 Squad sharing: kinds that auto-post (meal / workout / pr). null = schema_v31 not applied yet (everything posts). */
   auto_share: AutoShareKind[] | null;
+  /** v2.10 Preferences → Tracking "Hide calorie numbers" (opt-in). null = schema_v34 not applied yet (off). */
+  hide_numbers: boolean | null;
+  /** v2.10 optional waist for waist-to-height; null = not entered (or schema_v34 not applied yet). */
+  waist_cm: number | null;
 };
 
 export type Units = "metric" | "imperial";
@@ -196,6 +200,8 @@ export const DEFAULT_PROFILE: Profile = {
   water_goal_ml: 2500,
   units: "metric",
   auto_share: null,
+  hide_numbers: null,
+  waist_cm: null,
   username: null,
   water_glass_ml: 250,
   water_reminder_from: "08:00",

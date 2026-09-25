@@ -1,29 +1,33 @@
 "use client";
 
-import { roundSpeed, speedLabel } from "@/lib/goals";
+import { roundSpeed, speedLabel, speedMax, speedWhy } from "@/lib/goals";
+import type { GoalType } from "@/lib/types";
 import { Cheetah, Rabbit, Sloth } from "./icons";
+import { ScienceButton } from "./Science";
 import { fmt } from "./ui";
 
 /**
- * The 0.1–1.5 kg/week pace control: sloth / rabbit / cheetah above a notched slider, with the
- * big number and a "Slow and steady / Recommended / Aggressive" chip below. Shared by the
- * Goal & current weight page and onboarding so both always read the same (GoalSpeed.kt).
+ * The weekly pace control: sloth / rabbit / cheetah above a notched slider, the big number and a
+ * "Slow and steady / Recommended / Max safe pace" chip, then the one-line why and the ⓘ sheet.
+ * v2.10: the slider only reaches this person's safe max — 1 % of body weight a week for loss
+ * (never over 1 kg), 0.5 % for gain. Shared by Goal & current weight and onboarding (GoalSpeed.kt).
  */
-export default function GoalSpeedPicker({ speed, onChange }: { speed: number; onChange: (v: number) => void }) {
-  const kg = roundSpeed(speed);
-  const label = speedLabel(kg);
-  const tint = label === "Recommended" ? "var(--green)" : label === "Aggressive" ? "var(--red)" : "var(--orange)";
-  const tintBg = label === "Recommended" ? "var(--green-bg)" : label === "Aggressive" ? "var(--red-bg)" : "var(--orange-bg)";
+export default function GoalSpeedPicker({ speed, onChange, goal, weightKg }: { speed: number; onChange: (v: number) => void; goal: GoalType; weightKg: number | null }) {
+  const max = speedMax(goal, weightKg);
+  const kg = roundSpeed(speed, max);
+  const label = speedLabel(kg, max);
+  const tint = label === "Max safe pace" ? "var(--orange)" : "var(--green)";
+  const tintBg = label === "Max safe pace" ? "var(--orange-bg)" : "var(--green-bg)";
   return (
     <div className="w-full">
       <div className="flex items-center justify-between">
-        <Animal active={kg < 0.5} color="var(--green)" bg="var(--green-bg)" label="Slow and steady">
+        <Animal active={label === "Slow and steady"} color="var(--green)" bg="var(--green-bg)" label="Slow and steady">
           <Sloth size={26} />
         </Animal>
-        <Animal active={kg >= 0.5 && kg <= 0.8} color="var(--orange)" bg="var(--orange-bg)" label="Recommended">
+        <Animal active={label === "Recommended"} color="var(--green)" bg="var(--green-bg)" label="Recommended">
           <Rabbit size={26} />
         </Animal>
-        <Animal active={kg > 0.8} color="var(--red)" bg="var(--red-bg)" label="Aggressive">
+        <Animal active={label === "Max safe pace"} color="var(--orange)" bg="var(--orange-bg)" label="Max safe pace">
           <Cheetah size={26} />
         </Animal>
       </div>
@@ -31,16 +35,17 @@ export default function GoalSpeedPicker({ speed, onChange }: { speed: number; on
         type="range"
         className="range mt-3"
         min={0.1}
-        max={1.5}
+        max={max}
         step={0.1}
         value={kg}
-        onChange={(e) => onChange(roundSpeed(Number(e.target.value)))}
+        disabled={max <= 0.1}
+        onChange={(e) => onChange(roundSpeed(Number(e.target.value), max))}
         aria-label="Weekly pace in kilograms"
         aria-valuetext={`${fmt(kg)} kg per week, ${label}`}
       />
       <div className="flex justify-between text-[11px] muted">
         <span>0.1 kg</span>
-        <span>1.5 kg</span>
+        <span>{fmt(max)} kg</span>
       </div>
       <div className="mt-3 flex items-center gap-2.5">
         <span className="num text-xl font-extrabold" style={{ letterSpacing: "-0.03em" }}>
@@ -49,6 +54,10 @@ export default function GoalSpeedPicker({ speed, onChange }: { speed: number; on
         <span className="badge" style={{ background: tintBg, color: tint }}>
           {label}
         </span>
+      </div>
+      <div className="mt-2 flex items-start justify-between gap-2">
+        <p className="text-xs leading-[17px] muted">{speedWhy(goal, weightKg)}</p>
+        <ScienceButton />
       </div>
     </div>
   );

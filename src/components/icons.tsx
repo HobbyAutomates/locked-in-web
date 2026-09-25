@@ -625,6 +625,17 @@ export function Help(p: P) {
   );
 }
 
+/** Circled "i" for "The science" sheets (v2.10). */
+export function Info(p: P) {
+  return (
+    <Stroke {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5.5" />
+      <path d="M12 7.6h.01" />
+    </Stroke>
+  );
+}
+
 /** Key for "Join with code". */
 export function Key(p: P) {
   return (

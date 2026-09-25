@@ -14,6 +14,8 @@ import { movingAverage } from "@/lib/weightTrend";
 import { MUSCLE_COLOR, type Muscle } from "@/lib/muscles";
 import type { ExerciseEntry, Meal, Profile, ProgressPhoto, WeightEntry, Workout } from "@/lib/types";
 import { weightText } from "@/lib/display";
+import { calorieWords, edFlags, screenInput } from "@/lib/goals";
+import { BmiCard, SafetyNote, TeenGoalMigration } from "./Science";
 import HexMedal from "./HexMedal";
 import { Camera, ChevronDown, Close, Plus, Scale, Spinner, Trash } from "./icons";
 import { BreathingFlame, Card, Chevron, ErrorNote, Hair, MacroDot, PillButton, Rise, SPRING, Segmented, fmt } from "./ui";
@@ -69,6 +71,9 @@ export default function ProgressScreen({
   const left = Math.max(0, target - thisWeek);
   const current = weights[0]?.weight_kg ?? profile.weight_kg;
   const [showMore, setShowMore] = useState(false);
+  // v2.10: low BMI / rapid loss show the kind note with helplines (never a popup; closable).
+  const flags = edFlags(screenInput({ ...profile, weight_kg: current ?? null }, { weights: weights.map((w) => ({ date: w.date, kg: w.weight_kg })), today: t }));
+  const [safetyClosed, setSafetyClosed] = useState(false);
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -76,9 +81,17 @@ export default function ProgressScreen({
         <h1 className="screen-title">Progress</h1>
       </Rise>
 
+      <TeenGoalMigration profile={profile} />
+
       <Rise index={1}>
         <WeightTrendCard profile={profile} weights={weights} today={t} />
       </Rise>
+
+      {flags.length && !safetyClosed ? (
+        <Rise index={1}>
+          <SafetyNote flags={flags} onClose={() => setSafetyClosed(true)} />
+        </Rise>
+      ) : null}
 
       <Rise index={2}>
         <WeeklyEnergyCard meals={meals} exercises={exercises} profile={profile} today={t} />
@@ -112,7 +125,7 @@ export default function ProgressScreen({
           </Rise>
 
           <Rise index={1}>
-            <CaloriesChart meals={meals} today={t} goal={profile.calorie_target} />
+            <CaloriesChart meals={meals} today={t} goal={profile.calorie_target} hide={profile.hide_numbers === true} />
           </Rise>
 
           <Rise index={1}>
@@ -120,7 +133,7 @@ export default function ProgressScreen({
           </Rise>
 
           <Rise index={2}>
-            <BmiCard heightCm={profile.height_cm} weightKg={current ?? null} />
+            <BmiCard profile={profile} weightKg={current ?? null} waist />
           </Rise>
 
           <Rise index={2}>
@@ -295,6 +308,19 @@ function WeeklyEnergyCard({ meals, exercises, profile, today }: { meals: Meal[];
   const net = eaten - burned;
   const fraction = target > 0 ? net / target : 0;
 
+  // v2.10 "Hide calorie numbers": the bar and words, no kcal anywhere on the card.
+  if (profile.hide_numbers) {
+    return (
+      <Card>
+        <p className="text-[17px] font-bold">This week&apos;s energy</p>
+        <p className="text-xs muted">Since {dayShort(ws)}, {dayMonth(ws)}</p>
+        <p className="mt-3 text-[15px] font-bold">{calorieWords(net, target)}</p>
+        <Bar fraction={fraction} color="var(--ink)" />
+        <p className="mt-1.5 text-xs muted">{burned > 0 ? "Includes the exercise you logged." : "Numbers are hidden. You can turn them back on in Tracking."}</p>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <p className="text-[17px] font-bold">This week&apos;s energy</p>
@@ -448,7 +474,7 @@ function Spark({ values, color = "var(--ink)", w = 72, h = 22 }: { values: numbe
 // ---------------------------------------------------------------- calories (More stats)
 
 /** Daily average calories: a Protein / Carbs / Fats stacked bar per day of the chosen week. */
-function CaloriesChart({ meals, today, goal }: { meals: Meal[]; today: string; goal: number }) {
+function CaloriesChart({ meals, today, goal, hide = false }: { meals: Meal[]; today: string; goal: number; hide?: boolean }) {
   const [back, setBack] = useState(0);
   const ws = addDays(weekStart(today), -7 * back);
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
@@ -468,11 +494,15 @@ function CaloriesChart({ meals, today, goal }: { meals: Meal[]; today: string; g
     <Card>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[17px] font-bold">Daily average calories</p>
-          <p className="mt-0.5 flex items-baseline">
-            <span className="num text-[28px] font-extrabold leading-tight">{Math.round(avg).toLocaleString("en-IN")}</span>
-            <span className="ml-1 text-[13px] muted">kcal · goal {goal.toLocaleString("en-IN")}</span>
-          </p>
+          <p className="text-[17px] font-bold">{hide ? "Daily average" : "Daily average calories"}</p>
+          {hide ? (
+            <p className="mt-0.5 text-[15px] font-bold">{logged.length ? calorieWords(avg, goal) : "Nothing logged yet"}</p>
+          ) : (
+            <p className="mt-0.5 flex items-baseline">
+              <span className="num text-[28px] font-extrabold leading-tight">{Math.round(avg).toLocaleString("en-IN")}</span>
+              <span className="ml-1 text-[13px] muted">kcal · goal {goal.toLocaleString("en-IN")}</span>
+            </p>
+          )}
         </div>
       </div>
       <div className="mt-2.5">
@@ -560,67 +590,6 @@ function ExpenditureChanges({ exercises, today }: { exercises: ExerciseEntry[]; 
             </div>
           );
         })}
-      </div>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------- BMI (More stats)
-
-const BMI_BANDS = [
-  { label: "Underweight", upTo: 18.5, color: "#5B8DEF" },
-  { label: "Healthy", upTo: 25, color: "#2FB35E" },
-  { label: "Overweight", upTo: 30, color: "#E5A15B" },
-  { label: "Obese", upTo: 99, color: "#E9636B" },
-];
-const BMI_MIN = 15;
-const BMI_MAX = 40;
-
-function BmiCard({ heightCm, weightKg }: { heightCm: number | null; weightKg: number | null }) {
-  if (!heightCm || !weightKg) {
-    return (
-      <Card>
-        <p className="text-[17px] font-bold">Your BMI</p>
-        <p className="mt-1 text-[13px] muted">
-          Add your height and weight in{" "}
-          <Link href="/profile/details" className="font-semibold underline" style={{ color: "var(--ink)" }}>
-            Personal details
-          </Link>{" "}
-          to see it.
-        </p>
-      </Card>
-    );
-  }
-  const bmi = weightKg / (heightCm / 100) ** 2;
-  const band = BMI_BANDS.find((b) => bmi < b.upTo) ?? BMI_BANDS[BMI_BANDS.length - 1];
-  const pos = Math.max(0, Math.min(1, (bmi - BMI_MIN) / (BMI_MAX - BMI_MIN)));
-  const stop = (v: number) => `${(((v - BMI_MIN) / (BMI_MAX - BMI_MIN)) * 100).toFixed(1)}%`;
-  const gradient = `linear-gradient(90deg, ${BMI_BANDS[0].color} 0%, ${BMI_BANDS[0].color} ${stop(17.5)}, ${BMI_BANDS[1].color} ${stop(19.5)}, ${BMI_BANDS[1].color} ${stop(24)}, ${BMI_BANDS[2].color} ${stop(26)}, ${BMI_BANDS[2].color} ${stop(29)}, ${BMI_BANDS[3].color} ${stop(31)}, ${BMI_BANDS[3].color} 100%)`;
-  return (
-    <Card>
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[17px] font-bold">Your BMI</p>
-        <span className="rounded-full px-2.5 py-1 text-[12px] font-bold" style={{ background: `color-mix(in srgb, ${band.color} 16%, transparent)`, color: band.color }}>
-          {band.label}
-        </span>
-      </div>
-      <p className="num mt-1 text-[32px] font-extrabold leading-none" style={{ letterSpacing: "-0.04em" }}>
-        {bmi.toFixed(1)}
-      </p>
-      <div className="relative mt-4 h-3 rounded-full" style={{ background: gradient }}>
-        <motion.span
-          className="absolute top-1/2 block rounded-full"
-          style={{ width: 6, height: 22, background: "var(--ink)", border: "2px solid var(--card)", translateX: "-50%", translateY: "-50%" }}
-          initial={{ left: "0%" }}
-          animate={{ left: `${pos * 100}%` }}
-          transition={{ ...SPRING, delay: 0.2 }}
-          aria-hidden="true"
-        />
-      </div>
-      <div className="mt-3 flex flex-wrap gap-x-3.5 gap-y-1.5">
-        {BMI_BANDS.map((b, i) => (
-          <MacroDot key={b.label} value={`${b.label} ${i === 0 ? "< 18.5" : i === 3 ? "30+" : `${BMI_BANDS[i - 1].upTo}–${b.upTo}`}`} color={b.color} />
-        ))}
       </div>
     </Card>
   );

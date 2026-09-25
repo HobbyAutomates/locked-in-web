@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { saveProfile } from "@/lib/actions";
 import { ageFrom, type Gender, type Profile } from "@/lib/types";
 import { nameFromEmail } from "@/lib/display";
+import { effectiveGoal, isTeen } from "@/lib/goals";
 import SubPage from "./SubPage";
 import { CalendarIcon, Glass, Person, Ruler, Scale, Steps } from "./icons";
 import { Card, ErrorNote, Hair, NumberField, PillButton, Rise, Segmented, SettingRow, fmt } from "./ui";
@@ -73,7 +74,11 @@ export default function PersonalDetailsScreen({ profile, email = "" }: { profile
                 {profile.goal_weight_kg != null ? `${fmt(profile.goal_weight_kg)} kg` : "Not set"}
               </p>
               <p className="text-xs muted">
-                {profile.goal_type.charAt(0).toUpperCase() + profile.goal_type.slice(1)} · {fmt(profile.goal_speed_kg_wk)} kg/week
+                {isTeen(ageFrom(profile.dob))
+                  ? effectiveGoal(profile.goal_type, ageFrom(profile.dob)) === "gain"
+                    ? "Gain / build muscle"
+                    : "Maintain / grow stronger"
+                  : `${profile.goal_type.charAt(0).toUpperCase() + profile.goal_type.slice(1)} · ${fmt(profile.goal_speed_kg_wk)} kg/week`}
               </p>
             </div>
             <PillButton onClick={() => router.push("/profile/goal")} height={40} className="text-[13px]" style={{ width: 128, minHeight: 40 }}>

@@ -9,6 +9,7 @@ import { displayName, weightText } from "@/lib/display";
 import { AvatarPicker } from "./Avatar";
 import GraffitiWall from "./GraffitiWall";
 import ProfileSetupSheet from "./ProfileSetupSheet";
+import { TeenGoalMigration } from "./Science";
 import { Flame, Gear, Mail, Medal, Pencil, Person, Phone, Refresh, Scale, Share, Sparkle, Target } from "./icons";
 import { BottomSheet, Card, Chevron, ErrorNote, GroupLabel, Hair, Rise, SettingRow } from "./ui";
 
@@ -93,6 +94,9 @@ export default function ProfileScreen({ profile, email, userId }: { profile: Pro
 
       <GraffitiWall />
 
+      {/* v2.10: an under-18 "lose" goal moves to maintain here too, with its one-time card. */}
+      <TeenGoalMigration profile={profile} />
+
       {/* ---- You ---- */}
       <Rise index={1}>
         <GroupLabel>You</GroupLabel>
@@ -106,7 +110,7 @@ export default function ProfileScreen({ profile, email, userId }: { profile: Pro
             <Hair />
             <SettingRow icon={<Target size={20} />} label="Nutrition goals" href="/profile/goals">
               <span className="flex items-center gap-1 text-[13px] muted">
-                {profile.calorie_target} kcal
+                {profile.hide_numbers ? "Set" : `${profile.calorie_target} kcal`}
                 <Chevron />
               </span>
             </SettingRow>

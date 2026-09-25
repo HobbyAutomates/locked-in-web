@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveProfile } from "@/lib/actions";
-import { generate, missing, type Targets } from "@/lib/goals";
-import { DEFAULT_FIBER_G, DEFAULT_SUGAR_G, carbTargetG, fatTargetG, type Profile } from "@/lib/types";
+import { amdrNotes, capToFloor, edFlags, floorFor, missing, plan, screenInput, type EdFlag, type Plan, type Targets } from "@/lib/goals";
+import { recordEdit } from "@/lib/targetEdits";
+import { DEFAULT_FIBER_G, DEFAULT_SUGAR_G, carbTargetG, fatTargetG, type Profile, type WeightEntry } from "@/lib/types";
+import { SafetyNote, ScienceButton, TeenGoalMigration } from "./Science";
 import SubPage from "./SubPage";
 import { ChevronDown, ChevronRight, Flame } from "./icons";
 import { Card, ErrorNote, Hair, NumberField, PillButton, Ring, Rise, fmt } from "./ui";
@@ -62,14 +64,15 @@ function gramsFrom(calories: number, s: Split): Targets {
  * 100 % (grams follow the calories), and "Auto generate" — the Mifflin-St Jeor engine run in place
  * with a before → after preview. Nothing is stored until Save.
  */
-export default function NutritionGoalsScreen({ profile }: { profile: Profile }) {
+export default function NutritionGoalsScreen({ profile, weights = [] }: { profile: Profile; weights?: WeightEntry[] }) {
   const router = useRouter();
   const current: Targets = { calories: profile.calorie_target, protein: profile.protein_target_g, carbs: carbTargetG(profile), fat: fatTargetG(profile) };
   const [calories, setCalories] = useState(String(current.calories));
   const [split, setSplit] = useState<Split>(() => splitFrom(current));
   /** Exact grams to save as-is (the current goals, or freshly generated ones) until the split is touched. */
   const [exact, setExact] = useState<Targets | null>(current);
-  const [preview, setPreview] = useState<{ before: Targets; after: Targets } | null>(null);
+  const [preview, setPreview] = useState<{ before: Targets; after: Targets; plan: Plan } | null>(null);
+  const [safety, setSafety] = useState<{ flags: EdFlag[]; floor: number | null } | null>(null);
   const [gapNote, setGapNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -83,7 +86,10 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
   const microsDirty = fiberG !== (profile.fiber_target ?? DEFAULT_FIBER_G) || sugarG !== (profile.sugar_target ?? DEFAULT_SUGAR_G);
 
   const kcal = clampN(Number(calories) || 0, 0, 10_000);
-  const kcalValid = kcal >= 800 && kcal <= 10_000;
+  // v2.10: anything under the safe floor is lifted to it on save (never blocked), so only 0 is invalid.
+  const kcalValid = kcal >= 1 && kcal <= 10_000;
+  const floor = floorFor(profile);
+  const working = plan(profile);
   const next: Targets = exact && exact.calories === kcal ? exact : gramsFrom(kcal, split);
   const dirty = microsDirty || next.calories !== current.calories || next.protein !== current.protein || next.carbs !== (profile.carb_target_g ?? -1) || next.fat !== (profile.fat_target_g ?? -1);
 
@@ -100,10 +106,11 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
       setGapNote(`Add your ${gaps.join(", ")} in Personal details first.`);
       return;
     }
-    const t = generate(profile);
-    if (!t) return;
+    const pl = plan(profile);
+    if (!pl) return;
+    const t = pl.targets;
     setGapNote(null);
-    setPreview({ before: current, after: t });
+    setPreview({ before: current, after: t, plan: pl });
     setCalories(String(t.calories));
     setSplit(splitFrom(t));
     setExact(t);
@@ -111,15 +118,24 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
   }
 
   async function save() {
-    if (!kcalValid) return setError("Calorie goal must be between 800 and 10,000 kcal.");
+    if (!kcalValid) return setError("Pick a calorie goal up to 10,000 kcal.");
     setBusy(true);
     setSaved(false);
     setError(null);
     try {
-      await saveProfile({ calorie_target: next.calories, protein_target_g: next.protein, carb_target_g: next.carbs, fat_target_g: next.fat, fiber_target: fiberG, sugar_target: sugarG });
+      // Safety: a target under the floor is lifted to it, with the same split, and saved anyway.
+      // Only when the calorie number itself changed, so editing fibre alone never moves an old target.
+      const touched = next.calories !== current.calories;
+      const cap = touched ? capToFloor(next.calories, floor) : { calories: next.calories, capped: false };
+      const out: Targets = cap.capped ? gramsFrom(cap.calories, split) : next;
+      await saveProfile({ calorie_target: out.calories, protein_target_g: out.protein, carb_target_g: out.carbs, fat_target_g: out.fat, fiber_target: fiberG, sugar_target: sugarG });
+      const edits = recordEdit("calories", current.calories, next.calories);
+      const flags = edFlags(screenInput(profile, { weights: weights.map((w) => ({ date: w.date, kg: w.weight_kg })), requestedCalories: touched ? next.calories : null, edits }));
+      setSafety(flags.length ? { flags, floor: cap.capped ? cap.calories : null } : null);
+      if (cap.capped) setCalories(String(cap.calories));
       setSaved(true);
       setPreview(null);
-      setExact(next);
+      setExact(out);
       router.refresh();
     } catch (err) {
       console.error("[NutritionGoals] save failed", err);
@@ -133,14 +149,23 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
 
   return (
     <SubPage title="Nutrition goals" back="/profile">
+      <TeenGoalMigration profile={profile} />
+
       {/* ---- Auto generate ---- */}
       <Rise index={0}>
         <Card>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[15px] font-bold">Auto generate</p>
+              <p className="flex items-center gap-1.5 text-[15px] font-bold">
+                Auto generate
+                <ScienceButton />
+              </p>
               <p className="mt-0.5 text-xs leading-[17px] muted">
-                From your weight, height, age and gender, set for {profile.goal_type} at {fmt(profile.goal_speed_kg_wk)} kg/week.
+                {working == null
+                  ? "From your weight, height, age and gender."
+                  : working.teen
+                    ? `Built for a growing body: ${working.goal === "gain" ? "what you need to grow and train, plus a small extra" : "what you need to grow and train"}. No deficits under 18.`
+                    : `From your weight, height, age and gender: ${working.pal.label.toLowerCase()}, ${working.goal === "maintain" ? "maintaining" : `${working.goal === "lose" ? "losing" : "gaining"} ${fmt(working.speed)} kg/week`}.`}
               </p>
             </div>
             <PillButton onClick={autoGenerate} height={40} className="!w-auto shrink-0 !px-4 text-[13px]" style={{ minHeight: 40 }}>
@@ -162,6 +187,10 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
             </div>
           ) : null}
           {preview ? <BeforeAfter before={preview.before} after={preview.after} /> : null}
+          {preview?.plan.speedCapped ? (
+            <p className="mt-2 text-[12px] leading-4 muted">We used {fmt(preview.plan.speed)} kg/week, the safe max for your body weight, instead of {fmt(profile.goal_speed_kg_wk)}.</p>
+          ) : null}
+          {preview?.plan.floorApplied ? <p className="mt-1 text-[12px] leading-4 muted">Calories sit at your floor ({preview.plan.targets.calories.toLocaleString("en-IN")} kcal), the lowest we&apos;ll go for your body.</p> : null}
         </Card>
       </Rise>
 
@@ -214,6 +243,15 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
             ))}
           </div>
           <p className="px-4 pb-3.5 text-[11px] leading-4 muted">Grams follow your calories: protein and carbs 4 kcal per gram, fat 9.</p>
+          {amdrNotes(next).length ? (
+            <ul className="mx-4 mb-3.5 flex list-none flex-col gap-1.5 rounded-2xl px-3 py-2.5" style={{ background: "var(--card2)" }}>
+              {amdrNotes(next).map((n) => (
+                <li key={n.macro} className="text-[12px] leading-4" style={{ color: n.level === "warn" ? "var(--orange)" : "var(--muted)", fontWeight: n.level === "warn" ? 600 : 400 }}>
+                  {n.text}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </Card>
       </Rise>
 
@@ -244,6 +282,11 @@ export default function NutritionGoalsScreen({ profile }: { profile: Profile }) 
           {busy ? "Saving…" : saved && !dirty ? "Saved" : "Save goals"}
         </PillButton>
       </Rise>
+      {safety ? (
+        <Rise index={4}>
+          <SafetyNote flags={safety.flags} floor={safety.floor} onClose={() => setSafety(null)} />
+        </Rise>
+      ) : null}
     </SubPage>
   );
 }

@@ -19,11 +19,18 @@ const hhmm = (v: unknown, fallback: string): string => (typeof v === "string" &&
 export async function getProfile(): Promise<Profile> {
   const supabase = await createClient();
   // v2.9: auto_share comes in its own query so a database without schema_v31 still loads the profile.
-  const [{ data }, share] = await Promise.all([supabase.from("profiles").select(PROFILE_COLS).maybeSingle(), supabase.from("profiles").select("auto_share").maybeSingle()]);
+  // v2.10: hide_numbers / waist_cm likewise, so a database without schema_v34 still loads.
+  const [{ data }, share, science] = await Promise.all([
+    supabase.from("profiles").select(PROFILE_COLS).maybeSingle(),
+    supabase.from("profiles").select("auto_share").maybeSingle(),
+    supabase.from("profiles").select("hide_numbers, waist_cm").maybeSingle(),
+  ]);
   if (!data) return { ...DEFAULT_PROFILE };
   const d = data as Record<string, unknown>;
   return {
     auto_share: share.error ? null : parseAutoShare((share.data as { auto_share?: unknown } | null)?.auto_share),
+    hide_numbers: science.error ? null : (science.data as { hide_numbers?: unknown } | null)?.hide_numbers === true,
+    waist_cm: science.error ? null : num((science.data as { waist_cm?: unknown } | null)?.waist_cm),
     weekly_workout_target: num(d.weekly_workout_target) ?? DEFAULT_PROFILE.weekly_workout_target,
     protein_target_g: num(d.protein_target_g) ?? DEFAULT_PROFILE.protein_target_g,
     calorie_target: num(d.calorie_target) ?? DEFAULT_PROFILE.calorie_target,
