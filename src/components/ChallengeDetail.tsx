@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteChallenge } from "@/lib/actions";
-import { challengeEmoji, challengeLength, challengeStatus, ruleLabel, timeLabel } from "@/lib/challenges";
+import { challengeLength, challengeStatus, ruleLabel, timeLabel } from "@/lib/challenges";
 import { shortDate } from "@/lib/dates";
 import type { Challenge, ChallengeBoardRow, Squad } from "@/lib/types";
-import { ArrowLeft, Trash } from "./icons";
+import { ArrowLeft, ChallengeKindIcon, Flame, Trash, Trophy } from "./icons";
 import { ProgressBar, SquadRankRow } from "./SquadRankRow";
 import { BottomSheet, ErrorNote, Ring, Rise } from "./ui";
 
@@ -62,8 +62,9 @@ export default function ChallengeDetail({ me, today, squad, challenge: c, board 
         <Rise index={0}>
           <div className="card flex items-center gap-4" style={{ padding: 16 }}>
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-[12px] font-semibold muted">
-                {challengeEmoji(c.kind)} {status === "upcoming" ? "Upcoming" : status === "ended" ? "Wrapped" : "Live"} · {timeLabel(c, today)}
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold muted">
+                <ChallengeKindIcon kind={c.kind} size={14} className="shrink-0" />
+                {status === "upcoming" ? "Upcoming" : status === "ended" ? "Wrapped" : "Live"} · {timeLabel(c, today)}
               </span>
               <span className="mt-1 text-[21px] font-extrabold leading-tight" style={{ letterSpacing: "-0.02em" }}>
                 {c.title}
@@ -81,14 +82,25 @@ export default function ChallengeDetail({ me, today, squad, challenge: c, board 
                   {c.my_progress}
                   <span className="text-[13px] font-bold muted">/{c.target_days}</span>
                 </span>
-                <span className="mt-0.5 text-[10px] font-semibold muted">{done ? "done 🔥" : "you"}</span>
+                <span className="mt-0.5 flex items-center gap-0.5 text-[10px] font-semibold muted">
+                  {done ? "done" : "you"}
+                  {done ? <Flame size={10} style={{ color: "var(--flame)" }} /> : null}
+                </span>
               </span>
             </Ring>
           </div>
         </Rise>
 
-        <p className="px-1 pt-1 text-xs font-semibold muted">
-          Board · {c.completed_count ? `🏆 ${c.completed_count} of ${c.participants} done` : `${c.participants} in`}
+        <p className="flex items-center gap-1 px-1 pt-1 text-xs font-semibold muted">
+          Board ·{" "}
+          {c.completed_count ? (
+            <>
+              <Trophy size={13} />
+              {`${c.completed_count} of ${c.participants} done`}
+            </>
+          ) : (
+            `${c.participants} in`
+          )}
         </p>
         {board.map((r, i) => (
           <Rise key={r.user_id} index={i + 1}>
@@ -101,7 +113,11 @@ export default function ChallengeDetail({ me, today, squad, challenge: c, board 
               meta={r.completed && r.completed_on ? `done ${shortDate(r.completed_on)}` : status === "upcoming" ? "starts soon" : `${Math.max(0, c.target_days - r.progress)} to go`}
               right={
                 <span className="flex items-center gap-1 text-[15px] font-extrabold">
-                  {r.completed ? <span aria-label="Completed">🏆</span> : null}
+                  {r.completed ? (
+                    <span aria-label="Completed" className="inline-flex" style={{ color: "var(--flame)" }}>
+                      <Trophy size={16} />
+                    </span>
+                  ) : null}
                   <span className="num">
                     {r.progress}
                     <span className="text-[12px] font-bold muted">/{c.target_days}</span>
@@ -115,7 +131,7 @@ export default function ChallengeDetail({ me, today, squad, challenge: c, board 
         ))}
         {!board.length ? <p className="px-1 text-center text-[13px] muted">Couldn&apos;t load the board. Refresh in a sec.</p> : null}
         <p className="px-1 pt-1 text-center text-[12px] leading-snug muted">
-          Days count from your logs automatically. Hit {c.target_days} to take the 🏆.
+          Days count from your logs automatically. Hit {c.target_days} to take the trophy.
         </p>
       </div>
 

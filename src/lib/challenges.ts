@@ -13,13 +13,12 @@ export const CHALLENGE_LENGTHS = [7, 14, 30] as const;
 export const PROTEIN_MIN = 40;
 export const PROTEIN_MAX = 300;
 
-export const CHALLENGE_TEMPLATES: { kind: ChallengeKind; emoji: string; label: string }[] = [
-  { kind: "train_days", emoji: "🏋️", label: "Train days" },
-  { kind: "protein_days", emoji: "💪", label: "Protein days" },
-  { kind: "log_days", emoji: "📝", label: "Log every day" },
+/** v2.10: each kind's tag icon is ChallengeKindIcon (components/icons.tsx), not an emoji. */
+export const CHALLENGE_TEMPLATES: { kind: ChallengeKind; label: string }[] = [
+  { kind: "train_days", label: "Train days" },
+  { kind: "protein_days", label: "Protein days" },
+  { kind: "log_days", label: "Log every day" },
 ];
-
-export const challengeEmoji = (kind: ChallengeKind) => CHALLENGE_TEMPLATES.find((t) => t.kind === kind)?.emoji ?? "🏁";
 
 /** Log days: every day. Train days: 70% of the length. Protein days: 5 of every 7. */
 export function defaultTarget(kind: ChallengeKind, length: number): number {
@@ -69,9 +68,9 @@ export function ruleLabel(kind: ChallengeKind, protein: number | null): string {
   return kind === "train_days" ? "Any workout counts" : kind === "protein_days" ? `${protein ?? 100} g+ protein counts` : "Any logged meal counts";
 }
 
-/** "12/14 days 🔥" (the flame once it's done). */
+/** "12/14 days" (v2.10: the UI draws a Flame icon beside it once it's done, no emoji). */
 export function progressLabel(progress: number, target: number): string {
-  return `${progress}/${target} days${progress >= target ? " 🔥" : ""}`;
+  return `${progress}/${target} days`;
 }
 
 export const completionPostBody = (title: string) => `🏆 completed "${title}"`;

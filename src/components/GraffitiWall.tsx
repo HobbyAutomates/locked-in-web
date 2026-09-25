@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { loadGraffiti } from "@/lib/actions";
 import { longDate } from "@/lib/dates";
 import type { GraffitiEntry } from "@/lib/types";
+import { Crown } from "./icons";
 import { Card, Rise } from "./ui";
 
 const GOAL_LABEL: Record<string, string> = { gain: "Bulk", lose: "Cut", maintain: "Maintain" };
@@ -27,8 +28,8 @@ export default function GraffitiWall() {
     <Rise index={1}>
       <Card padding={0}>
         <div className="flex items-center gap-3 px-4 py-3.5">
-          <span className="graffiti-tag text-[22px]" aria-hidden="true">
-            👑
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)", color: "var(--ink)" }} aria-hidden="true">
+            <Crown size={20} />
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="text-[15px] font-bold">Graffiti wall</span>

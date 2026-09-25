@@ -12,7 +12,7 @@ import { today as todayIso } from "@/lib/dates";
 import { useDictation } from "@/lib/speech";
 import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
 import type { FoodPreset, FoodSearchHit, Meal, MealItem, ParsedWater, ParseResult, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
-import { Close, Drop, Mic, Search, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
+import { Close, Drop, Droplet, MealTypeIcon, Mic, Search, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
 import FoodImage, { FoodFallback, type FoodImageKind } from "./FoodImage";
 import QuantitySheet from "./QuantitySheet";
 import { saveWhenReady, type PlateJob } from "./PendingMeals";
@@ -504,7 +504,8 @@ export default function MealForm({
             exit={{ opacity: 0, y: 4 }}
           >
             <span role="status" className="pointer-events-auto badge flex items-center gap-2" style={{ background: "var(--blue-bg)", color: "var(--blue)", padding: "8px 8px 8px 14px", fontSize: 13, boxShadow: "var(--shadow)" }}>
-              💧 {waterToast.undone ? "Undone" : `+${waterToast.glasses % 1 === 0 ? waterToast.glasses : waterToast.glasses.toFixed(1)} glass${waterToast.glasses === 1 ? "" : "es"} to Water (${waterToast.ml} mL)`}
+              <Droplet size={15} />
+              {waterToast.undone ? "Undone" : `+${waterToast.glasses % 1 === 0 ? waterToast.glasses : waterToast.glasses.toFixed(1)} glass${waterToast.glasses === 1 ? "" : "es"} to Water (${waterToast.ml} mL)`}
               {!waterToast.undone ? (
                 <button type="button" className="hit press font-bold underline" onClick={() => void undoWaterToast(waterToast.id)}>
                   Undo
@@ -777,15 +778,13 @@ export default function MealForm({
   );
 }
 
-/** v2.8: 🍳 Breakfast · 🍛 Lunch · 🌙 Dinner · 🍿 Snacks — one row of four at the top of add / edit meal. */
+/** v2.8: Breakfast · Lunch · Dinner · Snacks (v2.10: Lucide line icons, not emoji) — one row of four at the top of add / edit meal. */
 function MealTypeChips({ value, onChange }: { value: MealType; onChange: (t: MealType) => void }) {
   return (
     <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Which meal">
       {MEAL_TYPES.map((t) => (
         <button key={t.key} type="button" role="radio" aria-checked={value === t.key} className="chip press flex-col" style={{ height: 52, padding: "0 4px", gap: 1, fontSize: 12.5, lineHeight: 1.15 }} onClick={() => onChange(t.key)}>
-          <span aria-hidden="true" style={{ fontSize: 17 }}>
-            {t.emoji}
-          </span>
+          <MealTypeIcon type={t.key} size={18} />
           <span className="max-w-full truncate">{t.label}</span>
         </button>
       ))}

@@ -8,7 +8,7 @@ import { toJpegBase64 } from "@/lib/image";
 import { mealItemFromPlate } from "@/lib/quantity";
 import type { BattleBoardRow, BattleWinner, PlateEstimate, PlateItem, Squad } from "@/lib/types";
 import { Avatar } from "./Avatar";
-import { Camera, Spinner, Trash } from "./icons";
+import { Camera, Crown, Spinner, Trash } from "./icons";
 import { BottomSheet, Card, ErrorNote } from "./ui";
 
 const GOAL_LABEL: Record<string, string> = { gain: "Bulk", lose: "Cut", maintain: "Maintain" };
@@ -59,7 +59,9 @@ export function BattleTab({ me, squad, date, crown, onError }: { me: string; squ
   if (!squad.battle_enabled) {
     return (
       <div className="flex flex-col items-center gap-2 px-4 pt-16 text-center">
-        <span className="text-[40px]">👑</span>
+        <span className="grid h-16 w-16 place-items-center rounded-full" style={{ background: "var(--card2)", color: "var(--ink)" }} aria-hidden="true">
+          <Crown size={32} />
+        </span>
         <p className="text-[17px] font-extrabold">Food Battle is off</p>
         <p className="max-w-[280px] text-[13px] muted">The squad owner can turn it on from Edit squad in Members. Everyone snaps their meals; whoever&apos;s closest to their own goal wins the crown.</p>
       </div>
@@ -104,7 +106,7 @@ export function BattleTab({ me, squad, date, crown, onError }: { me: string; squ
       ) : (
         scored.map((r) => <BoardRow key={r.userId} row={r} me={me} isLeader={r.userId === leaderId} gap={pointsToLead(r, scored)} />)
       )}
-      <p className="px-1 pt-1 text-center text-[12px] leading-snug muted">Score is how close you are to your own goal band today — not a ranking against anyone else. 👑 = today&apos;s leader.</p>
+      <p className="px-1 pt-1 text-center text-[12px] leading-snug muted">Score is how close you are to your own goal band today — not a ranking against anyone else. <Crown size={12} className="inline-block align-[-1px]" /> = today&apos;s leader.</p>
 
       <SnapSheet
         open={!!snapFile}
@@ -152,7 +154,11 @@ function BoardRow({ row, me, isLeader, gap }: { row: ScoredBattleRow; me: string
           <span className="flex items-center gap-1.5 truncate text-[14px] font-bold">
             {row.name}
             {isMe ? <span className="font-medium muted"> · you</span> : null}
-            {isLeader && row.canWin ? <span aria-label="Leader">👑</span> : null}
+            {isLeader && row.canWin ? (
+              <span aria-label="Leader" className="inline-flex shrink-0" style={{ color: "var(--flame)" }}>
+                <Crown size={15} />
+              </span>
+            ) : null}
           </span>
           <span className="flex items-center gap-1.5 text-[11px] muted">
             <span className="chip" style={{ height: 18, padding: "0 8px", fontSize: 10, fontWeight: 700, background: GOAL_TINT[row.goalType], color: "#fff" }}>

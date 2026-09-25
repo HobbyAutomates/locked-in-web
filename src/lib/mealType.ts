@@ -7,11 +7,12 @@ import type { Meal } from "./types";
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 
 /** Home's section order: Breakfast · Lunch · Dinner · Snacks. */
-export const MEAL_TYPES: { key: MealType; label: string; emoji: string }[] = [
-  { key: "breakfast", label: "Breakfast", emoji: "🍳" },
-  { key: "lunch", label: "Lunch", emoji: "🍛" },
-  { key: "dinner", label: "Dinner", emoji: "🌙" },
-  { key: "snack", label: "Snacks", emoji: "🍿" },
+// v2.10: no emoji here; the icon comes from MealTypeIcon (components/icons.tsx, Lucide line icons).
+export const MEAL_TYPES: { key: MealType; label: string }[] = [
+  { key: "breakfast", label: "Breakfast" },
+  { key: "lunch", label: "Lunch" },
+  { key: "dinner", label: "Dinner" },
+  { key: "snack", label: "Snacks" },
 ];
 
 export function isMealType(x: unknown): x is MealType {
@@ -78,7 +79,7 @@ export function mealTypeOf(meal: Pick<Meal, "created_at"> & { meal_type?: string
   return mealTypeForHour(h ?? 12);
 }
 
-export type MealSection<M> = { type: MealType; label: string; emoji: string; meals: M[]; kcal: number; protein: number };
+export type MealSection<M> = { type: MealType; label: string; meals: M[]; kcal: number; protein: number };
 
 /** Meals grouped into the four sections, in Home's order; each section's meals oldest first. */
 export function groupMeals<M extends Meal>(meals: M[]): MealSection<M>[] {
@@ -88,7 +89,6 @@ export function groupMeals<M extends Meal>(meals: M[]): MealSection<M>[] {
     return {
       type: t.key,
       label: t.label,
-      emoji: t.emoji,
       meals: list,
       kcal: Math.round(items.reduce((a, i) => a + Number(i.calories || 0), 0)),
       protein: Math.round(items.reduce((a, i) => a + Number(i.protein_g || 0), 0) * 10) / 10,

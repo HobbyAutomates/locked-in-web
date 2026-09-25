@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -8,6 +8,7 @@ import { addDays, longDate, shortDate } from "@/lib/dates";
 import { dismiss, useDismissed } from "@/lib/dismiss";
 import { calorieBudget, totalsFor } from "@/lib/totals";
 import { logWater } from "@/lib/actions";
+import { toggleMacroMode, useMacroMode, type MacroMode } from "@/lib/macroMode";
 import { litres, WaterBottle } from "./WaterBottle";
 import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Nudge, type Profile, type WaterEntry, type Workout, type Wrap } from "@/lib/types";
 import { CalendarIcon, Check, ChevronRight, Close, Fist, Flame, Lock, MoonStar, Plus, Run, Share, Spinner } from "./icons";
@@ -82,7 +83,21 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   // v2.3 Preferences: "Add burned calories to daily goal" and "Rollover calories" (up to 200).
   const budget = calorieBudget(profile, meals, exercises, selected);
   const burnedKcal = budget.burned;
-  const caloriesLeft = Math.max(0, Math.round(budget.budget - totals.calories));
+  // v2.10: every calorie / macro card shows "left" or "eaten"; tapping any one flips them all.
+  const { mode, showHint } = useMacroMode();
+  const [flipped, setFlipped] = useState(false);
+  const flip = () => {
+    setFlipped(true);
+    toggleMacroMode();
+  };
+  const kcalEaten = Math.round(totals.calories);
+  const kcalOver = Math.round(totals.calories - budget.budget);
+  const kcal =
+    mode === "eaten"
+      ? { value: kcalEaten, word: "eaten" }
+      : kcalOver > 0
+        ? { value: kcalOver, word: "over" }
+        : { value: Math.max(0, Math.round(budget.budget - totals.calories)), word: "left" };
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -109,19 +124,28 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         <DayStreakPill days={dayStreak} loggedToday={meals.some((m) => m.date === today) || workouts.some((w) => w.date === today) || exercises.some((e) => e.date === today)} />
       </Rise>
 
-      <BannerSlot nudges={nudges} wrap={wrap} pending={pending} />
+      <BannerCarousel nudges={nudges} wrap={wrap} pending={pending} />
 
       <Rise index={1}>
         <WeekStrip today={today} selected={selected} trained={trained} onSelect={setSelected} />
       </Rise>
 
       <Rise index={2}>
-        <Card padding={20}>
+        <button
+          type="button"
+          className="card press block w-full text-left"
+          style={{ padding: 20, color: "var(--ink)" }}
+          onClick={flip}
+          aria-label={`${kcal.value} calories ${kcal.word}. Tap to show ${mode === "eaten" ? "what's left" : "what you've eaten"}`}
+        >
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="num text-[40px] font-extrabold leading-none">{caloriesLeft}</p>
-              <p className="mt-1 flex items-center gap-2 text-sm font-medium muted">
-                {isToday ? "Calories left" : `Calories left · ${shortDate(selected)}`}
+            <FlipFace mode={mode} animate={flipped}>
+              <p className="num text-[40px] font-extrabold leading-none">
+                {kcal.value.toLocaleString("en-IN")}
+              </p>
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium muted">
+                {`Calories ${kcal.word}`}
+                {isToday ? "" : ` · ${shortDate(selected)}`}
                 {burnedKcal > 0 ? (
                   <span className="num rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }} title="Burned calories added to your goal">
                     +{Math.round(burnedKcal)} burned
@@ -133,20 +157,21 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
                   </span>
                 ) : null}
               </p>
-            </div>
+            </FlipFace>
             <Ring fraction={totals.calories / Math.max(1, budget.budget)} color="var(--ink)" size={96} stroke={9}>
               <Flame size={26} />
             </Ring>
           </div>
-        </Card>
+        </button>
       </Rise>
 
       <Rise index={3}>
         <div className="grid grid-cols-3 gap-2.5">
-          <MacroCard macro="Protein" consumed={totals.protein} target={profile.protein_target_g} color="var(--red)" />
-          <MacroCard macro="Carbs" consumed={totals.carbs} target={carbTarget} color="var(--orange)" />
-          <MacroCard macro="Fat" consumed={totals.fat} target={fatTarget} color="var(--blue)" />
+          <MacroCard macro="Protein" consumed={totals.protein} target={profile.protein_target_g} color="var(--red)" mode={mode} animate={flipped} onFlip={flip} />
+          <MacroCard macro="Carbs" consumed={totals.carbs} target={carbTarget} color="var(--orange)" mode={mode} animate={flipped} onFlip={flip} />
+          <MacroCard macro="Fat" consumed={totals.fat} target={fatTarget} color="var(--blue)" mode={mode} animate={flipped} onFlip={flip} />
         </div>
+        {showHint ? <p className="mt-1.5 text-center text-[12px] muted">Tap a card to switch between left and eaten</p> : null}
       </Rise>
 
       <Rise index={4}>
@@ -297,27 +322,74 @@ function DayStreakPill({ days, loggedToday }: { days: number; loggedToday: boole
 }
 
 /**
- * v2.8: one card above the hero, never a carousel — the most relevant of: a meal still being saved,
- * then a squad nudge, then the 9 pm wrap. Dismissing one lets the next show.
+ * v2.10: the cards above the hero — a meal still being saved, a squad nudge, the 9 pm wrap — as a
+ * swipeable row (CSS scroll-snap) with small dots. Dismissing a card takes it out; one card left
+ * shows no dots; no cards, no carousel. Android's TodayScreen uses a HorizontalPager for the same.
  */
-function BannerSlot({ nudges, wrap, pending }: { nudges: Nudge[]; wrap: Wrap | null; pending: Pending[] }) {
+function BannerCarousel({ nudges, wrap, pending }: { nudges: Nudge[]; wrap: Wrap | null; pending: Pending[] }) {
   const nudgeHidden = useDismissed(`nudge:${nudges[0]?.id ?? "none"}`);
   const wrapHidden = useDismissed(`wrap:${wrap?.date ?? "none"}`);
-  const slot = pending.length
-    ? { key: "pending", node: <PendingBanner pending={pending} /> }
-    : nudges.length && !nudgeHidden
-      ? { key: "nudge", node: <NudgeBanner nudges={nudges} /> }
-      : wrap && !wrapHidden
-        ? { key: "wrap", node: <WrapCard wrap={wrap} /> }
-        : null;
-  if (!slot) return null;
+  const cards: { key: string; label: string; node: React.ReactNode }[] = [];
+  if (pending.length) cards.push({ key: "pending", label: "Saving a meal", node: <PendingBanner pending={pending} /> });
+  if (nudges.length && !nudgeHidden) cards.push({ key: "nudge", label: "Squad nudge", node: <NudgeBanner nudges={nudges} /> });
+  if (wrap && !wrapHidden) cards.push({ key: "wrap", label: "Daily wrap", node: <WrapCard wrap={wrap} /> });
+  const track = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  if (!cards.length) return null;
+  const active = Math.min(page, cards.length - 1);
+  function onScroll() {
+    const el = track.current;
+    if (!el || !el.firstElementChild) return;
+    const step = (el.firstElementChild as HTMLElement).offsetWidth + 10;
+    setPage(Math.max(0, Math.round(el.scrollLeft / Math.max(1, step))));
+  }
+  function goTo(i: number) {
+    const el = track.current;
+    const child = el?.children[i] as HTMLElement | undefined;
+    if (el && child) el.scrollTo({ left: child.offsetLeft - el.offsetLeft - 4, behavior: "smooth" });
+  }
   return (
     <Rise index={1}>
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={slot.key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
-          {slot.node}
-        </motion.div>
-      </AnimatePresence>
+      <div
+        ref={track}
+        className="banner-carousel flex snap-x snap-mandatory overflow-x-auto"
+        style={{ gap: 10, margin: "-8px -4px", padding: "8px 4px", scrollPaddingInline: 4 }}
+        onScroll={onScroll}
+        role={cards.length > 1 ? "region" : undefined}
+        aria-roledescription={cards.length > 1 ? "carousel" : undefined}
+        aria-label={cards.length > 1 ? "Updates" : undefined}
+      >
+        {cards.map((c, i) => (
+          <motion.div
+            key={c.key}
+            className="w-full shrink-0 snap-center"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.16 }}
+            aria-roledescription={cards.length > 1 ? "slide" : undefined}
+            aria-label={cards.length > 1 ? `${i + 1} of ${cards.length}: ${c.label}` : undefined}
+          >
+            {c.node}
+          </motion.div>
+        ))}
+      </div>
+      {cards.length > 1 ? (
+        <div className="mt-2 flex justify-center gap-1.5">
+          {cards.map((c, i) => (
+            <button
+              key={c.key}
+              type="button"
+              aria-label={`Show card ${i + 1}: ${c.label}`}
+              aria-current={i === active}
+              className="grid h-4 w-4 place-items-center"
+              style={{ background: "none", border: 0, padding: 0 }}
+              onClick={() => goTo(i)}
+            >
+              <span className="rounded-full" style={{ width: i === active ? 14 : 6, height: 6, background: i === active ? "var(--ink)" : "var(--hair)", transition: "width 160ms ease, background 160ms ease" }} />
+            </button>
+          ))}
+        </div>
+      ) : null}
     </Rise>
   );
 }
@@ -474,28 +546,54 @@ function WeekStrip({
 }
 
 /**
- * One macro card. Below target it counts down ("34g / Protein left"); once the target is passed
- * it flips to the overshoot ("12g / Protein **over**") in the macro's own colour, like Cal AI.
+ * One macro card. In "left" mode it counts down ("34g / Protein left"); once the target is passed
+ * it shows the overshoot ("12g / Protein **over**") in the macro's own colour, like Cal AI. In
+ * "eaten" mode it shows what's been eaten ("58g / Protein eaten"). Tapping flips every card.
  */
-function MacroCard({ macro, consumed, target, color }: { macro: string; consumed: number; target: number; color: string }) {
+function MacroCard({ macro, consumed, target, color, mode, animate, onFlip }: { macro: string; consumed: number; target: number; color: string; mode: MacroMode; animate: boolean; onFlip: () => void }) {
   const safeTarget = Math.max(1, target);
-  const over = consumed > target && target > 0;
-  const amount = Math.max(0, Math.round(over ? consumed - target : target - consumed));
+  const over = mode === "left" && consumed > target && target > 0;
+  const amount = mode === "eaten" ? Math.max(0, Math.round(consumed)) : Math.max(0, Math.round(over ? consumed - target : target - consumed));
+  const word = mode === "eaten" ? "eaten" : over ? "over" : "left";
   return (
-    <Card padding={12}>
-      <p className="num text-xl font-extrabold leading-tight" style={{ color: over ? color : "var(--ink)" }}>
-        {amount}g
-      </p>
-      <p className="text-xs muted">
-        {macro}{" "}
-        <span style={{ color: over ? color : "var(--muted)", fontWeight: over ? 700 : 400 }}>{over ? "over" : "left"}</span>
-      </p>
+    <button
+      type="button"
+      className="card press block w-full text-left"
+      style={{ padding: 12, color: "var(--ink)" }}
+      onClick={onFlip}
+      aria-label={`${macro}: ${amount} grams ${word}. Tap to show ${mode === "eaten" ? "what's left" : "what you've eaten"}`}
+    >
+      <FlipFace mode={mode} animate={animate}>
+        <p className="num text-xl font-extrabold leading-tight" style={{ color: over ? color : "var(--ink)" }}>
+          {amount}g
+        </p>
+        <p className="text-xs muted">
+          {macro}{" "}
+          <span style={{ color: over ? color : "var(--muted)", fontWeight: over ? 700 : 400 }}>{word}</span>
+        </p>
+      </FlipFace>
       <div className="mt-2.5 flex justify-center">
         <Ring fraction={consumed / safeTarget} color={color} size={56} stroke={6}>
           <span className="rounded-full" style={{ width: 8, height: 8, background: color }} />
         </Ring>
       </div>
-    </Card>
+    </button>
+  );
+}
+
+/** The number + label of a Home card: a short flip-in whenever the left / eaten mode changes (not on first paint). */
+function FlipFace({ mode, animate, children }: { mode: MacroMode; animate: boolean; children: React.ReactNode }) {
+  return (
+    <motion.div
+      key={mode}
+      className="min-w-0"
+      initial={animate ? { opacity: 0, rotateX: -75 } : false}
+      animate={{ opacity: 1, rotateX: 0 }}
+      transition={{ duration: 0.26, ease: [0.2, 0.8, 0.2, 1] }}
+      style={{ transformPerspective: 500, transformOrigin: "50% 50%" }}
+    >
+      {children}
+    </motion.div>
   );
 }
 

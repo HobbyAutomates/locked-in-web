@@ -6,7 +6,7 @@ import { approveJoin, declineJoin, leaveSquad, setSquadAutoPost, toggleBattle, u
 import { inviteLink } from "@/lib/squadPosts";
 import type { JoinRequest, Squad, SquadMemberDetail } from "@/lib/types";
 import { Avatar } from "./Avatar";
-import { ArrowLeft, Chat, Check, Copy, Flame, Globe, LinkIcon, Padlock, Pencil, Share, Spinner } from "./icons";
+import { ArrowLeft, Chat, Check, Copy, Crown, Flame, Globe, LinkIcon, Padlock, Pencil, Share, Spinner } from "./icons";
 import { SQUAD_ICON_KEYS, SQUAD_ICON_LABELS, SquadIcon, SquadIconArt, isSquadIcon } from "./SquadIcon";
 import { BottomSheet, BreathingFlame, Card, ErrorNote, PillButton, Rise, Toggle } from "./ui";
 
@@ -339,7 +339,10 @@ function EditSheet({ open, onClose, squad }: { open: boolean; onClose: () => voi
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl px-4 py-3" style={{ background: "var(--card2)" }}>
         <span className="flex flex-col">
-          <span className="text-[15px] font-bold">Food Battle 👑</span>
+          <span className="flex items-center gap-1.5 text-[15px] font-bold">
+            Food Battle
+            <Crown size={15} />
+          </span>
           <span className="text-[12px] muted">Daily calorie-goal game with a graffiti crown for the winner.</span>
         </span>
         <Toggle on={battleEnabled} onChange={setBattleEnabled} label="Food Battle" />
