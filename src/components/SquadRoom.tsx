@@ -13,7 +13,7 @@ import type { BattleWinner, Challenge, ChallengeBoardRow, LeaderRow, Squad, Squa
 import { Avatar } from "./Avatar";
 import { BattleTab } from "./BattleTab";
 import { UndoSnackbar, usePendingDeletes } from "./LogBits";
-import { ArrowLeft, Bowl, Chat, Check, ChevronRight, Dumbbell, Fist, Flame, Medal, People, Photo, Plus, Send, Target, Trash } from "./icons";
+import { ArrowLeft, Bowl, Chat, Check, ChevronRight, Crown, Dumbbell, Fist, Flame, Medal, People, Photo, Plus, Send, Target, Trash } from "./icons";
 import { ChallengesTab } from "./SquadChallenges";
 import { SquadRankRow } from "./SquadRankRow";
 import { SquadIcon } from "./SquadIcon";
@@ -26,7 +26,7 @@ type Tab = "chat" | "challenges" | "battle" | "feed" | "leaderboard";
 const TABS: { key: Tab; label: string; battle?: true }[] = [
   { key: "chat", label: "Chat" },
   { key: "challenges", label: "Challenges" },
-  { key: "battle", label: "Battle 👑", battle: true },
+  { key: "battle", label: "Battle", battle: true },
   { key: "feed", label: "Feed" },
   { key: "leaderboard", label: "Leaderboard" },
 ];
@@ -211,6 +211,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
               onClick={() => setTab(t)}
             >
               {label}
+              {t === "battle" ? <Crown size={13} className="ml-1 inline-block align-[-2px]" /> : null}
               {tab === t ? <motion.span layoutId="squad-tab" className="absolute inset-x-3 bottom-0 h-[3px] rounded-full" style={{ background: "var(--ink)" }} /> : null}
             </button>
           ))}
@@ -665,7 +666,7 @@ function LeaderboardTab({ me, squadId, rows, sentNudges, onError, onOpenProfile 
           />
         );
       })}
-      <p className="px-1 pt-1 text-center text-[12px] leading-snug muted">🔥 = days in a row with a meal, workout or exercise logged. Points this week: 10 per training day + 5 per day with meals.</p>
+      <p className="px-1 pt-1 text-center text-[12px] leading-snug muted"><Flame size={12} className="inline-block align-[-1px]" style={{ color: "var(--flame)" }} /> = days in a row with a meal, workout or exercise logged. Points this week: 10 per training day + 5 per day with meals.</p>
     </div>
   );
 }

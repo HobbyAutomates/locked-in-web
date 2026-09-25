@@ -742,3 +742,87 @@ export function Padlock(p: P) {
     </Stroke>
   );
 }
+
+/* ---- v2.10: Lucide line icons ----
+ * Path data copied from Lucide (https://lucide.dev), ISC License,
+ * Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT);
+ * all other copyright (c) for Lucide are held by Lucide Contributors 2022.
+ * Circles and rects are written as paths so Android's Icons.kt (`lucide(...)`) uses the exact same
+ * strings. Stroke 2, round caps and joins, currentColor — as Lucide ships them.
+ */
+
+function Lucide({ size = 24, className, style, d }: P & { d: readonly string[] }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      className={className}
+      style={style}
+    >
+      {d.map((x) => (
+        <path key={x} d={x} />
+      ))}
+    </svg>
+  );
+}
+
+/** Lucide path data, keyed by Lucide icon name. Keep in sync with LUCIDE in Android's Icons.kt. */
+export const LUCIDE = {
+  sunrise: ["M12 2v8", "M4.93 10.93l1.41 1.41", "M2 18h2", "M20 18h2", "M19.07 10.93l-1.41 1.41", "M22 22H2", "M8 6l4-4 4 4", "M16 18a4 4 0 0 0-8 0"],
+  sun: ["M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0", "M12 2v2", "M12 20v2", "M4.93 4.93l1.41 1.41", "M17.66 17.66l1.41 1.41", "M2 12h2", "M20 12h2", "M6.34 17.66l-1.41 1.41", "M19.07 4.93l-1.41 1.41"],
+  moon: ["M12 3a6 6 0 0 0 9 9a9 9 0 1 1-9-9z"],
+  cookie: ["M12 2a10 10 0 1 0 10 10a4 4 0 0 1-5-5a4 4 0 0 1-5-5", "M8.5 8.5v.01", "M16 15.5v.01", "M12 12v.01", "M11 17v.01", "M7 14v.01"],
+  crown: ["M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z", "M5 20h14"],
+  trophy: [
+    "M6 9H4.5a2.5 2.5 0 0 1 0-5H6",
+    "M18 9h1.5a2.5 2.5 0 0 0 0-5H18",
+    "M4 22h16",
+    "M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22",
+    "M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22",
+    "M18 2H6v7a6 6 0 0 0 12 0V2z",
+  ],
+  flag: ["M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z", "M4 22v-7"],
+  egg: ["M12 22c6.23-.05 7.87-5.57 7.5-10-.36-4.34-3.95-9.96-7.5-10-3.55.04-7.14 5.66-7.5 10-.37 4.43 1.27 9.95 7.5 10z"],
+  clipboardList: [
+    "M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z",
+    "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",
+    "M12 11h4",
+    "M12 16h4",
+    "M8 11h.01",
+    "M8 16h.01",
+  ],
+  droplet: ["M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"],
+} as const;
+
+export const Sunrise = (p: P) => <Lucide {...p} d={LUCIDE.sunrise} />;
+export const Sun = (p: P) => <Lucide {...p} d={LUCIDE.sun} />;
+export const MoonLine = (p: P) => <Lucide {...p} d={LUCIDE.moon} />;
+export const Cookie = (p: P) => <Lucide {...p} d={LUCIDE.cookie} />;
+export const Crown = (p: P) => <Lucide {...p} d={LUCIDE.crown} />;
+export const Trophy = (p: P) => <Lucide {...p} d={LUCIDE.trophy} />;
+export const Flag = (p: P) => <Lucide {...p} d={LUCIDE.flag} />;
+export const Egg = (p: P) => <Lucide {...p} d={LUCIDE.egg} />;
+export const ClipboardList = (p: P) => <Lucide {...p} d={LUCIDE.clipboardList} />;
+export const Droplet = (p: P) => <Lucide {...p} d={LUCIDE.droplet} />;
+
+/** A meal section's icon: Breakfast sunrise, Lunch sun, Dinner moon, Snacks cookie. */
+export function MealTypeIcon({ type, ...p }: P & { type: "breakfast" | "lunch" | "dinner" | "snack" }) {
+  const d = type === "breakfast" ? LUCIDE.sunrise : type === "lunch" ? LUCIDE.sun : type === "dinner" ? LUCIDE.moon : LUCIDE.cookie;
+  return <Lucide {...p} d={d} />;
+}
+
+/** A challenge kind's tag icon: train days dumbbell, protein days egg, log every day clipboard. */
+export function ChallengeKindIcon({ kind, ...p }: P & { kind: string }) {
+  if (kind === "train_days") return <Dumbbell {...p} />;
+  if (kind === "protein_days") return <Egg {...p} />;
+  if (kind === "log_days") return <ClipboardList {...p} />;
+  return <Flag {...p} />;
+}

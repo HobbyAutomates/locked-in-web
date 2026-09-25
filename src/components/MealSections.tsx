@@ -5,7 +5,7 @@ import { formatTime } from "@/lib/display";
 import { groupMeals, type MealType } from "@/lib/mealType";
 import { itemQtyLabel } from "@/lib/quantity";
 import type { Meal } from "@/lib/types";
-import { Bowl, ChevronRight, Plus } from "./icons";
+import { Bowl, ChevronRight, MealTypeIcon, Plus } from "./icons";
 import FoodImage, { FoodFallback } from "./FoodImage";
 import { Hair, Rise, fmt } from "./ui";
 
@@ -26,7 +26,7 @@ export default function MealSections({ meals, date, back = "/", rise = 6 }: { me
           <Rise key={s.type} index={rise}>
             <div className="card flex items-center justify-between gap-3" style={{ padding: "4px 6px 4px 16px", minHeight: 48 }}>
               <span className="flex min-w-0 items-center gap-2 text-[15px] font-semibold muted">
-                <span aria-hidden="true">{s.emoji}</span>
+                <MealTypeIcon type={s.type} size={18} />
                 {s.label}
               </span>
               <AddLink href={addHref(s.type)} label={s.label} />
@@ -36,9 +36,7 @@ export default function MealSections({ meals, date, back = "/", rise = 6 }: { me
           <Rise key={s.type} index={rise}>
             <section className="card" style={{ padding: 0 }} aria-label={`${s.label}: ${s.kcal} kcal, ${fmt(s.protein)} g protein`}>
               <div className="flex items-center gap-2" style={{ padding: "8px 6px 4px 16px", minHeight: 48 }}>
-                <span aria-hidden="true" className="text-[16px]">
-                  {s.emoji}
-                </span>
+                <MealTypeIcon type={s.type} size={18} className="shrink-0" />
                 <span className="text-[16px] font-extrabold" style={{ letterSpacing: "-0.02em" }}>
                   {s.label}
                 </span>

@@ -9,7 +9,6 @@ import {
   MAX_OPEN_CHALLENGES,
   PROTEIN_MAX,
   PROTEIN_MIN,
-  challengeEmoji,
   challengeStatus,
   defaultProtein,
   defaultTarget,
@@ -22,7 +21,7 @@ import {
 import { addDays, shortDate } from "@/lib/dates";
 import type { Challenge, ChallengeBoardRow, ChallengeKind } from "@/lib/types";
 import { Avatar } from "./Avatar";
-import { ChevronDown, ChevronRight, Plus, Target } from "./icons";
+import { ChallengeKindIcon, ChevronDown, ChevronRight, Flame, Plus, Target, Trophy } from "./icons";
 import { BottomSheet, ErrorNote, PillButton, Ring } from "./ui";
 
 /**
@@ -113,8 +112,9 @@ function ChallengeCard({ me, today, squadId, c, board }: { me: string; today: st
     <Link href={`/squad/${squadId}/challenge/${c.id}`} className="card press flex flex-col gap-3" style={{ padding: 14, color: "var(--ink)" }}>
       <div className="flex items-start gap-3">
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[12px] font-semibold muted">
-            {challengeEmoji(c.kind)} {status === "upcoming" ? "Upcoming" : "Live"} · {timeLabel(c, today)}
+          <span className="flex items-center gap-1.5 text-[12px] font-semibold muted">
+            <ChallengeKindIcon kind={c.kind} size={14} className="shrink-0" />
+            {status === "upcoming" ? "Upcoming" : "Live"} · {timeLabel(c, today)}
           </span>
           <span className="mt-0.5 text-[17px] font-extrabold leading-tight" style={{ letterSpacing: "-0.02em" }}>
             {c.title}
@@ -127,7 +127,10 @@ function ChallengeCard({ me, today, squadId, c, board }: { me: string; today: st
               {c.my_progress}
               <span className="text-[12px] font-bold muted">/{c.target_days}</span>
             </span>
-            <span className="mt-0.5 text-[10px] font-semibold muted">{done ? "done 🔥" : "days"}</span>
+            <span className="mt-0.5 flex items-center gap-0.5 text-[10px] font-semibold muted">
+              {done ? "done" : "days"}
+              {done ? <Flame size={10} style={{ color: "var(--flame)" }} /> : null}
+            </span>
           </span>
         </Ring>
       </div>
@@ -138,6 +141,7 @@ function ChallengeCard({ me, today, squadId, c, board }: { me: string; today: st
             <Avatar path={leader?.avatar_path ?? null} name={c.leader_name} size={26} />
             <span className="min-w-0 flex-1 truncate">
               <span className="font-bold">{leaderIsMe ? "You" : c.leader_name}</span> <span className="muted">{leaderIsMe ? "lead" : "leads"} · {progressLabel(c.leader_progress, c.target_days)}</span>
+              {c.leader_progress >= c.target_days ? <Flame size={12} className="ml-1 inline-block align-[-1px]" style={{ color: "var(--flame)" }} /> : null}
             </span>
           </>
         ) : (
@@ -145,7 +149,12 @@ function ChallengeCard({ me, today, squadId, c, board }: { me: string; today: st
             {status === "upcoming" ? `${c.participants} in · kicks off ${shortDate(c.starts_on)}` : "Board's wide open. First log takes the lead 👀"}
           </span>
         )}
-        {c.completed_count ? <span className="shrink-0 text-[12px] font-semibold">🏆 {c.completed_count}</span> : null}
+        {c.completed_count ? (
+          <span className="num flex shrink-0 items-center gap-1 text-[12px] font-semibold" aria-label={`${c.completed_count} finished`}>
+            <Trophy size={14} />
+            {c.completed_count}
+          </span>
+        ) : null}
         <span className="muted inline-flex shrink-0">
           <ChevronRight size={16} />
         </span>
@@ -160,22 +169,26 @@ function PastRow({ squadId, c, board }: { squadId: string; c: Challenge; board?:
   const more = finishers.length - names.length;
   const who = !board
     ? c.completed_count
-      ? `🏆 ${c.completed_count} finished`
+      ? `${c.completed_count} finished`
       : "Wrapped up"
     : finishers.length
-      ? `🏆 ${names.join(", ")}${more > 0 ? ` +${more}` : ""}`
+      ? `${names.join(", ")}${more > 0 ? ` +${more}` : ""}`
       : "No finishers this round";
+  const trophy = board ? finishers.length > 0 : c.completed_count > 0;
   return (
     <Link href={`/squad/${squadId}/challenge/${c.id}`} className="card press flex items-center gap-3" style={{ padding: "12px 14px", color: "var(--ink)" }}>
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[18px]" style={{ background: "var(--card2)" }} aria-hidden="true">
-        {challengeEmoji(c.kind)}
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)" }} aria-hidden="true">
+        <ChallengeKindIcon kind={c.kind} size={18} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[14px] font-bold">{c.title}</span>
-        <span className="truncate text-[12px] muted">{who}</span>
+        <span className="flex min-w-0 items-center gap-1 text-[12px] muted">
+          {trophy ? <Trophy size={12} className="shrink-0" /> : null}
+          <span className="truncate">{who}</span>
+        </span>
       </span>
       <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold muted">
-        <span className="num">{progressLabel(c.my_progress, c.target_days).replace(" 🔥", "")}</span>
+        <span className="num">{progressLabel(c.my_progress, c.target_days)}</span>
         <ChevronRight size={14} />
       </span>
     </Link>
@@ -267,13 +280,14 @@ function CreateChallengeSheet({ open, today, squadId, proteinGoal, onClose, onCr
         reset();
         onClose();
       }}
-      primary={{ label: busy ? "Starting…" : "Start challenge 🏁", disabled: busy, onClick: () => void submit() }}
+      primary={{ label: busy ? "Starting…" : "Start challenge", disabled: busy, onClick: () => void submit() }}
     >
       <SheetLabel>Challenge</SheetLabel>
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Challenge type">
         {CHALLENGE_TEMPLATES.map((t) => (
-          <button key={t.kind} type="button" role="radio" aria-checked={kind === t.kind} className="chip press" onClick={() => pickKind(t.kind)}>
-            {t.emoji} {t.label}
+          <button key={t.kind} type="button" role="radio" aria-checked={kind === t.kind} className="chip press gap-1.5" onClick={() => pickKind(t.kind)}>
+            <ChallengeKindIcon kind={t.kind} size={15} />
+            {t.label}
           </button>
         ))}
       </div>

@@ -157,7 +157,14 @@ export default function ProfileSetupSheet({
           </button>
           {avatarPath ? (
             <button type="button" className="hit press mt-2 py-1 text-[13px] font-semibold muted" onClick={() => setPick({ kind: "keep" })} style={{ color: pick.kind === "keep" ? "var(--ink)" : undefined }}>
-              {pick.kind === "keep" ? "✓ Keeping my current photo" : "Keep my current photo"}
+              {pick.kind === "keep" ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Check size={15} />
+                  Keeping my current photo
+                </span>
+              ) : (
+                "Keep my current photo"
+              )}
             </button>
           ) : null}
           <input

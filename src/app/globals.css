@@ -450,6 +450,16 @@ button {
   animation: water-wave 2.6s linear infinite;
 }
 
+/* v2.10 Home card carousel: swipe with scroll-snap, no visible scrollbar. */
+.banner-carousel {
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.banner-carousel::-webkit-scrollbar {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
