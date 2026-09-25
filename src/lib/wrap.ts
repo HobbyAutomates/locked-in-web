@@ -65,7 +65,8 @@ export function computeWrap(profile: Profile, workouts: Workout[], meals: Meal[]
   const hit = protein >= target && target > 0;
   const tomorrow = tomorrowSuggestion(workouts, date);
   const proteinPart = hit ? `${Math.round(protein)} g protein ✓` : `${Math.round(protein)} g protein (${Math.max(0, Math.round(target - protein))} g short)`;
-  const line = `${date === today() ? "Today" : "Yesterday"}: ${proteinPart} · ${n0(calories)} kcal · ${sessions}/${profile.weekly_workout_target} sessions — tomorrow: ${tomorrow}`;
+  const kcalPart = profile.hide_numbers === true ? "" : ` · ${n0(calories)} kcal`;
+  const line = `${date === today() ? "Today" : "Yesterday"}: ${proteinPart}${kcalPart} · ${sessions}/${profile.weekly_workout_target} sessions — tomorrow: ${tomorrow}`;
   return {
     date,
     protein: Math.round(protein),

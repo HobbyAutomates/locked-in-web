@@ -130,7 +130,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         <DayStreakPill days={dayStreak} loggedToday={meals.some((m) => m.date === today) || workouts.some((w) => w.date === today) || exercises.some((e) => e.date === today)} />
       </Rise>
 
-      <BannerCarousel nudges={nudges} wrap={wrap} pending={pending} />
+      <BannerCarousel nudges={nudges} wrap={wrap} pending={pending} hideNumbers={profile?.hide_numbers === true} />
 
       <Rise index={1}>
         <WeekStrip today={today} selected={selected} trained={trained} onSelect={setSelected} />
@@ -336,13 +336,13 @@ function DayStreakPill({ days, loggedToday }: { days: number; loggedToday: boole
  * swipeable row (CSS scroll-snap) with small dots. Dismissing a card takes it out; one card left
  * shows no dots; no cards, no carousel. Android's TodayScreen uses a HorizontalPager for the same.
  */
-function BannerCarousel({ nudges, wrap, pending }: { nudges: Nudge[]; wrap: Wrap | null; pending: Pending[] }) {
+function BannerCarousel({ nudges, wrap, pending, hideNumbers = false }: { nudges: Nudge[]; wrap: Wrap | null; pending: Pending[]; hideNumbers?: boolean }) {
   const nudgeHidden = useDismissed(`nudge:${nudges[0]?.id ?? "none"}`);
   const wrapHidden = useDismissed(`wrap:${wrap?.date ?? "none"}`);
   const cards: { key: string; label: string; node: React.ReactNode }[] = [];
   if (pending.length) cards.push({ key: "pending", label: "Saving a meal", node: <PendingBanner pending={pending} /> });
   if (nudges.length && !nudgeHidden) cards.push({ key: "nudge", label: "Squad nudge", node: <NudgeBanner nudges={nudges} /> });
-  if (wrap && !wrapHidden) cards.push({ key: "wrap", label: "Daily wrap", node: <WrapCard wrap={wrap} /> });
+  if (wrap && !wrapHidden) cards.push({ key: "wrap", label: "Daily wrap", node: <WrapCard wrap={wrap} hideNumbers={hideNumbers} /> });
   const track = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
   if (!cards.length) return null;
@@ -445,7 +445,7 @@ function NudgeBanner({ nudges }: { nudges: Nudge[] }) {
 }
 
 /** The 9 pm daily wrap: protein, calories vs budget, sessions this week, tomorrow's session, best meal. */
-function WrapCard({ wrap }: { wrap: Wrap }) {
+function WrapCard({ wrap, hideNumbers = false }: { wrap: Wrap; hideNumbers?: boolean }) {
   const pct = Math.min(1, wrap.protein / Math.max(1, wrap.proteinTarget));
   async function share() {
     const text = `Locked In · ${wrap.line}`;
@@ -468,9 +468,10 @@ function WrapCard({ wrap }: { wrap: Wrap }) {
             <Close size={14} />
           </button>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className={`mt-3 grid gap-2 ${hideNumbers ? "grid-cols-2" : "grid-cols-3"}`}>
           <WrapStat value={`${wrap.protein} g`} label={wrap.proteinHit ? "protein, hit" : `protein · ${Math.max(0, wrap.proteinTarget - wrap.protein)} short`} color={wrap.proteinHit ? "var(--green)" : "var(--red)"} icon={wrap.proteinHit ? <Check size={13} /> : null} />
-          <WrapStat value={wrap.calories.toLocaleString("en-IN")} label={`of ${wrap.calorieBudget.toLocaleString("en-IN")} kcal`} />
+          {/* v2.11: "Hide calorie numbers" keeps kcal off the wrap too. */}
+          {!hideNumbers && <WrapStat value={wrap.calories.toLocaleString("en-IN")} label={`of ${wrap.calorieBudget.toLocaleString("en-IN")} kcal`} />}
           <WrapStat value={`${wrap.sessions}/${wrap.sessionTarget}`} label="sessions this week" />
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--track)" }}>

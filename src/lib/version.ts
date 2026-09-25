@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.10";
+export const APP_VERSION = "2.11";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.11",
+    date: "2026-09-26",
+    lines: [
+      "React to anything in your squad: ❤️ 🔥 👍 😂 😮 💪 on posts and chat messages. Tap the little counts to see who reacted.",
+      "Chat now shows who sent each message, ✓✓ Seen by under yours, and unread counts on your squads.",
+      "Hide calorie numbers now also covers the 9 pm wrap.",
+    ],
+  },
   {
     version: "2.10",
     date: "2026-09-25",
