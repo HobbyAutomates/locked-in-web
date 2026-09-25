@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -10,15 +10,20 @@ import { addDays, daysBetween, parseIso, today as todayIso, weekStart } from "@/
 import { toJpegBase64 } from "@/lib/image";
 import { totalsFor } from "@/lib/totals";
 import { restByMuscle } from "@/lib/streaks";
-import { movingAverage } from "@/lib/weightTrend";
 import { MUSCLE_COLOR, type Muscle } from "@/lib/muscles";
 import type { ExerciseEntry, Meal, Profile, ProgressPhoto, WeightEntry, Workout } from "@/lib/types";
 import { weightText } from "@/lib/display";
-import { calorieWords, edFlags, screenInput } from "@/lib/goals";
-import { BmiCard, SafetyNote, TeenGoalMigration } from "./Science";
-import HexMedal from "./HexMedal";
-import { Camera, ChevronDown, Close, Plus, Scale, Spinner, Trash } from "./icons";
-import { BreathingFlame, Card, Chevron, ErrorNote, Hair, MacroDot, PillButton, Rise, SPRING, Segmented, fmt } from "./ui";
+import { ageYears, calorieWords, edFlags, isTeen, screenInput } from "@/lib/goals";
+import { bmi, bmiCategoryIndia, healthyRange, waistToHeight, whtrWords } from "@/lib/bmi";
+import { bestDayRun, clockText, energyDays, goalEta, goalFraction, istMinutes, macroAverages, macroTargets, mealTimes, monthDay, proteinPicks, slopePerDay, weekFlames, weightTrend, type FlameDay } from "@/lib/progressStats";
+import { mealTypeLabel } from "@/lib/mealType";
+import { smoothPath } from "@/lib/svgPath";
+import { BmiCard, SafetyNote, ScienceSheet, TeenGoalMigration, WaistRow } from "./Science";
+import { LockedMedal, MetalMedal, TROPHY_ICON, medalShelf } from "./Medal";
+import { CountUp, MRise, STAGGER, drawLen, md } from "./motion";
+import { LineIcon } from "./lineIcons";
+import { Camera, ChevronDown, Close, Plus, Spinner, Trash } from "./icons";
+import { BreathingFlame, Card, Chevron, ErrorNote, Hair, MacroDot, Rise, SPRING, Segmented, fmt } from "./ui";
 
 const PROTEIN = "#E9636B";
 const CARBS = "#E5A15B";
@@ -33,9 +38,26 @@ const PERIODS: { label: string; days: number | null }[] = [
   { label: "All time", days: null },
 ];
 
+/** v2.12 range switch: the weight, energy and macro cards follow it. */
+const RANGES = [
+  { label: "Week", days: 7, tag: "7d", title: "this week" },
+  { label: "Month", days: 30, tag: "30d", title: "30 days" },
+  { label: "3 months", days: 90, tag: "90d", title: "3 months" },
+] as const;
+
 const dayShort = (d: string) => parseIso(d).toLocaleDateString("en-IN", { weekday: "short" });
 const dayMonth = (d: string) => parseIso(d).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+const kcalText = (n: number) => Math.round(n).toLocaleString("en-IN");
 
+/** Chart width in SVG units: a 390 px phone minus the page and card padding. Wider screens scale it. */
+const CW = 318;
+
+/**
+ * v2.12 Progress: Weight, Streak, Energy, Macros, BMI and Meal times, in that order, with the
+ * slow premium entrances (lib/motion.css). Everything the older screen had lives on under
+ * "More stats" (weight changes, daily calories by macro, expenditure, photos, week streak,
+ * badges, sessions per week).
+ */
 export default function ProgressScreen({
   profile,
   workouts,
@@ -71,21 +93,32 @@ export default function ProgressScreen({
   const left = Math.max(0, target - thisWeek);
   const current = weights[0]?.weight_kg ?? profile.weight_kg;
   const [showMore, setShowMore] = useState(false);
+  const [range, setRange] = useState(0);
+  const R = RANGES[range];
   // v2.10: low BMI / rapid loss show the kind note with helplines (never a popup; closable).
   const flags = edFlags(screenInput({ ...profile, weight_kg: current ?? null }, { weights: weights.map((w) => ({ date: w.date, kg: w.weight_kg })), today: t }));
   const [safetyClosed, setSafetyClosed] = useState(false);
+  const activity = [workouts.map((w) => w.date), exercises.map((e) => e.date), meals.map((m) => m.date)];
+  const best = bestDayRun(dayStreak, ...activity);
+  const card = (i: number) => 300 + i * STAGGER * 2;
 
   return (
     <div className="flex flex-col gap-3.5">
-      <Rise index={0}>
-        <h1 className="screen-title">Progress</h1>
-      </Rise>
+      <MRise delay={0}>
+        <h1 className="screen-title" style={{ padding: "8px 4px 2px" }}>
+          Progress
+        </h1>
+      </MRise>
 
       <TeenGoalMigration profile={profile} />
 
-      <Rise index={1}>
-        <WeightTrendCard profile={profile} weights={weights} today={t} />
-      </Rise>
+      <MRise delay={150}>
+        <RangeTabs value={range} onChange={setRange} />
+      </MRise>
+
+      <MRise delay={card(0)}>
+        <WeightCard profile={profile} weights={weights} today={t} days={R.days} tag={R.tag} b={card(0)} />
+      </MRise>
 
       {flags.length && !safetyClosed ? (
         <Rise index={1}>
@@ -93,30 +126,38 @@ export default function ProgressScreen({
         </Rise>
       ) : null}
 
-      <Rise index={2}>
-        <WeeklyEnergyCard meals={meals} exercises={exercises} profile={profile} today={t} />
-      </Rise>
+      <MRise delay={card(1)}>
+        <StreakCard dayStreak={dayStreak} best={best} flames={weekFlames(t, ...activity)} b={card(1)} />
+      </MRise>
 
-      <Rise index={3}>
-        <StreakCard dayStreak={dayStreak} weekStreak={weekStreak} />
-      </Rise>
+      <MRise delay={card(2)}>
+        <EnergyCard meals={meals} profile={profile} today={t} range={range} b={card(2)} />
+      </MRise>
 
-      <Rise index={4}>
-        <MacrosWeekCard meals={meals} today={t} />
-      </Rise>
+      <MRise delay={card(3)}>
+        <MacrosCard meals={meals} profile={profile} today={t} days={R.days} range={range} b={card(3)} />
+      </MRise>
 
-      <Rise index={5}>
+      <MRise delay={card(4)}>
+        <BmiScaleCard profile={profile} weightKg={current ?? null} b={card(4)} />
+      </MRise>
+
+      <MRise delay={card(5)}>
+        <MealTimesCard meals={meals} today={t} days={range === 2 ? 90 : 30} b={card(5)} />
+      </MRise>
+
+      <MRise delay={card(6)}>
         <button
           type="button"
           aria-expanded={showMore}
-          className="press flex w-full items-center justify-between rounded-2xl px-4 py-3 text-[14px] font-semibold"
+          className="press flex min-h-11 w-full items-center justify-between rounded-2xl px-4 py-3 text-[14px] font-semibold"
           style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }}
           onClick={() => setShowMore((v) => !v)}
         >
           More stats
           <ChevronDown size={16} style={{ transform: showMore ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
         </button>
-      </Rise>
+      </MRise>
 
       {showMore ? (
         <div className="flex flex-col gap-3.5">
@@ -130,10 +171,6 @@ export default function ProgressScreen({
 
           <Rise index={1}>
             <ExpenditureChanges exercises={exercises} today={t} />
-          </Rise>
-
-          <Rise index={2}>
-            <BmiCard profile={profile} weightKg={current ?? null} waist />
           </Rise>
 
           <Rise index={2}>
@@ -187,225 +224,566 @@ export default function ProgressScreen({
   );
 }
 
-// ---------------------------------------------------------------- weight trend (card 1)
+// ---------------------------------------------------------------- building blocks
 
-/** Line chart of every weigh-in plus a 7-entry moving average, with a dashed goal line. */
-function WeightLineChart({ values, goal, w = 300, h = 100 }: { values: number[]; goal: number | null; w?: number; h?: number }) {
-  const avg = movingAverage(values, 7);
-  const all = goal != null ? [...values, goal] : values;
-  const lo = Math.min(...all);
-  const hi = Math.max(...all);
-  const span = hi - lo > 0.001 ? hi - lo : 1;
-  const pad = span * 0.12;
-  const y = (v: number) => h - (h * (v - (lo - pad))) / (span + pad * 2);
-  const x = (i: number) => (values.length <= 1 ? w / 2 : (w * i) / (values.length - 1));
-  const path = (vals: number[]) => vals.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
-
+function RangeTabs({ value, onChange }: { value: number; onChange: (i: number) => void }) {
   return (
-    <svg viewBox={`-4 -6 ${w + 8} ${h + 12}`} className="mt-3 block w-full" role="img" aria-label={`Weight trend over ${values.length} weigh-ins`}>
-      {goal != null ? (
-        <>
-          <line x1={0} x2={w} y1={y(goal)} y2={y(goal)} stroke="var(--muted)" strokeWidth={1} strokeDasharray="4 4" opacity={0.6} />
-          <text x={w} y={y(goal) - 4} textAnchor="end" fontSize={9} fill="var(--muted)">
-            Goal
-          </text>
-        </>
-      ) : null}
-      <motion.path d={path(values)} fill="none" stroke="var(--track)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ ...SPRING, delay: 0.1 }} />
-      <motion.path d={path(avg)} fill="none" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ ...SPRING, delay: 0.25 }} />
-      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r={4} fill="var(--ink)" stroke="var(--card)" strokeWidth={2} />
-    </svg>
-  );
-}
-
-/** Current weight, the weigh-in pill, the trend line + moving average, and a Start → Goal bar. */
-function WeightTrendCard({ profile, weights, today }: { profile: Profile; weights: WeightEntry[]; today: string }) {
-  const router = useRouter();
-  const current = weights[0]?.weight_kg ?? profile.weight_kg;
-  const start = weights.length ? weights[weights.length - 1].weight_kg : profile.weight_kg;
-  const goal = profile.goal_weight_kg;
-  const last = weights[0]?.date ?? null;
-  const due = last ? Math.max(0, 7 - daysBetween(last, today)) : 0;
-  const span = start != null && goal != null ? start - goal : 0;
-  const fraction = current != null && start != null && goal != null && Math.abs(span) > 0.05 ? Math.max(0, Math.min(1, (start - current) / span)) : current != null && goal != null && Math.abs(current - goal) <= 0.05 ? 1 : 0;
-  const asc = [...weights].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  const values = asc.map((w) => w.weight_kg);
-  const pillText = weights.length === 0 ? "Log your first weigh-in" : due === 0 ? "Weigh-in due today" : `Next weigh-in: ${due}d`;
-  const pillActive = weights.length === 0 || due === 0;
-
-  return (
-    <Card padding={18}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[13px] font-medium muted">Weight trend</p>
-          <p className="num mt-1 text-[36px] font-extrabold leading-none" style={{ letterSpacing: "-0.04em" }}>
-            {current != null ? weightText(current, profile.units).split(" ")[0] : "—"}
-            <span className="ml-1 text-[15px] font-semibold muted">{profile.units === "imperial" ? "lb" : "kg"}</span>
-          </p>
-        </div>
+    <div role="tablist" aria-label="Range" className="grid grid-cols-3 gap-1 rounded-[14px] p-1" style={{ background: "var(--track)" }}>
+      {RANGES.map((r, i) => (
         <button
+          key={r.label}
           type="button"
-          className="press num shrink-0 rounded-full px-3 py-1.5 text-[12px] font-bold"
-          style={{ background: pillActive ? "var(--btn)" : "var(--card2)", color: pillActive ? "var(--btn-ink)" : "var(--ink)", border: 0 }}
-          onClick={() => router.push("/profile/weight?log=1")}
+          role="tab"
+          aria-selected={value === i}
+          className="press h-9 rounded-[11px] text-[14px]"
+          style={{ border: 0, background: value === i ? "var(--card)" : "transparent", color: value === i ? "var(--ink)" : "var(--muted)", fontWeight: value === i ? 700 : 600, boxShadow: value === i ? "var(--shadow-sm)" : "none" }}
+          onClick={() => onChange(i)}
         >
-          {pillText}
+          {r.label}
         </button>
-      </div>
-
-      {values.length >= 2 ? (
-        <WeightLineChart values={values} goal={goal} />
-      ) : (
-        <p className="mt-3 text-xs muted">Log a few weigh-ins to see your trend.</p>
-      )}
-
-      {goal != null && start != null ? (
-        <div className="mt-3.5">
-          <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
-            <motion.div className="h-full rounded-full" style={{ background: "var(--ink)" }} initial={{ width: 0 }} animate={{ width: `${fraction * 100}%` }} transition={{ ...SPRING, delay: 0.15 }} />
-          </div>
-          <div className="mt-1.5 flex justify-between text-xs">
-            <span className="muted">
-              Start <span className="num font-bold" style={{ color: "var(--ink)" }}>{weightText(start, profile.units)}</span>
-            </span>
-            <span className="num font-semibold muted">{Math.round(fraction * 100)}%</span>
-            <span className="muted">
-              Goal <span className="num font-bold" style={{ color: "var(--ink)" }}>{weightText(goal, profile.units)}</span>
-            </span>
-          </div>
-        </div>
-      ) : (
-        <p className="mt-2 text-xs muted">
-          Set a goal weight in{" "}
-          <Link href="/profile/goal" className="font-semibold underline" style={{ color: "var(--ink)" }}>
-            Goal & weight
-          </Link>{" "}
-          to see how far along you are.
-        </p>
-      )}
-      <div className="mt-3.5">
-        <PillButton soft height={42} onClick={() => router.push("/profile/weight?log=1")}>
-          <span className="inline-flex items-center gap-2">
-            <Scale size={16} />
-            Log weight
-          </span>
-        </PillButton>
-      </div>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------- this week's energy (card 2)
-
-/** Eaten vs target vs burned, summed from the start of this week through today. */
-function WeeklyEnergyCard({ meals, exercises, profile, today }: { meals: Meal[]; exercises: ExerciseEntry[]; profile: Profile; today: string }) {
-  const ws = weekStart(today);
-  const daysSoFar = daysBetween(ws, today) + 1;
-  const days = Array.from({ length: daysSoFar }, (_, i) => addDays(ws, i));
-  const eaten = days.reduce((a, d) => a + totalsFor(meals, d).calories, 0);
-  const burned = exercises.filter((e) => e.date >= ws && e.date <= today).reduce((a, e) => a + Number(e.kcal || 0), 0);
-  const target = profile.calorie_target * daysSoFar;
-  const net = eaten - burned;
-  const fraction = target > 0 ? net / target : 0;
-
-  // v2.10 "Hide calorie numbers": the bar and words, no kcal anywhere on the card.
-  if (profile.hide_numbers) {
-    return (
-      <Card>
-        <p className="text-[17px] font-bold">This week&apos;s energy</p>
-        <p className="text-xs muted">Since {dayShort(ws)}, {dayMonth(ws)}</p>
-        <p className="mt-3 text-[15px] font-bold">{calorieWords(net, target)}</p>
-        <Bar fraction={fraction} color="var(--ink)" />
-        <p className="mt-1.5 text-xs muted">{burned > 0 ? "Includes the exercise you logged." : "Numbers are hidden. You can turn them back on in Tracking."}</p>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <p className="text-[17px] font-bold">This week&apos;s energy</p>
-      <p className="text-xs muted">Since {dayShort(ws)}, {dayMonth(ws)}</p>
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <Stat label="Eaten" value={Math.round(eaten).toLocaleString("en-IN")} />
-        <Stat label="Target" value={Math.round(target).toLocaleString("en-IN")} />
-        <Stat label="Burned" value={Math.round(burned).toLocaleString("en-IN")} color="var(--green)" />
-      </div>
-      <Bar fraction={fraction} color={fraction > 1.05 ? "var(--red)" : "var(--ink)"} />
-      <p className="mt-1.5 text-xs muted">{Math.round(net).toLocaleString("en-IN")} kcal net of {Math.round(target).toLocaleString("en-IN")} kcal target</p>
-    </Card>
-  );
-}
-
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="flex flex-col items-center">
-      <span className="num text-lg font-extrabold" style={{ color: color ?? "var(--ink)" }}>
-        {value}
-      </span>
-      <span className="text-[11px] muted">{label}</span>
+      ))}
     </div>
   );
 }
 
-// ---------------------------------------------------------------- streak (card 3)
-
-/** Day streak (anything logged) plus the week streak (workout target met). */
-function StreakCard({ dayStreak, weekStreak }: { dayStreak: number; weekStreak: number }) {
+/** The v2.12 card surface: 22 px corners, 20 px padding, 14 px rhythm. */
+function PCard({ children, label }: { children: React.ReactNode; label?: string }) {
   return (
-    <Card>
-      <p className="text-[17px] font-bold">Streak</p>
-      <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-        <div className="flex flex-col items-center gap-1">
-          <BreathingFlame size={40} />
-          <p className="num text-[26px] font-extrabold leading-none" style={{ color: "var(--flame)" }}>
-            {dayStreak}
-          </p>
-          <p className="text-[13px] font-semibold">Day streak</p>
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <BreathingFlame size={40} />
-          <p className="num text-[26px] font-extrabold leading-none" style={{ color: "var(--flame)" }}>
-            {weekStreak}
-          </p>
-          <p className="text-[13px] font-semibold">Week streak</p>
-        </div>
-      </div>
-    </Card>
+    <section aria-label={label} className="flex flex-col gap-3.5" style={{ background: "var(--card)", borderRadius: 22, padding: 20, boxShadow: "var(--pcard-ring)" }}>
+      {children}
+    </section>
   );
 }
 
-// ---------------------------------------------------------------- macros this week (card 4)
+function Label({ children }: { children: React.ReactNode }) {
+  return <p className="text-[13px] font-semibold muted">{children}</p>;
+}
 
-/** The P/C/F split for everything logged since the start of this week. */
-function MacrosWeekCard({ meals, today }: { meals: Meal[]; today: string }) {
-  const ws = weekStart(today);
-  const days = Array.from({ length: daysBetween(ws, today) + 1 }, (_, i) => addDays(ws, i));
-  const totals = days.reduce(
-    (a, d) => {
-      const x = totalsFor(meals, d);
-      return { protein: a.protein + x.protein, carbs: a.carbs + x.carbs, fat: a.fat + x.fat };
-    },
-    { protein: 0, carbs: 0, fat: 0 },
+type Tone = "good" | "bad" | "flat";
+const TONE: Record<Tone, { mark: string; bg: string; ink: string }> = {
+  good: { mark: "var(--green)", bg: "var(--green-bg)", ink: "var(--green-ink)" },
+  bad: { mark: "var(--orange)", bg: "var(--orange-bg)", ink: "var(--orange-ink)" },
+  flat: { mark: "var(--ink)", bg: "var(--card2)", ink: "var(--muted)" },
+};
+
+function Pill({ tone, children, delay }: { tone: Tone; children: React.ReactNode; delay?: number }) {
+  return (
+    <span className={`num inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-bold ${delay != null ? "m-drop" : ""}`} style={md(delay ?? 0, { background: TONE[tone].bg, color: TONE[tone].ink })}>
+      {children}
+    </span>
   );
-  const p = totals.protein * 4;
-  const c = totals.carbs * 4;
-  const f = totals.fat * 9;
-  const total = Math.max(1, p + c + f);
+}
+
+// ---------------------------------------------------------------- 1 · weight
+
+function WeightCard({ profile, weights, today, days, tag, b }: { profile: Profile; weights: WeightEntry[]; today: string; days: number; tag: string; b: number }) {
+  const router = useRouter();
+  const imperial = profile.units === "imperial";
+  const conv = (kg: number) => (imperial ? kg * 2.20462 : kg);
+  const unit = imperial ? "lb" : "kg";
+  const current = weights[0]?.weight_kg ?? profile.weight_kg;
+  const start = weights.length ? weights[weights.length - 1].weight_kg : profile.weight_kg;
+  const goal = profile.goal_weight_kg;
+  const pts = weightTrend(weights, today, days);
+  const change = pts.length >= 2 ? pts[pts.length - 1].avg - pts[0].avg : null;
+  const eta = goalEta(pts.length ? pts[pts.length - 1].avg : current, goal, slopePerDay(weightTrend(weights, today, Math.max(days, 30))), profile.goal_speed_kg_wk, today);
+  const want = goal != null && current != null ? Math.sign(goal - current) : profile.goal_type === "lose" ? -1 : profile.goal_type === "gain" ? 1 : 0;
+  const tone: Tone = change == null || Math.abs(change) < 0.05 ? "flat" : want === 0 ? (Math.abs(change) < 0.5 ? "good" : "bad") : Math.sign(change) === want ? "good" : "bad";
+  const pill = change == null ? "No trend yet" : Math.abs(change) < 0.05 ? `No change · ${tag}` : `${change < 0 ? "−" : "+"}${fmt(Math.round(Math.abs(conv(change)) * 10) / 10)} ${unit} · ${tag}`;
+
+  // Chart: x by date across the range, y fitted to the averages.
+  const H = 130;
+  const from = addDays(today, -days);
+  const x = (d: string) => (Math.max(0, Math.min(days, daysBetween(from, d))) / days) * (CW - 8) + 4;
+  const vals = pts.map((p) => p.avg);
+  const lo = Math.min(...vals);
+  const hi = Math.max(...vals);
+  const span = Math.max(hi - lo, 0.6);
+  const mid = (hi + lo) / 2;
+  const y = (v: number) => 18 + ((mid + span / 2 - v) / span) * (H - 48);
+  const xy = pts.map((p) => [x(p.date), y(p.avg)] as [number, number]);
+  const line = smoothPath(xy);
+  const area = xy.length >= 2 ? `${line} L${xy[xy.length - 1][0]},${H} L${xy[0][0]},${H} Z` : "";
+  const end = xy[xy.length - 1];
+
+  const last = weights[0]?.date ?? null;
+  const due = last ? Math.max(0, 7 - daysBetween(last, today)) : 0;
+  const note = weights.length === 0 ? "Log your first weigh-in" : due === 0 ? "Weigh-in due today" : `Next weigh-in in ${due}d`;
+  const frac = goalFraction(start, current, goal);
 
   return (
-    <Card>
-      <p className="text-[17px] font-bold">Macros this week</p>
-      <div className="mt-3 flex h-3 w-full overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
-        <motion.div style={{ background: PROTEIN }} initial={{ width: 0 }} animate={{ width: `${(p / total) * 100}%` }} transition={{ ...SPRING, delay: 0.1 }} />
-        <motion.div style={{ background: CARBS }} initial={{ width: 0 }} animate={{ width: `${(c / total) * 100}%` }} transition={{ ...SPRING, delay: 0.15 }} />
-        <motion.div style={{ background: FATS }} initial={{ width: 0 }} animate={{ width: `${(f / total) * 100}%` }} transition={{ ...SPRING, delay: 0.2 }} />
+    <PCard label="Weight">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Label>Weight</Label>
+          <p className="num font-extrabold" style={{ fontSize: 40, letterSpacing: "-1.5px", lineHeight: 1.1 }}>
+            {current != null ? <CountUp value={Math.round(conv(current) * 10) / 10} decimals={1} delay={b + 150} format={(n) => fmt(Math.round(n * 10) / 10)} /> : "—"}
+            <span className="ml-1 text-[15px] font-semibold muted" style={{ letterSpacing: 0 }}>
+              {unit}
+            </span>
+          </p>
+        </div>
+        <Pill tone={tone} delay={b + 500}>
+          {pill}
+        </Pill>
       </div>
-      <div className="mt-3 flex flex-wrap gap-3.5">
-        <MacroDot value={`Protein ${Math.round(totals.protein)}g`} color={PROTEIN} />
-        <MacroDot value={`Carbs ${Math.round(totals.carbs)}g`} color={CARBS} />
-        <MacroDot value={`Fats ${Math.round(totals.fat)}g`} color={FATS} />
+
+      {xy.length >= 2 ? (
+        <svg viewBox={`0 0 ${CW} ${H}`} className="block w-full" role="img" aria-label={`Weight, 7-day average: ${change == null ? "no trend yet" : `${change < 0 ? "down" : "up"} ${fmt(Math.round(Math.abs(conv(change)) * 10) / 10)} ${unit}`} over ${days} days`}>
+          <path d={area} fill={TONE[tone].mark} fillOpacity={0.16} className="m-fade" style={md(b + 1500)} />
+          <path d={line} fill="none" stroke={TONE[tone].mark} strokeWidth={2.4} strokeLinecap="round" pathLength={1} className="m-draw" style={drawLen(1, b + 300)} />
+          <circle cx={end[0]} cy={end[1]} r={5} fill={TONE[tone].mark} stroke="var(--card)" strokeWidth={2} className="m-pop" style={md(b + 2100)} />
+        </svg>
+      ) : (
+        <p className="text-[13px] muted">Log a few weigh-ins to see your trend.</p>
+      )}
+
+      <div className="flex justify-between gap-2 text-[12px] muted">
+        <span>{pts.length ? monthDay(pts[0].date) : ""}</span>
+        {goal != null ? (
+          <span className="num text-center">
+            Goal {weightText(goal, profile.units)}
+            {eta.reached ? " · reached" : eta.date ? ` · about ${monthDay(eta.date)}` : ""}
+          </span>
+        ) : (
+          <Link href="/profile/goal" className="font-semibold underline" style={{ color: "var(--ink)" }}>
+            Set a goal weight
+          </Link>
+        )}
+        <span>Today</span>
       </div>
-    </Card>
+
+      <div className="flex items-center justify-between gap-3 border-t pt-3" style={{ borderColor: "var(--hair)" }}>
+        <span className="text-[12px] muted">
+          {note}
+          {goal != null && start != null ? ` · ${Math.round(frac * 100)}% to goal` : ""}
+        </span>
+        <button type="button" className="press inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-bold" style={{ background: weights.length === 0 || due === 0 ? "var(--btn)" : "var(--card2)", color: weights.length === 0 || due === 0 ? "var(--btn-ink)" : "var(--ink)", border: 0 }} onClick={() => router.push("/profile/weight?log=1")}>
+          <LineIcon name="scale" size={16} stroke={1.8} />
+          Log weight
+        </button>
+      </div>
+    </PCard>
+  );
+}
+
+// ---------------------------------------------------------------- 2 · streak
+
+function StreakCard({ dayStreak, best, flames, b }: { dayStreak: number; best: number; flames: FlameDay[]; b: number }) {
+  const toBeat = best - dayStreak + 1;
+  const done = flames.filter((f) => f.state === "done").length;
+  return (
+    <PCard label="Streak">
+      <Label>Streak</Label>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5">
+          <LineIcon name="flame" size={34} stroke={2} style={{ color: "var(--orange)" }} />
+          <span className="num font-extrabold" style={{ fontSize: 44, letterSpacing: "-1.5px", lineHeight: 1 }}>
+            <CountUp value={dayStreak} delay={b + 200} />
+          </span>
+          <span className="ml-1 text-[15px] font-semibold muted">{dayStreak === 1 ? "day" : "days"}</span>
+        </div>
+        <div className="text-right text-[13px] muted">
+          Best{" "}
+          <b className="num" style={{ color: "var(--ink)" }}>
+            {best}
+          </b>
+          <br />
+          {best === 0 ? "Log today to start" : dayStreak >= best ? "Personal best" : `${toBeat} to beat it`}
+        </div>
+      </div>
+      <div role="img" aria-label={`This week: ${done} of 7 days logged`} className="grid grid-cols-7">
+        {flames.map((f, i) => (
+          <div key={f.date} className="flex flex-col items-center gap-1.5">
+            <span
+              className="m-pop grid place-items-center rounded-full"
+              style={md(b + 520 + i * 120, {
+                width: 30,
+                height: 30,
+                background: f.state === "done" ? "var(--orange)" : f.state === "open" ? "transparent" : "var(--track)",
+                border: f.state === "open" ? "1.5px dashed var(--orange)" : 0,
+                opacity: f.state === "future" ? 0.55 : 1,
+                color: "var(--bg)",
+              })}
+            >
+              {f.state === "done" ? <LineIcon name="flame" size={15} stroke={2} /> : null}
+            </span>
+            <span className="text-[11px] font-semibold" style={{ color: f.state === "open" ? "var(--ink)" : "var(--muted)" }}>
+              {f.letter}
+            </span>
+          </div>
+        ))}
+      </div>
+    </PCard>
+  );
+}
+
+// ---------------------------------------------------------------- 3 · energy
+
+const STATUS_COLOR = { on: "var(--green)", over: "var(--orange)", under: "var(--blue)", none: "var(--muted)" } as const;
+
+function EnergyCard({ meals, profile, today, range, b }: { meals: Meal[]; profile: Profile; today: string; range: number; b: number }) {
+  const target = Math.max(1, profile.calorie_target);
+  const hide = profile.hide_numbers === true;
+  const R = RANGES[range];
+  const from = range === 0 ? weekStart(today) : addDays(today, -(R.days - 1));
+  const axisN = range === 0 ? 7 : R.days;
+  const days = energyDays(meals, from, today, target);
+  const logged = days.filter((d) => d.logged);
+  const past = logged.filter((d) => d.date !== today);
+  const todayRow = days.find((d) => d.date === today);
+  // Today only counts once it's already on target or over; a half-logged day isn't "under".
+  const judged = [...past, ...(todayRow && (todayRow.status === "on" || todayRow.status === "over") ? [todayRow] : [])];
+  const on = judged.filter((d) => d.status === "on").length;
+  const avgRows = past.length ? past : logged;
+  const avg = avgRows.length ? avgRows.reduce((a, d) => a + d.kcal, 0) / avgRows.length : 0;
+
+  const H = 120;
+  const x = (i: number) => (axisN <= 1 ? CW / 2 : 6 + (i * (CW - 12)) / (axisN - 1));
+  const kc = logged.map((d) => d.kcal);
+  const lo = Math.min(target, ...kc) * 0.85;
+  const hi = Math.max(target, ...kc) * 1.06;
+  const y = (v: number) => 10 + ((hi - v) / (hi - lo)) * 86;
+  const pts = days.map((d, i) => ({ ...d, x: x(i), y: y(d.kcal) })).filter((d) => d.logged);
+  const line = smoothPath(pts.map((p) => [p.x, p.y]));
+  const r = axisN <= 7 ? 4 : axisN <= 31 ? 3 : 2.2;
+  const step = Math.min(230, 1600 / Math.max(1, pts.length));
+  const labels: { i: number; text: string; anchor: "start" | "middle" | "end" }[] =
+    range === 0
+      ? Array.from({ length: 7 }, (_, i) => ({ i, text: "MTWTFSS"[i], anchor: "middle" as const }))
+      : [0, Math.round((axisN - 1) / 3), Math.round((2 * (axisN - 1)) / 3), axisN - 1].map((i, k) => ({ i, text: k === 3 ? "Today" : monthDay(addDays(from, i)), anchor: k === 0 ? ("start" as const) : k === 3 ? ("end" as const) : ("middle" as const) }));
+
+  return (
+    <PCard label="Energy">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Label>Energy · {R.title}</Label>
+          {hide ? (
+            <p className="mt-0.5 text-[20px] font-semibold" style={{ letterSpacing: "-0.5px" }}>
+              {logged.length ? calorieWords(avg, target) : "Nothing logged yet"}
+            </p>
+          ) : (
+            <p className="num mt-0.5 font-semibold" style={{ fontSize: 30, letterSpacing: "-1px" }}>
+              {logged.length ? <CountUp value={Math.round(avg)} delay={b + 200} format={kcalText} /> : "—"} <span className="text-[14px] font-medium muted">avg a day</span>
+            </p>
+          )}
+        </div>
+        <Pill tone={judged.length === 0 ? "flat" : on / judged.length >= 0.6 ? "good" : "bad"} delay={b + 500}>
+          {judged.length ? `${on} of ${judged.length} on target` : "No full days yet"}
+        </Pill>
+      </div>
+      {logged.length ? (
+        <svg viewBox={`0 0 ${CW} ${H}`} className="block w-full" role="img" aria-label={`Calories eaten each day against a flat target${hide ? "" : ` of ${kcalText(target)}`}: ${on} of ${judged.length} days on target`}>
+          <line x1={0} y1={y(target)} x2={CW} y2={y(target)} stroke="var(--green)" strokeWidth={1.5} strokeDasharray="3 4" className="m-growx" style={md(b + 200)} />
+          <text x={CW} y={y(target) - 6} textAnchor="end" fontSize={10} fontWeight={600} fill="var(--green)">
+            target
+          </text>
+          {pts.length >= 2 ? <path d={line} fill="none" stroke="var(--ink)" strokeWidth={2.2} strokeLinecap="round" pathLength={1} className="m-draw" style={drawLen(1, b + 500)} /> : null}
+          {pts.map((p, k) => {
+            const pending = p.date === today && p.status !== "on" && p.status !== "over";
+            return <circle key={p.date} cx={p.x} cy={p.y} r={r} fill={pending ? "var(--card)" : STATUS_COLOR[p.status]} stroke={pending ? "var(--muted)" : "var(--card)"} strokeWidth={r > 3 ? 2 : 1.2} className="m-pop" style={md(b + 700 + (k + 1) * step)} />;
+          })}
+          {labels.map((l) => (
+            <text key={l.i} x={l.anchor === "start" ? 0 : l.anchor === "end" ? CW : x(l.i)} y={118} textAnchor={l.anchor} fontSize={11} fontWeight={600} fill={l.text === "Today" || (range === 0 && addDays(from, l.i) === today) ? "var(--ink)" : "var(--muted)"}>
+              {l.text}
+            </text>
+          ))}
+        </svg>
+      ) : (
+        <p className="text-[13px] muted">Log a meal to see your energy line.</p>
+      )}
+      <div className="flex flex-wrap gap-3.5 text-[11px] font-semibold muted">
+        <span className="inline-flex items-center gap-1.5">
+          <Dot color="var(--green)" /> On target
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Dot color="var(--orange)" /> Over
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <Dot color="var(--blue)" /> Under
+        </span>
+      </div>
+    </PCard>
+  );
+}
+
+function Dot({ color }: { color: string }) {
+  return <span aria-hidden="true" className="inline-block shrink-0 rounded-full" style={{ width: 8, height: 8, background: color }} />;
+}
+
+// ---------------------------------------------------------------- 4 · macros
+
+function MacrosCard({ meals, profile, today, days, range, b }: { meals: Meal[]; profile: Profile; today: string; days: number; range: number; b: number }) {
+  const from = range === 0 ? weekStart(today) : addDays(today, -(days - 1));
+  const avg = macroAverages(meals, from, today, today);
+  const tg = macroTargets(profile);
+  const rings = [
+    { key: "Protein", value: avg.protein, target: tg.protein, color: "var(--blue)" },
+    { key: "Carbs", value: avg.carbs, target: tg.carbs, color: "var(--orange)" },
+    { key: "Fat", value: avg.fat, target: tg.fat, color: "var(--purple)" },
+  ].map((m) => ({ ...m, pct: m.target > 0 ? m.value / m.target : 0 }));
+  const todayProtein = totalsFor(meals, today).protein;
+  const toGo = Math.round(tg.protein - todayProtein);
+  const picks = proteinPicks(toGo);
+
+  return (
+    <PCard label="Macros">
+      <Label>Macros · daily average</Label>
+      <div role="img" aria-label={avg.days ? rings.map((m) => `${m.key} ${Math.round(m.pct * 100)} percent of target`).join(", ") : "No meals logged in this range yet"} className="grid grid-cols-3">
+        {rings.map((m, k) => {
+          const sub = !avg.days ? { text: "no logs yet", color: "var(--muted)" } : m.pct < 0.9 ? { text: `${Math.round(m.target - m.value)} g to go`, color: "var(--orange-ink)" } : m.pct <= 1.1 ? { text: "on track", color: "var(--green-ink)" } : { text: `${Math.round(m.value - m.target)} g over`, color: "var(--muted)" };
+          return (
+            <div key={m.key} className="flex flex-col items-center gap-1.5">
+              <svg width={78} height={78} viewBox="0 0 78 78" aria-hidden="true">
+                <circle cx={39} cy={39} r={32} fill="none" stroke="var(--track)" strokeWidth={8} />
+                {m.pct > 0.005 ? <circle cx={39} cy={39} r={32} fill="none" stroke={m.color} strokeWidth={8} strokeLinecap="round" pathLength={1} transform="rotate(-90 39 39)" className="m-draw" style={drawLen(Math.min(1, m.pct), b + 200 + (k + 1) * 260)} /> : null}
+                <text x={39} y={44} textAnchor="middle" fontSize={15} fontWeight={800} fill="var(--ink)">
+                  {Math.round(m.pct * 100)}%
+                </text>
+              </svg>
+              <span className="text-[13px] font-bold">{m.key}</span>
+              <span className="text-[12px] font-semibold" style={{ color: sub.color }}>
+                {sub.text}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-baseline gap-1.5 border-t pt-3" style={{ borderColor: "var(--hair)" }}>
+        {toGo > 3 ? (
+          <>
+            <span className="num text-[20px] font-extrabold" style={{ color: "var(--blue)" }}>
+              {toGo} g
+            </span>
+            <span className="text-[14px] font-semibold">protein to go today. Quick picks:</span>
+          </>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold" style={{ color: "var(--green-ink)" }}>
+            <LineIcon name="check" size={16} stroke={2} />
+            Protein goal hit today
+          </span>
+        )}
+      </div>
+      {toGo > 3 ? (
+        <div className="flex gap-1.5">
+          {picks.map((p, k) => (
+            <Link key={p.name} href="/log?mode=meal" className="press m-drop flex-1 rounded-xl px-2.5 py-2 text-[12px]" style={md(b + 1300 + (k + 1) * 140, { background: "var(--card2)", color: "var(--ink)", minHeight: 44 })}>
+              <span className="block font-bold">{p.name}</span>
+              <span className="mt-0.5 block muted">+{p.protein} g protein</span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </PCard>
+  );
+}
+
+// ---------------------------------------------------------------- 5 · BMI (Indian ranges)
+
+const BMI_LO = 15;
+const BMI_HI = 32;
+const BANDS = [
+  { from: BMI_LO, to: 18.5, label: "Under", color: "var(--blue)" },
+  { from: 18.5, to: 23, label: "Healthy", color: "var(--green)" },
+  { from: 23, to: 25, label: "Over", color: "var(--orange)" },
+  { from: 25, to: BMI_HI, label: "Obese", color: "var(--red)" },
+];
+const BMI_WORDS = {
+  Underweight: { text: "Below healthy", color: "var(--blue-ink)" },
+  Normal: { text: "Healthy", color: "var(--green-ink)" },
+  Overweight: { text: "A little above healthy", color: "var(--orange-ink)" },
+  Obese: { text: "Above healthy", color: "var(--red-ink)" },
+} as const;
+
+/**
+ * Adults: the Indian-cut-off scale with a swinging marker, the healthy weight range and (only when
+ * a waist is saved) waist ÷ height. Teens and missing height/weight keep the v2.10 card, which
+ * handles WHO growth charts and the "add your height" prompt.
+ */
+function BmiScaleCard({ profile, weightKg, b }: { profile: Profile; weightKg: number | null; b: number }) {
+  const [science, setScience] = useState(false);
+  const [waistOpen, setWaistOpen] = useState(false);
+  const value = bmi(weightKg, profile.height_cm);
+  const teen = isTeen(ageYears(profile.dob));
+  if (value == null || teen || !profile.height_cm) return <BmiCard profile={profile} weightKg={weightKg} waist />;
+
+  const cat = bmiCategoryIndia(value);
+  const words = BMI_WORDS[cat];
+  const xOf = (v: number) => 1 + ((Math.max(BMI_LO, Math.min(BMI_HI, v)) - BMI_LO) / (BMI_HI - BMI_LO)) * (CW - 2);
+  const mx = xOf(Math.max(BMI_LO + 0.3, Math.min(BMI_HI - 0.3, value)));
+  const range = healthyRange(profile.height_cm);
+  const w = (kg: number) => (profile.units === "imperial" ? Math.round(kg * 2.20462) : Math.round(kg));
+  const whtr = waistToHeight(profile.waist_cm, profile.height_cm);
+  const canWaist = profile.hide_numbers !== null; // null = the v34 columns aren't there yet
+
+  return (
+    <PCard label="BMI">
+      <div className="flex items-center justify-between gap-2">
+        <Label>BMI · Indian ranges</Label>
+        <button type="button" className="press inline-flex min-h-11 items-center gap-1 text-[12px] font-semibold muted" style={{ background: "none", border: 0, padding: 0 }} onClick={() => setScience(true)}>
+          <LineIcon name="info" size={15} stroke={2} />
+          The science
+        </button>
+      </div>
+      <ScienceSheet open={science} onClose={() => setScience(false)} />
+      <div className="-mt-2 flex items-baseline gap-2.5">
+        <span className="num font-extrabold" style={{ fontSize: 34, letterSpacing: "-1px" }}>
+          <CountUp value={Math.round(value * 10) / 10} decimals={1} delay={b + 200} />
+        </span>
+        <span className="text-[14px] font-semibold" style={{ color: words.color }}>
+          {words.text}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${CW} 64`} className="block w-full" role="img" aria-label={`BMI ${value.toFixed(1)} on the Indian scale: ${cat.toLowerCase()}`}>
+        {BANDS.map((band, k) => {
+          const x0 = xOf(band.from) + (k ? 1 : 0);
+          const x1 = xOf(band.to) - (k < BANDS.length - 1 ? 1 : 0);
+          return (
+            <g key={band.label}>
+              <rect x={x0} y={18} width={Math.max(0, x1 - x0)} height={12} rx={6} fill={band.color} className="m-growx" style={md(b + 150 + (k + 1) * 150)} />
+              <text x={(x0 + x1) / 2} y={48} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--muted)">
+                {band.label}
+              </text>
+            </g>
+          );
+        })}
+        {[18.5, 23, 25].map((v) => (
+          <text key={v} x={xOf(v)} y={62} textAnchor="middle" fontSize={10} fontWeight={500} fill="var(--muted)">
+            {v}
+          </text>
+        ))}
+        <g className="m-sweep" style={md(b + 900, { ["--a" as string]: `${-mx}px`, ["--b" as string]: `${CW - mx}px`, ["--c" as string]: `${-mx * 0.45}px` })}>
+          <path d={`M${mx - 7},4 L${mx + 7},4 L${mx},14 Z`} fill="var(--ink)" />
+          <rect x={mx - 1.5} y={14} width={3} height={20} rx={1.5} fill="var(--ink)" />
+        </g>
+      </svg>
+      <div className={`grid gap-2.5 ${whtr != null ? "grid-cols-2" : "grid-cols-1"}`}>
+        <div className="rounded-[14px] p-3" style={{ background: "var(--card2)" }}>
+          <p className="text-[12px] font-semibold muted">Healthy weight</p>
+          <p className="num mt-0.5 text-[17px] font-bold">
+            {w(range.min)} – {w(range.max)} {profile.units === "imperial" ? "lb" : "kg"}
+          </p>
+        </div>
+        {whtr != null ? (
+          <button type="button" className="press rounded-[14px] p-3 text-left" style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }} aria-expanded={waistOpen} onClick={() => setWaistOpen((v) => !v)}>
+            <span className="block text-[12px] font-semibold muted">Waist ÷ height</span>
+            <span className="num mt-0.5 block text-[17px] font-bold">
+              {whtr.toFixed(2)}{" "}
+              <span className="text-[12px]" style={{ color: whtrWords(whtr).ok ? "var(--green-ink)" : "var(--orange-ink)" }}>
+                {whtrWords(whtr).ok ? "under 0.5" : "0.5 or more"}
+              </span>
+            </span>
+          </button>
+        ) : null}
+      </div>
+      {canWaist && whtr == null && !waistOpen ? (
+        <button type="button" className="press -mt-1 self-start text-[12px] font-semibold underline muted" style={{ background: "none", border: 0, padding: "6px 0" }} onClick={() => setWaistOpen(true)}>
+          Add a waist measurement
+        </button>
+      ) : null}
+      {canWaist && waistOpen ? <WaistRow profile={profile} /> : null}
+    </PCard>
+  );
+}
+
+// ---------------------------------------------------------------- 6 · meal times
+
+const MEAL_DOT = { breakfast: "var(--orange)", lunch: "var(--green)", snack: "var(--purple)", dinner: "var(--blue)" } as const;
+
+function subscribeMinute(cb: () => void) {
+  const id = setInterval(cb, 30000);
+  return () => clearInterval(id);
+}
+
+function span(min: number): string {
+  const m = Math.round(Math.abs(min));
+  if (m < 60) return `${m} min`;
+  if (m >= 120) return `${Math.round(m / 60)} h`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r >= 10 ? `${h} h ${r} min` : `${h} h`;
+}
+
+function MealTimesCard({ meals, today, days, b }: { meals: Meal[]; today: string; days: number; b: number }) {
+  // Minutes after midnight in India; null on the server so the first paint never disagrees.
+  const now = useSyncExternalStore(subscribeMinute, () => istMinutes(new Date()), () => null);
+  const rows = mealTimes(meals, today, days);
+  const upcoming = now == null ? [] : rows.filter((r) => r.today == null && r.usual != null && r.usual > now + 15).sort((a, b2) => (a.usual as number) - (b2.usual as number));
+  const next = upcoming[0]?.type ?? null;
+
+  return (
+    <PCard label="Meal times">
+      <div className="flex items-baseline justify-between">
+        <Label>Your usual meal times</Label>
+        <span className="text-[12px] muted">and today</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {rows.map((r, k) => {
+          const usual = r.usual != null ? clockText(r.usual) : null;
+          let line: React.ReactNode;
+          if (r.today != null) {
+            const tc = clockText(r.today);
+            const diff = r.usual != null ? r.today - r.usual : null;
+            line = (
+              <>
+                Today {tc.time} {tc.ampm}
+                {diff != null ? (
+                  <>
+                    {" · "}
+                    <span className="font-bold" style={{ color: Math.abs(diff) <= 5 || diff < 0 ? "var(--green-ink)" : "var(--orange-ink)" }}>
+                      {Math.abs(diff) <= 5 ? "on time" : diff < 0 ? `${span(diff)} early` : `${span(diff)} late`}
+                    </span>
+                  </>
+                ) : null}
+              </>
+            );
+          } else if (r.usual == null) {
+            line = "Not enough logs yet";
+          } else if (now == null) {
+            line = "Today —";
+          } else if (now > r.usual + 90) {
+            line = (
+              <>
+                Today · <span className="font-bold">skipped</span>
+              </>
+            );
+          } else if (now >= r.usual - 15) {
+            line = (
+              <>
+                <span className="font-bold" style={{ color: "var(--blue-ink)" }}>Due now</span>
+              </>
+            );
+          } else if (r.type === next) {
+            line = (
+              <>
+                Next · <span className="font-bold" style={{ color: "var(--blue-ink)" }}>in about {span(r.usual - now)}</span>
+              </>
+            );
+          } else {
+            line = "Later today";
+          }
+          return (
+            <div key={r.type} className="m-drop flex flex-col gap-1.5 rounded-2xl p-3.5" style={md(b + 350 + k * 150, { background: "var(--card2)" })}>
+              <span className="flex items-center gap-1.5 text-[12px] font-semibold muted">
+                <Dot color={MEAL_DOT[r.type]} />
+                {mealTypeLabel(r.type)}
+              </span>
+              <span className="num font-extrabold" style={{ fontSize: 28, letterSpacing: "-1px", lineHeight: 1 }}>
+                {usual ? (
+                  <>
+                    {usual.time}
+                    <span className="text-[13px] font-semibold muted"> {usual.ampm}</span>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </span>
+              <span className="text-[12px] muted">{line}</span>
+            </div>
+          );
+        })}
+      </div>
+    </PCard>
   );
 }
 
@@ -701,9 +1079,11 @@ function PhotosStrip({ photos }: { photos: ProgressPhoto[] }) {
 /** How many medals are unlocked; taps through to the full grid. */
 function BadgesCard({ progress }: { progress: BadgeProgress }) {
   const got = earnedCount(progress);
+  const { earned } = medalShelf(progress);
+  const top = earned[0];
   return (
     <Link href="/badges" className="card press flex w-full items-center gap-3.5" style={{ padding: 14 }} aria-label={`Badges: ${got} of ${ALL_BADGES.length} earned`}>
-      <HexMedal number={got} earned={got > 0} size={48} />
+      {top ? <MetalMedal tier={top.tier} icon={TROPHY_ICON} size={48} /> : <LockedMedal progress={got / ALL_BADGES.length} icon={TROPHY_ICON} size={48} />}
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-base font-bold">Badges</span>
         <span className="text-xs muted">

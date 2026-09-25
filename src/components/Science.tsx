@@ -280,7 +280,7 @@ const ordinal = (n: number) => {
 };
 
 /** Optional waist entry and the waist-to-height ratio. */
-function WaistRow({ profile }: { profile: Profile }) {
+export function WaistRow({ profile }: { profile: Profile }) {
   const router = useRouter();
   const [value, setValue] = useState(profile.waist_cm != null ? fmt(profile.waist_cm) : "");
   const [busy, setBusy] = useState(false);
