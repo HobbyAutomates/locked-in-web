@@ -238,7 +238,25 @@ function isReportShape(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === "object" && "verdict" in (v as object) && "fits" in (v as object);
 }
 
-export async function analyseTranscript(input: AnalysisInput): Promise<{ report: Record<string, unknown>; analysis: string; usage: UsageEntry[] }> {
+/**
+ * v2.9: the pages the label analysis' web_search actually returned (title + url, first 3, deduped) —
+ * shown as research links in the "Where's this from?" sheet. Empty when the model didn't search.
+ */
+export function webCitations(msg: Anthropic.Message): { label: string; url: string }[] {
+  const out: { label: string; url: string }[] = [];
+  for (const b of msg.content as unknown as Record<string, unknown>[]) {
+    if (b?.type !== "web_search_tool_result" || !Array.isArray(b.content)) continue;
+    for (const r of b.content as Record<string, unknown>[]) {
+      const url = typeof r?.url === "string" ? r.url : "";
+      if (!/^https?:\/\//.test(url) || out.some((o) => o.url === url)) continue;
+      out.push({ label: String(r.title ?? url).slice(0, 80), url });
+      if (out.length >= 3) return out;
+    }
+  }
+  return out;
+}
+
+export async function analyseTranscript(input: AnalysisInput): Promise<{ report: Record<string, unknown>; analysis: string; usage: UsageEntry[]; citations?: { label: string; url: string }[] }> {
   const { transcript, note, lens, profile } = input;
   const text = (m: Anthropic.Message) => m.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("\n");
   const targets = targetsLine(profile);
@@ -279,7 +297,8 @@ export async function analyseTranscript(input: AnalysisInput): Promise<{ report:
   const msg = call.data;
   const analysis = text(msg).trim();
   const block = msg.content.find((b) => b.type === "tool_use" && b.name === "label_report");
-  if (block && block.type === "tool_use") return { report: block.input as Record<string, unknown>, analysis, usage };
+  const citations = webCitations(msg);
+  if (block && block.type === "tool_use") return { report: block.input as Record<string, unknown>, analysis, usage, citations };
 
   // Rare fallback: the model wrote prose but never called the tool — structure it in a second call.
   // Structuring has no Anthropic-only feature — a generic structured-JSON task, provider-flexible.
@@ -298,7 +317,7 @@ export async function analyseTranscript(input: AnalysisInput): Promise<{ report:
     isReportShape,
   );
   usage.push(toUsageEntry("label_structure", s.model, s.usage));
-  return { report: s.data, analysis, usage };
+  return { report: s.data, analysis, usage, citations };
 }
 
 // ---- Barcode AI-report cache (v2.7: keyed on barcode + lens + a hash of the profile targets used

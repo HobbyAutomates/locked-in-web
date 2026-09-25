@@ -72,7 +72,7 @@ export function sourceBonus(source: string) {
  * Descriptor / cooking words that never change what the core ingredient IS — stripped before
  * comparing a query's words against a hit's words so "peeled cucumber" reduces to "cucumber".
  */
-const DESCRIPTOR_WORDS = new Set([
+export const DESCRIPTOR_WORDS = new Set([
   "cold", "hot", "warm", "fresh", "raw", "boiled", "fried", "roasted", "peeled", "unpeeled", "chopped", "sliced",
   "diced", "grated", "steamed", "plain", "mixed", "whole", "cooked", "baked", "grilled", "cream", "creamy", "ripe",
   "green", "red", "small", "medium", "large", "big", "half", "extra", "spicy", "sweet", "sour", "org", "organic",
@@ -84,14 +84,14 @@ const DESCRIPTOR_WORDS = new Set([
  * the query didn't ask for, the hit is a different food and gets rejected — e.g. "cucumber" must
  * never resolve to "cold cucumber cream soup".
  */
-const DISH_WORDS = new Set([
+export const DISH_WORDS = new Set([
   "soup", "sandwich", "raita", "curry", "sabzi", "salad", "sharbat", "chaat", "kadhi", "stew", "gravy", "cutlet",
   "pickle", "achar", "halwa", "kheer", "shake", "smoothie", "juice", "roll", "wrap", "poriyal", "thoran", "kofta",
   "koftas", "biryani", "pulao", "khichdi", "idli", "dosa", "uttapam", "momos", "pakora", "bhurji", "tikka",
   "masala", "bharta", "cutlets", "chutney", "dip", "spread", "paratha", "toast", "burger", "pizza", "cake", "pie",
 ]);
 
-function significantWords(s: string): string[] {
+export function significantWords(s: string): string[] {
   return s
     .toLowerCase()
     .replace(/[^a-z\s]/g, " ")
@@ -248,4 +248,43 @@ export async function foodById(id: string): Promise<FoodHit | null> {
   const { data, error } = await admin().from("foods").select("id, name, aliases, calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg, micros, source, region, names_local, units, unit_name, unit_grams").eq("id", id).maybeSingle();
   if (error || !data) return null;
   return rowToHit({ ...(data as Record<string, unknown>), score: 3 });
+}
+
+// ---- v2.9: "Where's this from?" — per-row provenance (barcode, source_ref) for the source sheet ----
+
+/** Provenance of one bandlog.foods row: its dataset, barcode (OFF rows) and dataset id (schema_v32's source_ref). */
+export type FoodMeta = { id: string; name: string; source: string; barcode: string | null; source_ref: string | null };
+
+/**
+ * Provenance for a set of food ids, keyed by id. `source_ref` (the USDA fdc id / IFCT code, added by
+ * supabase/schema_v32.sql) is optional: when the column isn't there yet the select is retried
+ * without it and every row gets `source_ref: null`. Never throws — an empty map on any error.
+ */
+export async function foodMeta(ids: string[]): Promise<Map<string, FoodMeta>> {
+  const want = [...new Set(ids.filter(Boolean))].slice(0, 50);
+  const out = new Map<string, FoodMeta>();
+  if (!want.length) return out;
+  try {
+    const db = admin();
+    let rows: Record<string, unknown>[] | null = null;
+    const withRef = await db.from("foods").select("id, name, source, barcode, source_ref").in("id", want);
+    if (!withRef.error) rows = (withRef.data ?? []) as Record<string, unknown>[];
+    else {
+      const plain = await db.from("foods").select("id, name, source, barcode").in("id", want);
+      if (!plain.error) rows = (plain.data ?? []) as Record<string, unknown>[];
+    }
+    for (const r of rows ?? []) {
+      const id = String(r.id);
+      out.set(id, {
+        id,
+        name: String(r.name ?? ""),
+        source: String(r.source ?? "custom"),
+        barcode: r.barcode == null || r.barcode === "" ? null : String(r.barcode),
+        source_ref: r.source_ref == null || r.source_ref === "" ? null : String(r.source_ref),
+      });
+    }
+  } catch {
+    // Provenance is decoration — a failure never blocks a parse or a scan.
+  }
+  return out;
 }

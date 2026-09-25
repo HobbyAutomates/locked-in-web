@@ -1,5 +1,10 @@
 import type { BandLevel, Muscle } from "./muscles";
 import type { AutoShareKind } from "./squadSharing";
+import type { SourceInfo } from "./sourceInfo";
+import type { FoodVariant } from "./variants";
+
+export type { FoodVariant } from "./variants";
+export type { SourceInfo, SourceLink } from "./sourceInfo";
 
 export type Workout = {
   id: string;
@@ -44,6 +49,10 @@ export type MealItem = {
   image_url?: string | null;
   /** v2.5: the one unit a count item is counted in ("1 roti", 40 g) — display only, lets the plate open the stepper. */
   serving_unit?: PresetServing | null;
+  /** v2.9: "Which one?" options when the name is ambiguous (display only, never written to meal_items). */
+  variants?: FoodVariant[];
+  /** v2.9: where the numbers came from, for the ⓘ sheet (display only). */
+  source_info?: SourceInfo | null;
 };
 
 export type Meal = {
@@ -325,6 +334,8 @@ export type LabelReport = {
   transcript?: string;
   /** v2.8: deterministic sanity-check flags from src/lib/ai/validate/label.ts — never blocks the scan. */
   validation?: { field: string; issue: string; suggestion: string }[];
+  /** v2.9: where the numbers came from (label / Open Food Facts + research links) — optional. */
+  source_info?: SourceInfo | null;
 };
 
 /** One detected item on a food photo (see /api/photo-meal). */
@@ -346,6 +357,10 @@ export type PlateItem = {
   grams_high?: number | null;
   /** v2.8: what's uncertain about this item, e.g. "oil amount unclear". */
   uncertainties?: string[];
+  /** v2.9: "Which one?" options when the name is ambiguous — optional, older reports have none. */
+  variants?: FoodVariant[];
+  /** v2.9: where the numbers came from, for the ⓘ sheet — optional. */
+  source_info?: SourceInfo | null;
 };
 
 /** v2.8: one clarifying question the model can ask after a plate scan, with a fixed effect vocabulary

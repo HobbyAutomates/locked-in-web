@@ -236,7 +236,7 @@ export function mentionsRestaurant(text: string): boolean {
 }
 
 /** A plate-photo item as a meal item (the confidence word becomes a number, like the Android app). */
-export function mealItemFromPlate(i: { food_id: string | null; name: string; grams: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; source: "table" | "estimated"; confidence: "high" | "medium" | "low"; micros: ItemMicros; cooked_in?: string | null }): MealItem {
+export function mealItemFromPlate(i: { food_id: string | null; name: string; grams: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; source: "table" | "estimated"; confidence: "high" | "medium" | "low"; micros: ItemMicros; cooked_in?: string | null; variants?: MealItem["variants"]; source_info?: MealItem["source_info"] }): MealItem {
   return {
     food_id: i.food_id,
     name: i.name,
@@ -251,6 +251,9 @@ export function mealItemFromPlate(i: { food_id: string | null; name: string; gra
     unit: "g",
     servings: null,
     cooked_in: i.cooked_in ?? null,
+    // v2.9: display-only provenance rides along to the plate (never written to meal_items).
+    ...(i.variants?.length ? { variants: i.variants } : {}),
+    ...(i.source_info ? { source_info: i.source_info } : {}),
   };
 }
 

@@ -9,6 +9,7 @@ import { countStep } from "@/lib/quantity";
 import { foodKey } from "@/lib/foodKey";
 import { cachedFoodImages, resolveFoodImage } from "@/lib/foodImage";
 import { extractWater } from "@/lib/waterParse";
+import { enrichItems } from "@/lib/itemSources";
 import type { ParseResult, ParsedItem } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -290,6 +291,15 @@ export async function POST(req: Request) {
     }
     items.push(counted(it, food));
   }
+
+  // v2.9: optional `source_info` + `variants` ("Which one?") per item, AFTER pricing — nothing here
+  // changes a number, and older clients simply ignore the extra fields.
+  const queryOf = (i: ParsedItem) => {
+    const c = chunksOf(i.input ?? "")[0] ?? "";
+    return hasDevanagari(c) ? hindiToLatin(c) : c;
+  };
+  const enriched = await enrichItems(items, { queryOf }).catch(() => items);
+  items.splice(0, items.length, ...enriched);
 
   // v2.4: pictures from the shared cache so the plate shows photos with no extra round trip; the
   // first few foods nobody has pictured yet are looked up after the response, for next time.

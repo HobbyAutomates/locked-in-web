@@ -24,6 +24,8 @@ import {
 import { extractBarcode, parseNutritionLabel, reportNutritionTrusted, roundPer100, sanityCheckPer100 } from "@/lib/labelParse";
 import { liveLookup } from "@/lib/liveFood";
 import { crossValidatePlateItem } from "@/lib/plateMatch";
+import { enrichItems } from "@/lib/itemSources";
+import { reportSourceInfo } from "@/lib/sourceInfo";
 import { RESTAURANT_MULTIPLIER, RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
 import { scanName } from "@/lib/scanNames";
 import type { ItemMicros, PlateEstimate, PlateItem } from "@/lib/types";
@@ -150,7 +152,7 @@ export async function labelFlow(input: {
     return unreadableReport(transcript.replace("NOT_A_LABEL", "").trim() || "Couldn't read a food label in that photo.", transcript);
   }
 
-  const { report, analysis, usage: analyseUsage } = await analyseTranscript({ transcript, note: input.note ?? undefined, lens, profile, fromPhoneOcr: fromPhone, kind: "label" });
+  const { report, analysis, usage: analyseUsage, citations } = await analyseTranscript({ transcript, note: input.note ?? undefined, lens, profile, fromPhoneOcr: fromPhone, kind: "label" });
   usage.push(...analyseUsage);
 
   // 2. The parser is the source of truth for per_100g, never the model. No table -> no numbers.
@@ -163,6 +165,8 @@ export async function labelFlow(input: {
     const digits = extractBarcode(transcript);
     if (digits) report.barcode = digits;
   }
+  // v2.9: where the numbers came from (after applyParsedNutrition decided nutrition_source).
+  report.source_info = reportSourceInfo(report, citations ?? []);
 
   // Never store "<UNKNOWN>" or a blank name: the model's name, else the first ingredient, else "Unnamed label".
   const product = scanName("label", { model: report.product, ingredients: transcript });
@@ -295,6 +299,7 @@ export async function barcodeFlow(input: {
   const hit = cacheable ? product.__reports?.[key] : undefined;
   let report: Record<string, unknown>;
   let analysis: string;
+  let citations: { label: string; url: string }[] = [];
   if (hit && reportNutritionTrusted(hit.report)) {
     report = { ...hit.report, per_100g: gated.per_100g, nutrition_source: "openfoodfacts", needs_back_of_pack: false };
     analysis = hit.analysis;
@@ -302,6 +307,7 @@ export async function barcodeFlow(input: {
     const r = await analyseTranscript({ transcript, note: input.note ?? undefined, lens, profile, kind: "barcode", maxSearches: offComplete(product) ? 1 : 2 });
     report = r.report;
     analysis = r.analysis;
+    citations = r.citations ?? [];
     usage.push(...r.usage);
     const reasonBefore = report.verdict_reason && String(report.verdict_reason).trim() ? String(report.verdict_reason) : "";
     applyParsedNutrition(report, { per_100g: gated.per_100g ?? {}, per_serving: {}, serving_g: null, hasTable: cacheable, coreComplete: cacheable });
@@ -321,6 +327,8 @@ export async function barcodeFlow(input: {
     }
   }
   attachValidation(report);
+  // v2.9: where the numbers came from — the OFF product page for this barcode, plus any research links.
+  const source_info = reportSourceInfo({ ...report, barcode }, citations);
   if (needsWrite && cacheable) {
     try {
       await input.admin.from("barcode_cache").upsert({ barcode, product, fetched_at: fresh && cachedRow ? cachedRow.fetched_at : new Date().toISOString() });
@@ -330,7 +338,7 @@ export async function barcodeFlow(input: {
   }
   const image_url = product.image_url ?? null;
   const productName = scanName("barcode", { model: report.product, off: product.product_name, ingredients: product.ingredients_text });
-  const full = { ...report, product: productName, kind: "barcode", lens, barcode, image_url, transcript, analysis, usage };
+  const full = { ...report, product: productName, kind: "barcode", lens, barcode, image_url, transcript, analysis, usage, source_info };
   const id = await saveScan(input.admin, {
     userId: input.userId,
     kind: "barcode",
@@ -342,7 +350,7 @@ export async function barcodeFlow(input: {
   });
   // The OFF pack shot is the better history picture; the photo of the bars only fills in without one.
   const thumb_path = image_url ? null : await attachThumb(input.admin, input.userId, id, input.thumb);
-  return { id, found: true, ...report, product: productName, kind: "barcode", lens, barcode, image_url, transcript, thumb_path };
+  return { id, found: true, ...report, product: productName, kind: "barcode", lens, barcode, image_url, transcript, thumb_path, source_info };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -562,7 +570,7 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
   //     ×1.4 and add the hidden teaspoon of oil to curries / dal / sabzi — same rule as the Quantity sheet.
   const noteText = String(note ?? "");
   const restaurant = mentionsRestaurant(`${noteText} ${String(raw.plate_note ?? "")}`);
-  const finalItems: PlateItem[] = restaurant
+  const scaledItems: PlateItem[] = restaurant
     ? items.map((it) => {
         const k = RESTAURANT_MULTIPLIER;
         const oil = restaurantOil(it.name, null) ? RESTAURANT_OIL_G : 0;
@@ -582,6 +590,10 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
         };
       })
     : items;
+
+  // 2c. v2.9: optional provenance + "Which one?" variants per item, after every number is final
+  //     (plateMatch and the restaurant rule above) — nothing here changes a number.
+  const finalItems: PlateItem[] = await enrichItems(scaledItems).catch(() => scaledItems);
 
   // 3. Store the photo and the estimate.
   let photo_path: string | null = null;

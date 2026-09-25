@@ -14,6 +14,9 @@ import QuantitySheet from "./QuantitySheet";
 import FoodImage from "./FoodImage";
 import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
 import { Card, ErrorNote, Hair, MacroDot, PillButton, Ring, Rise, SPRING, fmt } from "./ui";
+import { InfoButton, SourceSheet, VariantChips } from "./SourceSheet";
+import { needsCheck, reportSourceInfo, sourceInfoFor } from "@/lib/sourceInfo";
+import { swapToVariant, type FoodVariant } from "@/lib/variants";
 
 const LENSES: { key: Lens; label: string }[] = [
   { key: "protein", label: "Protein" },
@@ -477,7 +480,8 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
             onClick={() => {
               const serving = food.servings[0];
               const item = priceItem(food, serving ? { unit: "serving", value: 1 } : { unit: "g", value: 100 });
-              openOnPlate(router, { items: [{ ...item, image_url: r.image_url ?? null }], label: `${r.product || "Scanned product"} (scan)`, kind: "product" });
+              // v2.9: the plate's ⓘ shows where these numbers came from (the label, or Open Food Facts).
+              openOnPlate(router, { items: [{ ...item, image_url: r.image_url ?? null, source_info: r.source_info ?? reportSourceInfo(r as { nutrition_source?: unknown; barcode?: unknown }) }], label: `${r.product || "Scanned product"} (scan)`, kind: "product" });
             }}
           >
             Add to plate with other food
@@ -904,6 +908,9 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
   // scale from the current items (picking a different chip after one, e.g. "Bigger" then "No oil",
   // composes rather than replaces).
   const [pickedEffect, setPickedEffect] = useState<string | null>(null);
+  // v2.9: the row whose "Where's this from?" sheet is open, and rows whose variant the user picked.
+  const [infoIdx, setInfoIdx] = useState<number | null>(null);
+  const [confirmed, setConfirmed] = useState<Set<number>>(() => new Set());
   const kcalTotal = totalKcalRange(items);
   const prot = items.reduce((a, i) => a + i.protein_g, 0);
 
@@ -920,6 +927,14 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
 
   // Low-confidence items sorted first (and outlined below), everything else keeping its own order.
   const order = items.map((_, i) => i).sort((a, b) => CONF_RANK[items[a].confidence] - CONF_RANK[items[b].confidence]);
+
+  /** "Which one?": the row (and its unscaled original) swap to that food at the same grams. */
+  function pickVariant(idx: number, v: FoodVariant) {
+    const swap = (it: PlateItem): PlateItem => ({ ...swapToVariant(it, v), source: "table", confidence: "high", source_info: sourceInfoFor({ name: v.name, food_id: v.food_id, source: v.source ?? null, item_source: "table" }) });
+    setItems((cur) => cur.map((x, i) => (i === idx ? swap(x) : x)));
+    setOriginals((cur) => cur.map((x, i) => (i === idx ? swap(x) : x)));
+    setConfirmed((cur) => new Set(cur).add(idx));
+  }
 
   function pickFollowUp(effect: string) {
     setPickedEffect(effect);
@@ -961,6 +976,7 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                         <span className="badge shrink-0" style={{ background: `color-mix(in srgb, ${c.color} 16%, transparent)`, color: c.color, fontSize: 10 }}>
                           {c.label}
                         </span>
+                        <InfoButton name={it.name} check={!confirmed.has(idx) && needsCheck(it)} onClick={() => setInfoIdx(idx)} />
                       </div>
                       <div className="mt-0.5 flex flex-wrap gap-2 text-xs muted">
                         <span>{it.calories} kcal</span>
@@ -975,6 +991,7 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                       </div>
                       {it.grams_low != null && it.grams_high != null ? <p className="mt-0.5 text-[11px] muted">{gramsRangeLabel(it)}</p> : null}
                       {it.uncertainties?.length ? <p className="mt-0.5 text-[11px]" style={{ color: "var(--orange)" }}>{it.uncertainties.join(" · ")}</p> : null}
+                      {!readOnly && it.variants && it.variants.length > 1 ? <VariantChips variants={it.variants} currentId={it.food_id} onPick={(v) => pickVariant(idx, v)} /> : null}
                       {open === idx ? (
                         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs muted">
                           {micros.map(([k, label, unit]) => (
@@ -1002,6 +1019,7 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                           onClick={() => {
                             setItems(items.filter((_, i) => i !== idx));
                             setOriginals(originals.filter((_, i) => i !== idx));
+                            setConfirmed((cur) => new Set([...cur].filter((i) => i !== idx).map((i) => (i > idx ? i - 1 : i))));
                           }}
                         >
                           <Trash size={16} />
@@ -1017,6 +1035,19 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
           </div>
         </Card>
       </Rise>
+      <SourceSheet
+        item={infoIdx !== null ? (items[infoIdx] ?? null) : null}
+        onClose={() => setInfoIdx(null)}
+        onPickVariant={
+          readOnly
+            ? undefined
+            : (v) => {
+                if (infoIdx !== null) pickVariant(infoIdx, v);
+                setInfoIdx(null);
+              }
+        }
+        onPickAnother={readOnly ? undefined : () => openOnPlate(router, { items: items.map(mealItemFromPlate), label: plate.plate_note || "Plate photo", photo_path: plate.photo_path ?? null })}
+      />
       {plate.follow_up && plate.follow_up.options.length ? (
         <Rise index={5}>
           <p className="px-1 text-xs font-semibold muted">{plate.follow_up.question}</p>

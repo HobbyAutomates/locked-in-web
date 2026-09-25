@@ -17,6 +17,9 @@ import FoodImage, { FoodFallback, type FoodImageKind } from "./FoodImage";
 import QuantitySheet from "./QuantitySheet";
 import { saveWhenReady, type PlateJob } from "./PendingMeals";
 import { BottomSheet, ErrorNote, Hair, MacroDot, PillButton, fmt } from "./ui";
+import { InfoButton, SourceSheet, VariantChips, lookUpSources } from "./SourceSheet";
+import { needsCheck, sourceInfoFor } from "@/lib/sourceInfo";
+import { swapToVariant, type FoodVariant } from "@/lib/variants";
 
 const CATEGORIES: { key: PresetCategory; label: string }[] = [
   { key: "breakfast", label: "Breakfast" },
@@ -37,7 +40,12 @@ const SOURCE_LABEL: Record<string, string> = { dish: "INDB", ifct: "IFCT", usda:
  * One plate row: the priced item plus the serving sizes it came with (so the Quantity sheet can
  * offer them again). v2.4: `image` / `imageKind` are the row's picture (display only).
  */
-type Row = { key: number; item: MealItem; servings?: PresetServing[]; servingLabel?: string | null; category?: string | null; image?: string | null; imageKind?: FoodImageKind };
+type Row = { key: number; item: MealItem; servings?: PresetServing[]; servingLabel?: string | null; category?: string | null; image?: string | null; imageKind?: FoodImageKind; confirmed?: boolean };
+
+/** v2.9: a search hit as a variant, so "Pick another" -> search swaps the row at the same grams. */
+function hitVariant(h: FoodSearchHit): FoodVariant {
+  return { food_id: h.id, name: h.name, kcal_per_100g: h.calories, protein_per_100g: h.protein_g, carbs_per_100g: h.carbs_g, fat_per_100g: h.fat_g, micros_per_100g: h.micros, source: h.source };
+}
 type Job = { id: number; kind: "parse" | "photo"; label: string };
 
 async function parseMeal(text: string, correction?: string, previous?: MealItem[]): Promise<ParseResult> {
@@ -150,6 +158,9 @@ export default function MealForm({
   const [repeatOpen, setRepeatOpen] = useState(false);
   const [repeatName, setRepeatName] = useState("");
   const [waterToast, setWaterToast] = useState<{ id: number; ml: number; glasses: number; undone: boolean } | null>(null);
+  // v2.9: the row whose "Where's this from?" sheet is open, and the row "Pick another" is replacing via search.
+  const [infoKey, setInfoKey] = useState<number | null>(null);
+  const [swapKey, setSwapKey] = useState<number | null>(null);
   const tapped = useRef<string[]>([]);
   const promises = useRef(new Map<number, Promise<PlateJob>>());
   const handedOff = useRef(false);
@@ -160,6 +171,8 @@ export default function MealForm({
   const totalProtein = items.reduce((a, i) => a + Number(i.protein_g), 0);
   const fats = useMemo(() => presets.filter((p) => p.category === "fat"), [presets]);
   const editing = rows.find((r) => r.key === editKey) ?? null;
+  const infoRow = rows.find((r) => r.key === infoKey) ?? null;
+  const swapRow = rows.find((r) => r.key === swapKey) ?? null;
   const sentence = looksLikeSentence(text);
   const typing = text.trim().length >= 2;
 
@@ -186,6 +199,53 @@ export default function MealForm({
     if (d.photo_path) setPhotoPath(d.photo_path);
     tapped.current.push(d.label);
   }, [prefill]);
+
+  // v2.9 meal editor: saved rows carry no provenance - one lookup on open brings the ⓘ source and
+  // any "Which one?" variants (best-effort; the editor works the same without it).
+  useEffect(() => {
+    if (!existing?.items.length) return;
+    let live = true;
+    const saved = rowsFromMeal(existing);
+    lookUpSources(saved.map((r) => r.item))
+      .then((found) => {
+        if (!live) return;
+        setRows((cur) =>
+          cur.map((r) => {
+            const i = saved.findIndex((x) => x.key === r.key);
+            const f = i >= 0 ? found[i] : undefined;
+            if (!f || r.item.source_info) return r;
+            return { ...r, item: { ...r.item, source_info: f.source_info ?? null, ...(f.variants?.length ? { variants: f.variants } : {}) } };
+          }),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [existing]);
+
+  /** v2.9 "Which one?": swap the row to that food at the same grams (it keeps its chips). */
+  function pickVariant(key: number, v: FoodVariant, keepChips = true) {
+    setRows((cur) =>
+      cur.map((r) => {
+        if (r.key !== key) return r;
+        const swapped = swapToVariant(r.item, v);
+        const source_info = sourceInfoFor({ name: v.name, food_id: v.food_id, source: v.source ?? null, item_source: "table" });
+        const next: MealItem = { ...swapped, confidence: 1, source_info, image_url: null, variants: keepChips ? r.item.variants : undefined };
+        return { ...r, item: next, image: null, confirmed: true };
+      }),
+    );
+    say(`Swapped to ${v.label ?? v.name}`);
+  }
+
+  /** "Not right? Pick another" with no variants: search for the replacement; the pick swaps this row. */
+  function pickAnother(key: number) {
+    const r = rows.find((x) => x.key === key);
+    setInfoKey(null);
+    setSwapKey(key);
+    setText(r ? r.item.name.replace(/\s*\(restaurant\)$/i, "") : "");
+    barRef.current?.focus();
+  }
 
   function addRows(next: Omit<Row, "key">[]) {
     setRows((cur) => [...cur, ...next.map((r) => ({ ...r, key: seq.current++ }))]);
@@ -512,7 +572,32 @@ export default function MealForm({
         <ErrorNote text={error} />
 
         {typing ? (
-          <SearchResults key="results" query={text} search={search} sentence={sentence} onPick={(h) => addFood(hitFood(h), false, { src: h.image_url ?? null, kind: h.source === "off" ? "product" : "generic" })} onWorkItOut={() => workItOut(text)} />
+          <>
+            {swapRow ? (
+              <div className="flex items-center justify-between gap-2 rounded-2xl px-3.5 py-2" style={{ background: "var(--card2)" }} role="status">
+                <span className="min-w-0 truncate text-[13px] font-semibold">Pick a food to replace {swapRow.item.name}</span>
+                <button type="button" className="hit press shrink-0 text-[13px] font-bold muted" onClick={() => setSwapKey(null)}>
+                  Cancel
+                </button>
+              </div>
+            ) : null}
+            <SearchResults
+              key="results"
+              query={text}
+              search={search}
+              sentence={sentence}
+              onPick={(h) => {
+                if (swapRow) {
+                  pickVariant(swapRow.key, hitVariant(h), false);
+                  setSwapKey(null);
+                  setText("");
+                  return;
+                }
+                addFood(hitFood(h), false, { src: h.image_url ?? null, kind: h.source === "off" ? "product" : "generic" });
+              }}
+              onWorkItOut={() => workItOut(text)}
+            />
+          </>
         ) : (
           <PresetGrid presets={presets} savedMeals={savedMeals} usage={usage} onPreset={(p) => addFood(presetFood(p), p.category === "restaurant", { src: p.image_url ?? null, kind: "preset" })} onSaved={addSaved} onEmpty={() => barRef.current?.focus()} />
         )}
@@ -565,6 +650,8 @@ export default function MealForm({
                 onCookedIn={() => setCookedKey(r.key)}
                 onOpen={() => setEditKey(r.key)}
                 onRemove={() => setRows((cur) => cur.filter((x) => x.key !== r.key))}
+                onInfo={() => setInfoKey(r.key)}
+                onPickVariant={(v) => pickVariant(r.key, v)}
               />
             ))}
             {jobs.map((j, i) => (
@@ -635,6 +722,21 @@ export default function MealForm({
           setEditKey(null);
           // A row entered by weight reads in grams; counted rows keep their one-piece unit ("1 roti").
           setRows((cur) => cur.map((r) => (r.key === key ? { ...r, servingLabel: servingLabel ?? null, item: { ...item, name: item.cooked_in === "restaurant" ? item.name : r.item.name, confidence: r.item.confidence, cooked_in: item.cooked_in ?? r.item.cooked_in ?? null, source: r.item.source, food_id: r.item.food_id, image_url: r.item.image_url } } : r)));
+        }}
+      />
+
+      <SourceSheet
+        item={infoRow?.item ?? null}
+        mealId={existing?.id ?? null}
+        onClose={() => setInfoKey(null)}
+        onPickVariant={(v) => {
+          if (infoKey !== null) pickVariant(infoKey, v);
+          setInfoKey(null);
+        }}
+        onPickAnother={() => infoKey !== null && pickAnother(infoKey)}
+        onLoaded={(f) => {
+          const key = infoKey;
+          setRows((cur) => cur.map((r) => (r.key === key && !r.item.source_info ? { ...r, item: { ...r.item, source_info: f.source_info ?? null, ...(f.variants?.length ? { variants: f.variants } : {}) } } : r)));
         }}
       />
 
@@ -891,6 +993,8 @@ function PlateRow({
   onCookedIn,
   onOpen,
   onRemove,
+  onInfo,
+  onPickVariant,
 }: {
   row: Row;
   first: boolean;
@@ -899,6 +1003,8 @@ function PlateRow({
   onCookedIn: () => void;
   onOpen: () => void;
   onRemove: () => void;
+  onInfo: () => void;
+  onPickVariant: (v: FoodVariant) => void;
 }) {
   const item = row.item;
   const [delta, setDelta] = useState<number | null>(null);
@@ -921,9 +1027,12 @@ function PlateRow({
       <div className="flex items-center gap-2.5 py-2.5">
         <FoodImage name={item.name} kind={row.imageKind ?? (item.source === "scan" ? "product" : "generic")} src={row.image ?? item.image_url} size={40} fallback={<FoodFallback size={40} category={row.category} />} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-[15px] font-semibold">
-            {item.name}
-            {item.source === "estimated" ? " ~" : ""}
+          <span className="flex min-w-0 items-center gap-1">
+            <span className="truncate text-[15px] font-semibold">
+              {item.name}
+              {item.source === "estimated" ? " ~" : ""}
+            </span>
+            <InfoButton name={item.name} check={!row.confirmed && needsCheck(item)} onClick={onInfo} />
           </span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-xs muted">{Math.round(item.calories)} kcal</span>
@@ -938,6 +1047,7 @@ function PlateRow({
             ) : null}
           </span>
           {item.cooked_in === "restaurant" ? <span className="text-[11px] muted">Restaurant portion · oil included</span> : fatLabel ? <span className="text-[11px] muted">Cooked in {fatLabel}</span> : null}
+          {item.variants && item.variants.length > 1 ? <VariantChips variants={item.variants} currentId={item.food_id} onPick={onPickVariant} /> : null}
         </div>
         <AnimatePresence>
           {delta !== null ? (
