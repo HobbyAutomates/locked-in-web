@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.6";
+export const APP_VERSION = "2.7";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.7",
+    date: "2026-09-25",
+    lines: [
+      "Squad Challenges: start one in any squad (train X of N days, hit your protein X days, or log food every day), watch the ranked board fill up, and get a 🏆 in the feed when you finish.",
+      "Squad Food Battle: squads can turn on a daily battle. Whoever eats closest to their own goal wins the day's 👑, and snaps of your meals show up in the squad.",
+      "Fixes: editing grams on a scanned plate keeps the macros, \"4 idli\" logs four and \"aadhi roti\" logs half, deleting shows Undo, labels and barcodes read more accurately, and you can log water by voice.",
+    ],
+  },
   {
     version: "2.6",
     date: "2026-09-24",
