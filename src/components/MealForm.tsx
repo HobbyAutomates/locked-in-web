@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { createSavedMeal, logWater, saveMeal, searchFoodsForPicker, undoLastWater } from "@/lib/actions";
+import { createSavedMeal, deleteMeal, logWater, saveMeal, searchFoodsForPicker, undoLastWater, updateMeal } from "@/lib/actions";
 import { postJson } from "@/lib/image";
 import { looksLikeSentence } from "@/lib/mealText";
-import { applyRestaurant, countStep, countText, foodFromItem, nounFor, priceItem, restaurantOil, servingNoun, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
+import { MEAL_TYPES, aiLogged, defaultMealType, mealTypeOf, type MealType } from "@/lib/mealType";
+import { applyRestaurant, countLabel, foodFromItem, itemQtyLabel, oneTap, priceItem, restaurantOil, savedUnitOf, snapCount, unitFor, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
+import { today as todayIso } from "@/lib/dates";
 import { useDictation } from "@/lib/speech";
 import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
-import type { FoodPreset, FoodSearchHit, MealItem, ParsedWater, ParseResult, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
-import { Close, Drop, Mic, Search, Spinner } from "./icons";
+import type { FoodPreset, FoodSearchHit, Meal, MealItem, ParsedWater, ParseResult, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
+import { Close, Drop, Mic, Search, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
 import FoodImage, { FoodFallback, type FoodImageKind } from "./FoodImage";
 import QuantitySheet from "./QuantitySheet";
 import { saveWhenReady, type PlateJob } from "./PendingMeals";
@@ -78,16 +80,17 @@ function hitFood(h: FoodSearchHit): QuantityFood {
   };
 }
 
-/** The default serving of a food: its preset / first unit, else 100 g. */
-function defaultOf(f: QuantityFood): { q: Quantity; label: string | null } {
-  const s = f.servings.find((x) => x.label === f.defaultServing) ?? f.servings[0];
-  return s && s.grams > 0 ? { q: { unit: "serving", value: 1 }, label: s.label } : { q: { unit: "g", value: 100 }, label: null };
+/** "2 roti", "1½ katori", "180 g" (v2.8: restaurant portions read in grams). */
+function qtyText(r: Row): string {
+  return itemQtyLabel(r.item, r.servingLabel);
 }
 
-function qtyText(r: Row): string {
-  const it = r.item;
-  if (it.unit === "serving" && it.servings != null && r.servingLabel) return `${countText(it.servings)} ${nounFor(servingNoun(r.servingLabel), it.servings)}`;
-  return `${fmt(Math.round(it.grams))} g`;
+/** A saved meal's items as plate rows (the meal editor): counted rows keep counting in their one-piece unit. */
+function rowsFromMeal(meal: Meal): Row[] {
+  return meal.items.map((item, i) => {
+    const unit = savedUnitOf(item);
+    return { key: -1 - i, item, servings: unit ? [unit] : undefined, servingLabel: unit?.label ?? null, image: item.image_url ?? null };
+  });
 }
 
 /**
@@ -105,6 +108,8 @@ export default function MealForm({
   onClose,
   search = searchFoodsForPicker,
   prefill = false,
+  mealType = null,
+  existing = null,
 }: {
   date: string;
   savedMeals: SavedMeal[];
@@ -115,13 +120,24 @@ export default function MealForm({
   search?: (q: string, limit?: number) => Promise<FoodSearchHit[]>;
   /** Opened from a scan's "Add to plate": start with those items on the plate. */
   prefill?: boolean;
+  /** v2.8: Home's per-section "+ Add" preselects the type; otherwise the hour rule picks it. */
+  mealType?: MealType | null;
+  /** v2.8 meal editor: the saved meal being edited (items, type, date; Save updates it, Delete removes it). */
+  existing?: Meal | null;
 }) {
   const router = useRouter();
+  const seq = useRef(1);
   const [text, setText] = useState("");
-  const [rows, setRows] = useState<Row[]>([]);
+  // Saved items take negative keys, so they never clash with the ones `seq` hands out later.
+  const [rows, setRows] = useState<Row[]>(() => (existing ? rowsFromMeal(existing) : []));
+  const [type, setType] = useState<MealType>(() => (existing ? mealTypeOf(existing) : mealType ?? defaultMealType()));
+  const [day, setDay] = useState(existing?.date ?? date);
+  const [deleting, setDeleting] = useState(false);
+  const [voted, setVoted] = useState<"up" | "down" | null>(null);
+  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [notes, setNotes] = useState<string[]>([]);
   const [rawParts, setRawParts] = useState<string[]>([]);
-  const [photoPath, setPhotoPath] = useState<string | null>(null);
+  const [photoPath, setPhotoPath] = useState<string | null>(existing?.photo_path ?? null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -134,7 +150,6 @@ export default function MealForm({
   const [repeatOpen, setRepeatOpen] = useState(false);
   const [repeatName, setRepeatName] = useState("");
   const [waterToast, setWaterToast] = useState<{ id: number; ml: number; glasses: number; undone: boolean } | null>(null);
-  const seq = useRef(1);
   const tapped = useRef<string[]>([]);
   const promises = useRef(new Map<number, Promise<PlateJob>>());
   const handedOff = useRef(false);
@@ -218,22 +233,23 @@ export default function MealForm({
    * count food that is already on the plate adds one more (roti, roti, roti = 3 roti) instead of a new row.
    */
   function addFood(f: QuantityFood, restaurant = false, image: { src?: string | null; kind?: FoodImageKind } = {}) {
-    const d = defaultOf(f);
-    const step = countStep(f);
-    const same = !restaurant && step && d.label ? rows.find((r) => r.item.food_id === f.food_id && r.item.name === f.name && r.servingLabel === d.label && r.item.unit === "serving" && !r.item.cooked_in) : undefined;
-    if (same && step && d.label) {
-      const n = Number(same.item.servings ?? 1) + step;
-      const next = priceItem({ ...f, defaultServing: d.label }, { unit: "serving", value: n });
+    // v2.8 (B2): one tap counts single pieces, like Android — "2 tbsp" adds 1 tbsp, "10 almonds" adds 10 almonds.
+    const t = oneTap(f);
+    const cu = t.unit;
+    const same = !restaurant && cu && t.label ? rows.find((r) => r.item.food_id === f.food_id && r.item.name === f.name && r.servingLabel === t.label && r.item.unit === "serving" && !r.item.cooked_in) : undefined;
+    if (same && cu && t.label) {
+      const n = snapCount(cu, Number(same.item.servings ?? cu.defaultCount) + cu.step);
+      const next = priceItem(t.food, { unit: "serving", value: n });
       setRows((cur) => cur.map((r) => (r.key === same.key ? { ...r, item: { ...next, image_url: r.item.image_url } } : r)));
       tapped.current.push(f.name);
-      say(`${countText(n)} ${nounFor(servingNoun(d.label), n)} · ${Math.round(next.calories)} kcal`);
+      say(`${countLabel(cu, n)} · ${Math.round(next.calories)} kcal`);
       return;
     }
-    const base = priceItem(f, d.q);
+    const base = priceItem(t.food, t.q);
     const item = restaurant ? applyRestaurant(base, restaurantOil(f.name, f.category)) : base;
-    addRows([{ item, servings: f.servings, servingLabel: d.label, category: f.category ?? null, image: image.src ?? null, imageKind: image.kind ?? "generic" }]);
+    addRows([{ item, servings: f.servings, servingLabel: restaurant ? null : t.label, category: f.category ?? null, image: image.src ?? null, imageKind: image.kind ?? "generic" }]);
     tapped.current.push(f.name);
-    say(`Added · ${d.label ?? "100 g"}${restaurant ? " · restaurant" : ""} · ${Math.round(item.calories)} kcal`);
+    say(`Added · ${restaurant ? `${Math.round(item.grams)} g · restaurant` : cu ? countLabel(cu, cu.defaultCount) : "100 g"} · ${Math.round(item.calories)} kcal`);
   }
 
   function addSaved(sm: SavedMeal) {
@@ -286,22 +302,71 @@ export default function MealForm({
 
   async function save() {
     const raw = [...rawParts, ...tapped.current].join(", ") || items.map((i) => i.name).join(", ") || "Meal";
+    if (existing) {
+      // The editor waits for anything still being worked out (the Save button says so), then updates in place.
+      setSaving(true);
+      setError(null);
+      try {
+        const added = [...rawParts, ...tapped.current];
+        await updateMeal({ id: existing.id, date: day, meal_type: type, items, raw_text: added.length ? [existing.raw_text, ...added].filter(Boolean).join(", ") : undefined });
+        onClose();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not save");
+        setSaving(false);
+      }
+      return;
+    }
     if (promises.current.size) {
       // Still working something out: close now, Home shows the pending row, the save lands when it's done.
       handedOff.current = true;
-      saveWhenReady({ label: jobs.map((j) => j.label).join(", ") || raw, date, raw_text: raw, items, photo_path: photoPath, jobs: [...promises.current.values()] });
+      saveWhenReady({ label: jobs.map((j) => j.label).join(", ") || raw, date, raw_text: raw, items, photo_path: photoPath, meal_type: type, jobs: [...promises.current.values()] });
       onClose();
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      await saveMeal({ date, raw_text: raw, items, photo_path: photoPath });
+      await saveMeal({ date, raw_text: raw, items, photo_path: photoPath, meal_type: type });
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
       setSaving(false);
     }
+  }
+
+  /** v2.7 undo pattern: "Deleted · Undo" for 5 s, then the delete (it still lands if you leave the page first). */
+  function startDelete() {
+    if (!existing) return;
+    setDeleting(true);
+    setError(null);
+    const id = existing.id;
+    deleteTimer.current = setTimeout(() => {
+      deleteTimer.current = null;
+      void deleteMeal(id)
+        .then(() => onClose())
+        .catch((e) => {
+          setDeleting(false);
+          setError(e instanceof Error ? e.message : "Could not delete that meal");
+        });
+    }, 5000);
+  }
+  /** 👍 / 👎 on an AI-logged meal: the same best-effort /api/feedback write the old Home row used. */
+  function vote(rating: "up" | "down") {
+    if (!existing) return;
+    setVoted(rating);
+    void fetch("/api/feedback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ meal_id: existing.id, raw_text: existing.raw_text, rating }),
+    }).catch(() => {
+      // Feedback never blocks the editor.
+    });
+  }
+
+  function undoDelete() {
+    if (deleteTimer.current) clearTimeout(deleteTimer.current);
+    deleteTimer.current = null;
+    setDeleting(false);
   }
 
   async function fix() {
@@ -349,13 +414,22 @@ export default function MealForm({
     setCookedKey(null);
   }
 
-  const showPlate = rows.length > 0 || jobs.length > 0;
-  const editFood = editing ? { ...foodFromItem(editing.item, editing.servings ?? []), defaultServing: editing.servingLabel ?? null } : null;
-  const editInitial: Quantity | undefined = editing
-    ? editing.item.unit === "serving" && editing.item.servings && editing.servingLabel
-      ? { unit: "serving", value: editing.item.servings }
-      : { unit: "g", value: Math.round(editing.item.grams) }
-    : undefined;
+  const showPlate = rows.length > 0 || jobs.length > 0 || !!existing;
+  // The sheet re-prices from the row's own per-gram values; it opens on the row's grams (in pieces when they land on a step).
+  const editFood: QuantityFood | null = editing
+    ? { ...foodFromItem(editing.item, editing.servings ?? (savedUnitOf(editing.item) ? [savedUnitOf(editing.item)!] : [])), defaultServing: editing.servingLabel ?? null, category: editing.category ?? null }
+    : null;
+  const editInitial: Quantity | undefined = editing ? { unit: "g", value: editing.item.grams } : undefined;
+  const saveLabel = existing
+    ? saving
+      ? "Saving…"
+      : jobs.length
+        ? "Working it out…"
+        : "Save changes"
+    : saving
+      ? "Saving…"
+      : `Save · ${rows.length + jobs.length} item${rows.length + jobs.length === 1 ? "" : "s"}`;
+  const saveDisabled = saving || deleting || (existing ? rows.length === 0 || jobs.length > 0 : rows.length === 0 && jobs.length === 0);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -381,6 +455,14 @@ export default function MealForm({
         ) : null}
       </AnimatePresence>
       <div className="flex flex-1 flex-col gap-3 px-4 pb-5 pt-1.5">
+        {/* ---- v2.8: which meal this is (the hour rule picks; one tap changes it) ---- */}
+        <MealTypeChips value={type} onChange={setType} />
+        {existing ? (
+          <label className="flex items-center justify-between gap-3 rounded-2xl px-3.5" style={{ minHeight: 48, background: "var(--card)", boxShadow: "var(--shadow-sm)" }}>
+            <span className="text-[14px] font-semibold">Date</span>
+            <input type="date" className="num bg-transparent text-right text-[14px] font-semibold" style={{ color: "var(--ink)", border: 0, minHeight: 44 }} value={day} max={todayIso()} aria-label="Date of this meal" onChange={(e) => e.target.value && setDay(e.target.value)} />
+          </label>
+        ) : null}
         {/* ---- the bar: search / say it / photo ---- */}
         <div className="flex items-center gap-2">
           <div className="searchbar min-w-0 flex-1">
@@ -495,14 +577,48 @@ export default function MealForm({
               </div>
             ))}
             {notes.length ? <p className="pb-2 text-xs muted">{notes.join(" · ")}</p> : null}
+            {existing && rows.length === 0 && jobs.length === 0 ? <p className="py-3 text-[13px] muted">Nothing on the plate. Add something, or delete the meal.</p> : null}
           </div>
+          {existing ? (
+            deleting ? (
+              <div className="mx-4 mt-1 flex min-h-[44px] items-center justify-between gap-3 rounded-2xl px-3.5" style={{ background: "var(--card2)" }} role="status">
+                <span className="text-[14px] font-semibold muted">Deleted</span>
+                <button type="button" className="hit press text-[13px] font-bold" style={{ color: "var(--btn)", background: "none", border: 0 }} onClick={undoDelete}>
+                  Undo
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2 px-4 pt-1">
+                {aiLogged(existing) ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="mr-1 text-xs muted">{voted === null ? "AI right?" : "Thanks"}</span>
+                    {(["up", "down"] as const).map((r) => {
+                      const sel = voted === r;
+                      const Icon = r === "up" ? ThumbUp : ThumbDown;
+                      return (
+                        <button key={r} type="button" disabled={voted !== null} onClick={() => vote(r)} aria-label={r === "up" ? "The AI got this right" : "The AI got this wrong"} className="hit press grid h-9 w-9 place-items-center rounded-full" style={{ background: sel ? "var(--btn)" : "var(--card2)", color: sel ? "var(--btn-ink)" : "var(--muted)" }}>
+                          <Icon size={15} />
+                        </button>
+                      );
+                    })}
+                  </span>
+                ) : (
+                  <span />
+                )}
+                <button type="button" className="press inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold" style={{ background: "var(--red-bg)", color: "var(--red)" }} disabled={saving} onClick={startDelete}>
+                  <Trash size={15} />
+                  Delete
+                </button>
+              </div>
+            )
+          ) : null}
           <div className="flex items-center gap-3 px-4 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-2.5">
             <div className="shrink-0">
               <p className="num text-xl font-extrabold leading-tight">{Math.round(totalKcal)} kcal</p>
               <p className="text-xs muted">{fmt(Math.round(totalProtein * 10) / 10)} g protein</p>
             </div>
-            <PillButton onClick={save} disabled={saving || (rows.length === 0 && jobs.length === 0)}>
-              {saving ? "Saving…" : `Save · ${rows.length + jobs.length} item${rows.length + jobs.length === 1 ? "" : "s"}`}
+            <PillButton onClick={save} disabled={saveDisabled}>
+              {saveLabel}
             </PillButton>
           </div>
         </div>
@@ -517,7 +633,8 @@ export default function MealForm({
         onDone={(item, _q, servingLabel) => {
           const key = editKey;
           setEditKey(null);
-          setRows((cur) => cur.map((r) => (r.key === key ? { ...r, servingLabel: servingLabel ?? r.servingLabel, item: { ...item, cooked_in: item.cooked_in ?? r.item.cooked_in ?? null, source: r.item.source, food_id: r.item.food_id, image_url: r.item.image_url } } : r)));
+          // A row entered by weight reads in grams; counted rows keep their one-piece unit ("1 roti").
+          setRows((cur) => cur.map((r) => (r.key === key ? { ...r, servingLabel: servingLabel ?? null, item: { ...item, name: item.cooked_in === "restaurant" ? item.name : r.item.name, confidence: r.item.confidence, cooked_in: item.cooked_in ?? r.item.cooked_in ?? null, source: r.item.source, food_id: r.item.food_id, image_url: r.item.image_url } } : r)));
         }}
       />
 
@@ -554,6 +671,22 @@ export default function MealForm({
       <BottomSheet open={repeatOpen} title="Save as a repeat meal" subtitle="It shows up first under Yours, one tap to add." onClose={() => setRepeatOpen(false)} primary={{ label: "Save", onClick: () => void saveRepeat(), disabled: !repeatName.trim() }}>
         <input className="field" value={repeatName} autoFocus maxLength={40} aria-label="Name for this repeat meal" onChange={(e) => setRepeatName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && repeatName.trim() && void saveRepeat()} placeholder="Name it, e.g. Dinner usual" />
       </BottomSheet>
+    </div>
+  );
+}
+
+/** v2.8: 🍳 Breakfast · 🍛 Lunch · 🌙 Dinner · 🍿 Snacks — one row of four at the top of add / edit meal. */
+function MealTypeChips({ value, onChange }: { value: MealType; onChange: (t: MealType) => void }) {
+  return (
+    <div className="grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Which meal">
+      {MEAL_TYPES.map((t) => (
+        <button key={t.key} type="button" role="radio" aria-checked={value === t.key} className="chip press flex-col" style={{ height: 52, padding: "0 4px", gap: 1, fontSize: 12.5, lineHeight: 1.15 }} onClick={() => onChange(t.key)}>
+          <span aria-hidden="true" style={{ fontSize: 17 }}>
+            {t.emoji}
+          </span>
+          <span className="max-w-full truncate">{t.label}</span>
+        </button>
+      ))}
     </div>
   );
 }
@@ -644,16 +777,18 @@ function PresetGrid({
             ))
           : null}
         {list.map((p) => {
-          const def = p.servings.find((s) => s.label === p.default_serving) ?? p.servings[0];
-          const kcal = Math.round((p.calories * (def?.grams ?? 100)) / 100);
+          // v2.8: the tile shows what one tap adds — "1 tbsp · 45 kcal", not the preset's "2 tbsp" (Android parity).
+          const cu = unitFor(p.servings, p.default_serving);
+          const amount = cu ? countLabel(cu, cu.defaultCount) : "100 g";
+          const kcal = Math.round((p.calories * (cu ? cu.grams * cu.defaultCount : 100)) / 100);
           return (
-            <button key={p.id} type="button" className="card press flex w-full items-center gap-2.5 text-left" style={{ padding: 10, borderRadius: 16, minHeight: 60 }} onClick={() => onPreset(p)} aria-label={`Add ${p.label}, ${def?.label ?? "100 g"}, ${kcal} kcal`}>
+            <button key={p.id} type="button" className="card press flex w-full items-center gap-2.5 text-left" style={{ padding: 10, borderRadius: 16, minHeight: 60 }} onClick={() => onPreset(p)} aria-label={`Add ${p.label}, ${amount}, ${kcal} kcal`}>
               <FoodImage name={p.label} kind="preset" src={p.image_url} size={40} fallback={<FoodFallback size={40} category={p.category} />} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] font-semibold">{p.label}</span>
                 <span className="block truncate text-[12px] muted">
                   {p.label_hi ? `${p.label_hi} · ` : ""}
-                  {def?.label ?? "100 g"} · {kcal} kcal
+                  {amount} · {kcal} kcal
                 </span>
               </span>
             </button>

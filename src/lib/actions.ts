@@ -15,6 +15,7 @@ import { fetchChallengeBoard, fetchChallenges, fetchSquadPosts } from "./data";
 import { checkChallengeCompletions } from "./challenges";
 import { battleLine } from "./battleLines";
 import { battleTarget, type BattleGoal } from "./battle";
+import { defaultMealType, isMealType, missingMealTypeColumn, type MealType } from "./mealType";
 
 /** v2.5: Compendium rows for the auto-burn of gym / bodyweight sessions. */
 const LIFT_BURN: Record<"gym" | "bodyweight", { code: string; met: number; label: string }> = {
@@ -296,19 +297,13 @@ export async function searchActivities(q: string): Promise<Activity[]> {
   return ((data ?? []) as Activity[]).map((r) => ({ ...r, met: Number(r.met), tags: r.tags ?? [] }));
 }
 
-export async function saveMeal(input: { date: string; raw_text: string; items: MealItem[]; photo_path?: string | null }) {
-  const { supabase, user } = await userOrThrow();
-  const { data: meal, error } = await supabase
-    .from("meals")
-    .insert({ user_id: user.id, date: input.date, raw_text: input.raw_text, photo_path: input.photo_path ?? null })
-    .select("id")
-    .single();
-  if (error || !meal) throw new Error(error?.message ?? "Could not save meal");
-  const items = input.items
+/** meal_items rows for a meal (empty grams dropped). */
+function mealItemRows(mealId: string, userId: string, list: MealItem[]) {
+  return list
     .filter((i) => i.grams > 0)
     .map((i) => ({
-      meal_id: meal.id,
-      user_id: user.id,
+      meal_id: mealId,
+      user_id: userId,
       food_id: i.food_id,
       name: i.name,
       grams: i.grams,
@@ -323,6 +318,21 @@ export async function saveMeal(input: { date: string; raw_text: string; items: M
       servings: i.servings ?? null,
       cooked_in: i.cooked_in ?? null,
     }));
+}
+
+/**
+ * `input.meal_type` (v2.8) defaults to the hour rule; when schema_v30 isn't applied yet the insert
+ * is retried without the column, and Home falls back to the same hour rule.
+ */
+export async function saveMeal(input: { date: string; raw_text: string; items: MealItem[]; photo_path?: string | null; meal_type?: MealType | null }) {
+  const { supabase, user } = await userOrThrow();
+  const row = { user_id: user.id, date: input.date, raw_text: input.raw_text, photo_path: input.photo_path ?? null };
+  const mealType = isMealType(input.meal_type) ? input.meal_type : defaultMealType();
+  let res = await supabase.from("meals").insert({ ...row, meal_type: mealType }).select("id").single();
+  if (res.error && missingMealTypeColumn(res.error)) res = await supabase.from("meals").insert(row).select("id").single();
+  const { data: meal, error } = res;
+  if (error || !meal) throw new Error(error?.message ?? "Could not save meal");
+  const items = mealItemRows(meal.id as string, user.id, input.items);
   if (items.length) {
     const { error: e2 } = await supabase.from("meal_items").insert(items);
     if (e2) throw new Error(e2.message);
@@ -331,6 +341,34 @@ export async function saveMeal(input: { date: string; raw_text: string; items: M
   await postMealToSquads(supabase, user.id, meal.id as string, mealPostBody(items, input.raw_text), input.photo_path ?? null);
   revalidatePath("/", "layout");
   return { id: meal.id as string };
+}
+
+/**
+ * v2.8 meal editor: rewrites a meal's date / type and replaces its items. The rollup reruns for
+ * the old and the new date (a meal moved between days leaves one and joins the other); counting
+ * is unchanged — one meal is still one meal in daily_stats.
+ */
+export async function updateMeal(input: { id: string; date: string; meal_type: MealType; items: MealItem[]; raw_text?: string }) {
+  const { supabase, user } = await userOrThrow();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error("Pick a date");
+  if (input.date > todayIso()) throw new Error("That date hasn't happened yet");
+  const items = input.items.filter((i) => i.grams > 0);
+  if (!items.length) throw new Error("Add at least one item, or delete the meal");
+  const { data: old, error: e0 } = await supabase.from("meals").select("date").eq("id", input.id).eq("user_id", user.id).maybeSingle();
+  if (e0) throw new Error(e0.message);
+  if (!old) throw new Error("That meal is gone — it may have been deleted");
+  const patch: Record<string, unknown> = { date: input.date };
+  if (input.raw_text != null) patch.raw_text = input.raw_text;
+  let res = await supabase.from("meals").update({ ...patch, meal_type: isMealType(input.meal_type) ? input.meal_type : null }).eq("id", input.id).eq("user_id", user.id);
+  if (res.error && missingMealTypeColumn(res.error)) res = await supabase.from("meals").update(patch).eq("id", input.id).eq("user_id", user.id);
+  if (res.error) throw new Error(res.error.message);
+  const { error: e2 } = await supabase.from("meal_items").delete().eq("meal_id", input.id).eq("user_id", user.id);
+  if (e2) throw new Error(e2.message);
+  const { error: e3 } = await supabase.from("meal_items").insert(mealItemRows(input.id, user.id, items));
+  if (e3) throw new Error(e3.message);
+  await rollupQuietly(supabase, user.id, [old.date as string, input.date]);
+  revalidatePath("/", "layout");
+  return { id: input.id };
 }
 
 export async function deleteMeal(id: string) {
