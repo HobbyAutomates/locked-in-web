@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.11";
+export const APP_VERSION = "2.12";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.12",
+    date: "2026-09-26",
+    lines: [
+      "A new Profile: dials for your streak, protein and weight, metal badges with the next one to earn, and your goal at a glance.",
+      "Progress is redesigned, with calm, slower animations: lines draw in, rings sweep round and numbers count up.",
+      "A new sign-in and sign-up, and cleaner scan screens for photos, barcodes and food labels.",
+    ],
+  },
   {
     version: "2.11",
     date: "2026-09-26",
