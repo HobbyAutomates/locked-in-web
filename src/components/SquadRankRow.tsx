@@ -14,6 +14,7 @@ export function SquadRankRow({
   meta,
   right,
   children,
+  onClick,
 }: {
   rank: number;
   avatarPath: string | null;
@@ -23,9 +24,17 @@ export function SquadRankRow({
   meta?: React.ReactNode;
   right?: React.ReactNode;
   children?: React.ReactNode;
+  /** Leaderboard rows are tappable (opens the member's mini profile); challenge-board rows leave this unset. */
+  onClick?: () => void;
 }) {
+  const Tag = onClick ? "button" : "div";
   return (
-    <div className="card flex flex-col gap-2.5" style={{ padding: "12px 14px", outline: isMe ? "2px solid var(--ink)" : "none" }}>
+    <Tag
+      type={onClick ? "button" : undefined}
+      className={`card flex w-full flex-col gap-2.5 text-left ${onClick ? "press" : ""}`}
+      style={{ padding: "12px 14px", outline: isMe ? "2px solid var(--ink)" : "none", border: 0, color: "var(--ink)" }}
+      onClick={onClick}
+    >
       <div className="flex items-center gap-3">
         <span className="num w-8 shrink-0 text-[15px] font-extrabold" style={{ color: rank === 1 ? "var(--flame)" : "var(--ink)" }}>
           #{rank}
@@ -42,7 +51,7 @@ export function SquadRankRow({
         {right ? <span className="flex shrink-0 flex-col items-end gap-1.5">{right}</span> : null}
       </div>
       {children}
-    </div>
+    </Tag>
   );
 }
 

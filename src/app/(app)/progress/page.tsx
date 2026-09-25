@@ -1,6 +1,6 @@
 import { getBadgeProgress, getDashboard, getExercises, getProgressPhotos, getWeights } from "@/lib/data";
 import { addDays } from "@/lib/dates";
-import { thisWeekCount, trainingDates, workoutWeekStreak } from "@/lib/streaks";
+import { activityDayStreak, thisWeekCount, trainingDates, workoutWeekStreak } from "@/lib/streaks";
 import ProgressScreen from "@/components/ProgressScreen";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +24,11 @@ export default async function ProgressPage() {
       photos={photos}
       badges={badges}
       weekStreak={workoutWeekStreak(dates, profile.weekly_workout_target)}
+      dayStreak={activityDayStreak(
+        workouts.map((w) => w.date),
+        exercises.map((e) => e.date),
+        meals.map((m) => m.date),
+      )}
       thisWeek={thisWeekCount(dates)}
     />
   );

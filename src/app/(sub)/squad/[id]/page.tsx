@@ -28,8 +28,11 @@ export default async function SquadRoomPage({ params, searchParams }: { params: 
     // first read after a day closes inserts the win + crown post; every later read is a no-op.
     squad.battle_enabled ? closeBattleDay(id, yesterdayIso) : Promise.resolve(null),
   ]);
-  const tab =
-    sp.tab === "feed" || sp.tab === "leaderboard" || sp.tab === "challenges" || (sp.tab === "battle" && squad.battle_enabled) ? sp.tab : "chat";
+  const deepLinkTab =
+    sp.tab === "feed" || sp.tab === "leaderboard" || sp.tab === "challenges" || sp.tab === "chat" || (sp.tab === "battle" && squad.battle_enabled) ? sp.tab : null;
+  // v2.8: with no deep link (a notification, a shared "?tab=" link) or remembered tab, a squad
+  // opens on Challenges when one is running, otherwise the Leaderboard.
+  const defaultTab = challenges.some((c) => c.status === "active") ? "challenges" : "leaderboard";
   return (
     <SquadRoom
       me={user.id}
@@ -43,7 +46,8 @@ export default async function SquadRoomPage({ params, searchParams }: { params: 
       sentNudges={sent}
       shareStats={profile.share_stats}
       pendingRequests={requests.length}
-      initialTab={tab}
+      initialTab={deepLinkTab ?? defaultTab}
+      hasDeepLinkTab={deepLinkTab != null}
       crown={crown}
       yesterday={yesterdayIso}
     />

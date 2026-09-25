@@ -42,11 +42,15 @@ type Props = {
   shareStats: boolean;
   pendingRequests: number;
   initialTab: Tab;
+  /** Whether `initialTab` came from a deep link (?tab=, a notification) — that always wins over the remembered tab. */
+  hasDeepLinkTab?: boolean;
   /** v2.8: yesterday's Food Battle crown, already closed server-side on this page load. */
   crown?: BattleWinner;
   /** v2.8: yesterday's date (Asia/Kolkata) — what the crown card refers to; today's board reads live. */
   yesterday?: string;
 };
+
+const rememberedTabKey = (squadId: string) => `squad-tab:${squadId}`;
 
 /**
  * v2.6 squad page (Cal AI group): header with the squad's icon and a members button, then
@@ -54,9 +58,9 @@ type Props = {
  * Chat and Feed poll every 5 s / 15 s while visible; meals, workouts and PRs arrive in the Feed by
  * themselves (see actions.ts → post_to_my_groups).
  */
-export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, challenges: challenges0, proteinGoal, sentNudges, shareStats, pendingRequests, initialTab, crown = null }: Props) {
+export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, challenges: challenges0, proteinGoal, sentNudges, shareStats, pendingRequests, initialTab, hasDeepLinkTab = false, crown = null }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const [tab, setTabState] = useState<Tab>(initialTab);
   const [chat, setChat] = useState(chat0);
   const [feed, setFeed] = useState(feed0);
   const [board, setBoard] = useState(board0);
@@ -64,7 +68,35 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
   const [challengeBoards, setChallengeBoards] = useState<Record<string, ChallengeBoardRow[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [photoSheet, setPhotoSheet] = useState<null | { base64: string; preview: string }>(null);
+  const [profileSheet, setProfileSheet] = useState<LeaderRow | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
+
+  // A remembered tab (this browser's last choice on this squad) wins over the Challenges/Leaderboard
+  // default, but a deep link — a notification, a shared "?tab=" link — always wins over both. This
+  // reads localStorage, so it has to happen post-mount rather than in the initial render (server and
+  // first client render must match) — hence the one-time setState here rather than in useState itself.
+  useEffect(() => {
+    if (hasDeepLinkTab) return;
+    try {
+      const remembered = window.localStorage.getItem(rememberedTabKey(squad.id));
+      if (remembered && TABS.some((t) => t.key === remembered && (!t.battle || squad.battle_enabled))) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from localStorage, an external system, on mount
+        setTabState(remembered as Tab);
+      }
+    } catch {
+      // No storage access (private mode) — the computed default stands.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [squad.id]);
+
+  function setTab(t: Tab) {
+    setTabState(t);
+    try {
+      window.localStorage.setItem(rememberedTabKey(squad.id), t);
+    } catch {
+      // Not persisted this time; the tab still switches for this visit.
+    }
+  }
 
   const refresh = useCallback(
     async (which: Exclude<Tab, "battle">) => {
@@ -117,9 +149,14 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           <button type="button" onClick={() => router.push("/squad")} aria-label="Back" className="press grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)" }}>
             <ArrowLeft size={18} />
           </button>
-          <Link href={`/squad/${squad.id}/members`} className="press flex min-w-0 flex-1 items-center gap-2.5" style={{ color: "var(--ink)" }}>
+          <Link
+            href={`/squad/${squad.id}/members`}
+            aria-label={pendingRequests ? `${squad.name}, members and invite, ${pendingRequests} requests` : `${squad.name}, members and invite`}
+            className="press flex min-w-0 flex-1 items-center gap-2.5"
+            style={{ color: "var(--ink)" }}
+          >
             <SquadIcon icon={squad.icon} cover={squad.cover_url} size={36} />
-            <span className="flex min-w-0 flex-col">
+            <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-[17px] font-extrabold leading-tight" style={{ letterSpacing: "-0.02em" }}>
                 {squad.name}
               </span>
@@ -127,14 +164,14 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
                 {squad.member_count ?? 1} member{(squad.member_count ?? 1) === 1 ? "" : "s"} · {squad.is_public ? "Public" : "Private"}
               </span>
             </span>
-          </Link>
-          <Link href={`/squad/${squad.id}/members`} aria-label={pendingRequests ? `Members and invite, ${pendingRequests} requests` : "Members and invite"} className="press relative grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)", color: "var(--ink)" }}>
-            <People size={19} />
-            {pendingRequests ? (
-              <span className="num absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-extrabold" style={{ background: "var(--red)", color: "#fff" }}>
-                {pendingRequests}
-              </span>
-            ) : null}
+            <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)", color: "var(--ink)" }}>
+              <People size={19} />
+              {pendingRequests ? (
+                <span className="num absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-extrabold" style={{ background: "var(--red)", color: "#fff" }}>
+                  {pendingRequests}
+                </span>
+              ) : null}
+            </span>
           </Link>
         </div>
         <div className="flex" role="tablist" aria-label="Squad">
@@ -180,7 +217,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
       ) : tab === "feed" ? (
         <FeedTab me={me} today={today} squadId={squad.id} posts={feed} shareStats={shareStats} isOwner={squad.owner_id === me} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDeleted={(id) => setFeed((f) => f.filter((p) => p.id !== id))} onError={setError} />
       ) : tab === "leaderboard" ? (
-        <LeaderboardTab me={me} squadId={squad.id} rows={board} sentNudges={sentNudges} onError={setError} />
+        <LeaderboardTab me={me} squadId={squad.id} rows={board} sentNudges={sentNudges} onError={setError} onOpenProfile={setProfileSheet} />
       ) : (
         <BattleTab me={me} squad={squad} date={today} crown={crown} onError={setError} />
       )}
@@ -208,7 +245,50 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           void refresh(tab === "chat" ? "chat" : "feed");
         }}
       />
+      <MemberProfileSheet squadId={squad.id} row={profileSheet} onClose={() => setProfileSheet(null)} />
     </div>
+  );
+}
+
+/** A leaderboard row's mini profile — name, streak and points, with a link through to the full Members page. */
+function MemberProfileSheet({ squadId, row, onClose }: { squadId: string; row: LeaderRow | null; onClose: () => void }) {
+  return (
+    <BottomSheet open={!!row} title="Member" onClose={onClose}>
+      {row ? (
+        <div className="flex flex-col items-center pb-1 text-center">
+          <Avatar path={row.avatar_path} name={row.name} size={72} />
+          <p className="mt-3 flex items-center gap-1.5 text-[19px] font-extrabold" style={{ letterSpacing: "-0.02em" }}>
+            {row.name}
+            {row.is_owner ? (
+              <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }}>
+                Owner
+              </span>
+            ) : null}
+          </p>
+          {row.username ? <p className="text-[13px] muted">@{row.username}</p> : null}
+          <div className="mt-4 flex w-full gap-2.5">
+            <div className="flex flex-1 flex-col items-center rounded-2xl py-3" style={{ background: "var(--card2)" }}>
+              <span className="flex items-center gap-1 text-[20px] font-extrabold">
+                {row.flames > 0 ? <BreathingFlame size={18} /> : <span className="muted inline-flex"><Flame size={18} /></span>}
+                <span className="num">{row.flames}</span>
+              </span>
+              <span className="text-[11px] muted">day streak</span>
+            </div>
+            <div className="flex flex-1 flex-col items-center rounded-2xl py-3" style={{ background: "var(--card2)" }}>
+              <span className="num text-[20px] font-extrabold">#{row.rank}</span>
+              <span className="text-[11px] muted">rank</span>
+            </div>
+            <div className="flex flex-1 flex-col items-center rounded-2xl py-3" style={{ background: "var(--card2)" }}>
+              <span className="num text-[20px] font-extrabold">{row.week_points}</span>
+              <span className="text-[11px] muted">pts this wk</span>
+            </div>
+          </div>
+          <Link href={`/squad/${squadId}/members`} className="press mt-4 text-[13px] font-bold underline" style={{ color: "var(--ink)" }} onClick={onClose}>
+            See all members
+          </Link>
+        </div>
+      ) : null}
+    </BottomSheet>
   );
 }
 
@@ -464,7 +544,7 @@ function FeedTab({
 
 /* ---------------- Leaderboard ---------------- */
 
-function LeaderboardTab({ me, squadId, rows, sentNudges, onError }: { me: string; squadId: string; rows: LeaderRow[]; sentNudges: string[]; onError: (e: string | null) => void }) {
+function LeaderboardTab({ me, squadId, rows, sentNudges, onError, onOpenProfile }: { me: string; squadId: string; rows: LeaderRow[]; sentNudges: string[]; onError: (e: string | null) => void; onOpenProfile: (row: LeaderRow) => void }) {
   const [nudged, setNudged] = useState<Set<string>>(() => new Set(sentNudges));
   async function nudge(r: LeaderRow) {
     onError(null);
@@ -494,6 +574,7 @@ function LeaderboardTab({ me, squadId, rows, sentNudges, onError }: { me: string
             username={r.username}
             isMe={isMe}
             meta={`${r.week_points} pts this week`}
+            onClick={() => onOpenProfile(r)}
             right={
               <>
                 <span className="flex items-center gap-1 text-[17px] font-extrabold" title={`${r.flames}-day streak`}>
@@ -507,7 +588,10 @@ function LeaderboardTab({ me, squadId, rows, sentNudges, onError }: { me: string
                     style={{ height: 28, padding: "0 10px", gap: 4, fontSize: 12, fontWeight: 700, background: already ? "var(--card2)" : "var(--btn)", color: already ? "var(--muted)" : "var(--btn-ink)" }}
                     disabled={already}
                     aria-label={already ? `Nudged ${r.name}` : `Nudge ${r.name}`}
-                    onClick={() => void nudge(r)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void nudge(r);
+                    }}
                   >
                     {already ? <Check size={12} /> : <Fist size={12} />}
                     {already ? "Nudged" : "Nudge"}

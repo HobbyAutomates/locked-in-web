@@ -10,11 +10,12 @@ import { addDays, daysBetween, parseIso, today as todayIso, weekStart } from "@/
 import { toJpegBase64 } from "@/lib/image";
 import { totalsFor } from "@/lib/totals";
 import { restByMuscle } from "@/lib/streaks";
+import { movingAverage } from "@/lib/weightTrend";
 import { MUSCLE_COLOR, type Muscle } from "@/lib/muscles";
 import type { ExerciseEntry, Meal, Profile, ProgressPhoto, WeightEntry, Workout } from "@/lib/types";
 import { weightText } from "@/lib/display";
 import HexMedal from "./HexMedal";
-import { Camera, Close, Plus, Scale, Spinner, Trash } from "./icons";
+import { Camera, ChevronDown, Close, Plus, Scale, Spinner, Trash } from "./icons";
 import { BreathingFlame, Card, Chevron, ErrorNote, Hair, MacroDot, PillButton, Rise, SPRING, Segmented, fmt } from "./ui";
 
 const PROTEIN = "#E9636B";
@@ -42,6 +43,7 @@ export default function ProgressScreen({
   photos,
   badges,
   weekStreak,
+  dayStreak,
   thisWeek,
 }: {
   profile: Profile;
@@ -54,6 +56,8 @@ export default function ProgressScreen({
   photos: ProgressPhoto[];
   badges: BadgeProgress;
   weekStreak: number;
+  /** Consecutive days with anything logged, ending today or yesterday. */
+  dayStreak: number;
   thisWeek: number;
 }) {
   const t = todayIso();
@@ -64,6 +68,7 @@ export default function ProgressScreen({
   const rest = restByMuscle(workouts).filter((r) => r.last !== null).slice(0, 3);
   const left = Math.max(0, target - thisWeek);
   const current = weights[0]?.weight_kg ?? profile.weight_kg;
+  const [showMore, setShowMore] = useState(false);
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -72,78 +77,136 @@ export default function ProgressScreen({
       </Rise>
 
       <Rise index={1}>
-        <CurrentWeightCard profile={profile} weights={weights} today={t} />
-      </Rise>
-
-      <Rise index={1}>
-        <WeightChanges weights={weights} today={t} />
+        <WeightTrendCard profile={profile} weights={weights} today={t} />
       </Rise>
 
       <Rise index={2}>
-        <CaloriesChart meals={meals} today={t} goal={profile.calorie_target} />
-      </Rise>
-
-      <Rise index={2}>
-        <ExpenditureChanges exercises={exercises} today={t} />
+        <WeeklyEnergyCard meals={meals} exercises={exercises} profile={profile} today={t} />
       </Rise>
 
       <Rise index={3}>
-        <BmiCard heightCm={profile.height_cm} weightKg={current ?? null} />
-      </Rise>
-
-      <Rise index={3}>
-        <PhotosStrip photos={photos} />
+        <StreakCard dayStreak={dayStreak} weekStreak={weekStreak} />
       </Rise>
 
       <Rise index={4}>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Card>
-            <p className="text-[13px] font-medium muted">This week</p>
-            <p className="mt-1.5 flex items-baseline">
-              <span className="num text-3xl font-extrabold">{thisWeek}</span>
-              <span className="ml-1 text-base font-semibold muted">/ {target}</span>
-            </p>
-            <Bar fraction={thisWeek / target} color="var(--ink)" />
-            <p className="mt-1.5 text-xs muted">{left === 0 ? "Target hit — streak safe" : `${left} more to keep the streak`}</p>
-          </Card>
-          <Card>
-            <div className="flex flex-col items-center gap-1">
-              <BreathingFlame size={40} />
-              <p className="num text-[26px] font-extrabold leading-none" style={{ color: "var(--flame)" }}>
-                {weekStreak}
-              </p>
-              <p className="text-[13px] font-semibold">Week streak</p>
-            </div>
-          </Card>
-        </div>
-      </Rise>
-
-      <Rise index={4}>
-        <BadgesCard progress={badges} />
+        <MacrosWeekCard meals={meals} today={t} />
       </Rise>
 
       <Rise index={5}>
-        <Card>
-          <div className="flex items-center justify-between">
-            <p className="text-[17px] font-bold">Sessions per week</p>
-            <p className="text-xs muted">target {target}</p>
-          </div>
-          <Bars values={weeks.map((w) => perWeek.get(w) ?? 0)} target={target} labels={weeks.map((w) => String(Number(w.slice(8))))} color="var(--ink)" dim="var(--track)" lastColor="var(--green)" height={70} />
-          <div className="mt-2.5 flex flex-wrap gap-2.5">
-            {rest.map((r) => (
-              <MacroDot key={r.muscle} value={`${r.muscle} ${r.days === 0 ? "today" : `${r.days} d rest`}`} color={r.days >= 7 ? MUSCLE_COLOR[r.muscle as Muscle] : "var(--muted)"} />
-            ))}
-          </div>
-        </Card>
+        <button
+          type="button"
+          aria-expanded={showMore}
+          className="press flex w-full items-center justify-between rounded-2xl px-4 py-3 text-[14px] font-semibold"
+          style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }}
+          onClick={() => setShowMore((v) => !v)}
+        >
+          More stats
+          <ChevronDown size={16} style={{ transform: showMore ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+        </button>
       </Rise>
+
+      {showMore ? (
+        <div className="flex flex-col gap-3.5">
+          <Rise index={0}>
+            <WeightChanges weights={weights} today={t} />
+          </Rise>
+
+          <Rise index={1}>
+            <CaloriesChart meals={meals} today={t} goal={profile.calorie_target} />
+          </Rise>
+
+          <Rise index={1}>
+            <ExpenditureChanges exercises={exercises} today={t} />
+          </Rise>
+
+          <Rise index={2}>
+            <BmiCard heightCm={profile.height_cm} weightKg={current ?? null} />
+          </Rise>
+
+          <Rise index={2}>
+            <PhotosStrip photos={photos} />
+          </Rise>
+
+          <Rise index={3}>
+            <div className="grid grid-cols-2 gap-2.5">
+              <Card>
+                <p className="text-[13px] font-medium muted">This week</p>
+                <p className="mt-1.5 flex items-baseline">
+                  <span className="num text-3xl font-extrabold">{thisWeek}</span>
+                  <span className="ml-1 text-base font-semibold muted">/ {target}</span>
+                </p>
+                <Bar fraction={thisWeek / target} color="var(--ink)" />
+                <p className="mt-1.5 text-xs muted">{left === 0 ? "Target hit — streak safe" : `${left} more to keep the streak`}</p>
+              </Card>
+              <Card>
+                <div className="flex flex-col items-center gap-1">
+                  <BreathingFlame size={40} />
+                  <p className="num text-[26px] font-extrabold leading-none" style={{ color: "var(--flame)" }}>
+                    {weekStreak}
+                  </p>
+                  <p className="text-[13px] font-semibold">Week streak</p>
+                </div>
+              </Card>
+            </div>
+          </Rise>
+
+          <Rise index={3}>
+            <BadgesCard progress={badges} />
+          </Rise>
+
+          <Rise index={4}>
+            <Card>
+              <div className="flex items-center justify-between">
+                <p className="text-[17px] font-bold">Sessions per week</p>
+                <p className="text-xs muted">target {target}</p>
+              </div>
+              <Bars values={weeks.map((w) => perWeek.get(w) ?? 0)} target={target} labels={weeks.map((w) => String(Number(w.slice(8))))} color="var(--ink)" dim="var(--track)" lastColor="var(--green)" height={70} />
+              <div className="mt-2.5 flex flex-wrap gap-2.5">
+                {rest.map((r) => (
+                  <MacroDot key={r.muscle} value={`${r.muscle} ${r.days === 0 ? "today" : `${r.days} d rest`}`} color={r.days >= 7 ? MUSCLE_COLOR[r.muscle as Muscle] : "var(--muted)"} />
+                ))}
+              </div>
+            </Card>
+          </Rise>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-// ---------------------------------------------------------------- weight
+// ---------------------------------------------------------------- weight trend (card 1)
 
-/** Big current weight, "Next weigh-in: Nd" (7 days after the last one) and a Start → Goal bar. */
-function CurrentWeightCard({ profile, weights, today }: { profile: Profile; weights: WeightEntry[]; today: string }) {
+/** Line chart of every weigh-in plus a 7-entry moving average, with a dashed goal line. */
+function WeightLineChart({ values, goal, w = 300, h = 100 }: { values: number[]; goal: number | null; w?: number; h?: number }) {
+  const avg = movingAverage(values, 7);
+  const all = goal != null ? [...values, goal] : values;
+  const lo = Math.min(...all);
+  const hi = Math.max(...all);
+  const span = hi - lo > 0.001 ? hi - lo : 1;
+  const pad = span * 0.12;
+  const y = (v: number) => h - (h * (v - (lo - pad))) / (span + pad * 2);
+  const x = (i: number) => (values.length <= 1 ? w / 2 : (w * i) / (values.length - 1));
+  const path = (vals: number[]) => vals.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+
+  return (
+    <svg viewBox={`-4 -6 ${w + 8} ${h + 12}`} className="mt-3 block w-full" role="img" aria-label={`Weight trend over ${values.length} weigh-ins`}>
+      {goal != null ? (
+        <>
+          <line x1={0} x2={w} y1={y(goal)} y2={y(goal)} stroke="var(--muted)" strokeWidth={1} strokeDasharray="4 4" opacity={0.6} />
+          <text x={w} y={y(goal) - 4} textAnchor="end" fontSize={9} fill="var(--muted)">
+            Goal
+          </text>
+        </>
+      ) : null}
+      <motion.path d={path(values)} fill="none" stroke="var(--track)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ ...SPRING, delay: 0.1 }} />
+      <motion.path d={path(avg)} fill="none" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ ...SPRING, delay: 0.25 }} />
+      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r={4} fill="var(--ink)" stroke="var(--card)" strokeWidth={2} />
+    </svg>
+  );
+}
+
+/** Current weight, the weigh-in pill, the trend line + moving average, and a Start → Goal bar. */
+function WeightTrendCard({ profile, weights, today }: { profile: Profile; weights: WeightEntry[]; today: string }) {
   const router = useRouter();
   const current = weights[0]?.weight_kg ?? profile.weight_kg;
   const start = weights.length ? weights[weights.length - 1].weight_kg : profile.weight_kg;
@@ -152,22 +215,39 @@ function CurrentWeightCard({ profile, weights, today }: { profile: Profile; weig
   const due = last ? Math.max(0, 7 - daysBetween(last, today)) : 0;
   const span = start != null && goal != null ? start - goal : 0;
   const fraction = current != null && start != null && goal != null && Math.abs(span) > 0.05 ? Math.max(0, Math.min(1, (start - current) / span)) : current != null && goal != null && Math.abs(current - goal) <= 0.05 ? 1 : 0;
+  const asc = [...weights].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const values = asc.map((w) => w.weight_kg);
+  const pillText = weights.length === 0 ? "Log your first weigh-in" : due === 0 ? "Weigh-in due today" : `Next weigh-in: ${due}d`;
+  const pillActive = weights.length === 0 || due === 0;
+
   return (
     <Card padding={18}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[13px] font-medium muted">Current weight</p>
+          <p className="text-[13px] font-medium muted">Weight trend</p>
           <p className="num mt-1 text-[36px] font-extrabold leading-none" style={{ letterSpacing: "-0.04em" }}>
             {current != null ? weightText(current, profile.units).split(" ")[0] : "—"}
             <span className="ml-1 text-[15px] font-semibold muted">{profile.units === "imperial" ? "lb" : "kg"}</span>
           </p>
         </div>
-        <span className="num shrink-0 rounded-full px-3 py-1.5 text-[12px] font-bold" style={{ background: due === 0 ? "var(--btn)" : "var(--card2)", color: due === 0 ? "var(--btn-ink)" : "var(--ink)" }}>
-          {due === 0 ? "Weigh in today" : `Next weigh-in: ${due}d`}
-        </span>
+        <button
+          type="button"
+          className="press num shrink-0 rounded-full px-3 py-1.5 text-[12px] font-bold"
+          style={{ background: pillActive ? "var(--btn)" : "var(--card2)", color: pillActive ? "var(--btn-ink)" : "var(--ink)", border: 0 }}
+          onClick={() => router.push("/profile/weight?log=1")}
+        >
+          {pillText}
+        </button>
       </div>
+
+      {values.length >= 2 ? (
+        <WeightLineChart values={values} goal={goal} />
+      ) : (
+        <p className="mt-3 text-xs muted">Log a few weigh-ins to see your trend.</p>
+      )}
+
       {goal != null && start != null ? (
-        <div className="mt-4">
+        <div className="mt-3.5">
           <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
             <motion.div className="h-full rounded-full" style={{ background: "var(--ink)" }} initial={{ width: 0 }} animate={{ width: `${fraction * 100}%` }} transition={{ ...SPRING, delay: 0.15 }} />
           </div>
@@ -201,6 +281,109 @@ function CurrentWeightCard({ profile, weights, today }: { profile: Profile; weig
     </Card>
   );
 }
+
+// ---------------------------------------------------------------- this week's energy (card 2)
+
+/** Eaten vs target vs burned, summed from the start of this week through today. */
+function WeeklyEnergyCard({ meals, exercises, profile, today }: { meals: Meal[]; exercises: ExerciseEntry[]; profile: Profile; today: string }) {
+  const ws = weekStart(today);
+  const daysSoFar = daysBetween(ws, today) + 1;
+  const days = Array.from({ length: daysSoFar }, (_, i) => addDays(ws, i));
+  const eaten = days.reduce((a, d) => a + totalsFor(meals, d).calories, 0);
+  const burned = exercises.filter((e) => e.date >= ws && e.date <= today).reduce((a, e) => a + Number(e.kcal || 0), 0);
+  const target = profile.calorie_target * daysSoFar;
+  const net = eaten - burned;
+  const fraction = target > 0 ? net / target : 0;
+
+  return (
+    <Card>
+      <p className="text-[17px] font-bold">This week&apos;s energy</p>
+      <p className="text-xs muted">Since {dayShort(ws)}, {dayMonth(ws)}</p>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Stat label="Eaten" value={Math.round(eaten).toLocaleString("en-IN")} />
+        <Stat label="Target" value={Math.round(target).toLocaleString("en-IN")} />
+        <Stat label="Burned" value={Math.round(burned).toLocaleString("en-IN")} color="var(--green)" />
+      </div>
+      <Bar fraction={fraction} color={fraction > 1.05 ? "var(--red)" : "var(--ink)"} />
+      <p className="mt-1.5 text-xs muted">{Math.round(net).toLocaleString("en-IN")} kcal net of {Math.round(target).toLocaleString("en-IN")} kcal target</p>
+    </Card>
+  );
+}
+
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="num text-lg font-extrabold" style={{ color: color ?? "var(--ink)" }}>
+        {value}
+      </span>
+      <span className="text-[11px] muted">{label}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- streak (card 3)
+
+/** Day streak (anything logged) plus the week streak (workout target met). */
+function StreakCard({ dayStreak, weekStreak }: { dayStreak: number; weekStreak: number }) {
+  return (
+    <Card>
+      <p className="text-[17px] font-bold">Streak</p>
+      <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+        <div className="flex flex-col items-center gap-1">
+          <BreathingFlame size={40} />
+          <p className="num text-[26px] font-extrabold leading-none" style={{ color: "var(--flame)" }}>
+            {dayStreak}
+          </p>
+          <p className="text-[13px] font-semibold">Day streak</p>
+        </div>
+        <div className="flex flex-col items-center gap-1">
+          <BreathingFlame size={40} />
+          <p className="num text-[26px] font-extrabold leading-none" style={{ color: "var(--flame)" }}>
+            {weekStreak}
+          </p>
+          <p className="text-[13px] font-semibold">Week streak</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------- macros this week (card 4)
+
+/** The P/C/F split for everything logged since the start of this week. */
+function MacrosWeekCard({ meals, today }: { meals: Meal[]; today: string }) {
+  const ws = weekStart(today);
+  const days = Array.from({ length: daysBetween(ws, today) + 1 }, (_, i) => addDays(ws, i));
+  const totals = days.reduce(
+    (a, d) => {
+      const x = totalsFor(meals, d);
+      return { protein: a.protein + x.protein, carbs: a.carbs + x.carbs, fat: a.fat + x.fat };
+    },
+    { protein: 0, carbs: 0, fat: 0 },
+  );
+  const p = totals.protein * 4;
+  const c = totals.carbs * 4;
+  const f = totals.fat * 9;
+  const total = Math.max(1, p + c + f);
+
+  return (
+    <Card>
+      <p className="text-[17px] font-bold">Macros this week</p>
+      <div className="mt-3 flex h-3 w-full overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
+        <motion.div style={{ background: PROTEIN }} initial={{ width: 0 }} animate={{ width: `${(p / total) * 100}%` }} transition={{ ...SPRING, delay: 0.1 }} />
+        <motion.div style={{ background: CARBS }} initial={{ width: 0 }} animate={{ width: `${(c / total) * 100}%` }} transition={{ ...SPRING, delay: 0.15 }} />
+        <motion.div style={{ background: FATS }} initial={{ width: 0 }} animate={{ width: `${(f / total) * 100}%` }} transition={{ ...SPRING, delay: 0.2 }} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-3.5">
+        <MacroDot value={`Protein ${Math.round(totals.protein)}g`} color={PROTEIN} />
+        <MacroDot value={`Carbs ${Math.round(totals.carbs)}g`} color={CARBS} />
+        <MacroDot value={`Fats ${Math.round(totals.fat)}g`} color={FATS} />
+      </div>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------- weight (More stats)
 
 /** Weigh-ins in [today − days, today] in time order, plus the last one before the window as its baseline. */
 function windowOf<T extends { date: string }>(rows: T[], today: string, days: number | null): T[] {
@@ -262,7 +445,7 @@ function Spark({ values, color = "var(--ink)", w = 72, h = 22 }: { values: numbe
   );
 }
 
-// ---------------------------------------------------------------- calories
+// ---------------------------------------------------------------- calories (More stats)
 
 /** Daily average calories: a Protein / Carbs / Fats stacked bar per day of the chosen week. */
 function CaloriesChart({ meals, today, goal }: { meals: Meal[]; today: string; goal: number }) {
@@ -333,7 +516,7 @@ function CaloriesChart({ meals, today, goal }: { meals: Meal[]; today: string; g
   );
 }
 
-// ---------------------------------------------------------------- expenditure
+// ---------------------------------------------------------------- expenditure (More stats)
 
 /** Average kcal/day burned (exercise log) per period, against the period before it. */
 function ExpenditureChanges({ exercises, today }: { exercises: ExerciseEntry[]; today: string }) {
@@ -382,7 +565,7 @@ function ExpenditureChanges({ exercises, today }: { exercises: ExerciseEntry[]; 
   );
 }
 
-// ---------------------------------------------------------------- BMI
+// ---------------------------------------------------------------- BMI (More stats)
 
 const BMI_BANDS = [
   { label: "Underweight", upTo: 18.5, color: "#5B8DEF" },
@@ -443,7 +626,7 @@ function BmiCard({ heightCm, weightKg }: { heightCm: number | null; weightKg: nu
   );
 }
 
-// ---------------------------------------------------------------- photos
+// ---------------------------------------------------------------- photos (More stats)
 
 function PhotosStrip({ photos }: { photos: ProgressPhoto[] }) {
   const router = useRouter();
