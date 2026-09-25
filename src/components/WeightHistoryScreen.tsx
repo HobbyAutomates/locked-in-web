@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { deleteWeight, logWeight } from "@/lib/actions";
+import { updateWeight } from "@/lib/activityActions";
 import { daysBetween, parseIso, shortDate, today as todayIso } from "@/lib/dates";
 import type { Profile, WeightEntry } from "@/lib/types";
 import { weightText } from "@/lib/display";
 import SubPage from "./SubPage";
-import { Plus, Scale, Trash } from "./icons";
+import { ChevronRight, Plus, Scale } from "./icons";
+import { DeletedRow, usePendingDeletes } from "./LogBits";
 import { Card, ErrorNote, Hair, IconTile, NumberField, PillButton, Rise, fmt } from "./ui";
 
 /** "Today" / "Yesterday" / "3 days ago" / a short date. */
@@ -22,12 +24,17 @@ function relative(date: string) {
 
 const monthYear = (iso: string) => parseIso(iso).toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 
-/** Big current number, the movement since the first weigh-in, and the full log. */
+/** Big current number, the movement since the first weigh-in, and the full log. v2.8: tap a weigh-in to edit or delete it. */
 export default function WeightHistoryScreen({ profile, weights, openLog = false }: { profile: Profile; weights: WeightEntry[]; openLog?: boolean }) {
   const router = useRouter();
   const [showLog, setShowLog] = useState(openLog);
   const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
+  const [editing, setEditing] = useState<WeightEntry | null>(null);
+  const dels = usePendingDeletes(
+    (id) => deleteWeight(id),
+    () => router.refresh(),
+    (msg) => setError(msg),
+  );
   const latest = weights[0]?.weight_kg ?? profile.weight_kg;
   const first = weights[weights.length - 1];
   const delta = latest != null && first ? latest - first.weight_kg : null;
@@ -35,19 +42,6 @@ export default function WeightHistoryScreen({ profile, weights, openLog = false 
   const signed = (d: number) => `${d > 0 ? "+" : ""}${fmt(Math.round(d * 10) / 10)}`;
   // v2.4: shown in the Preferences → Weight units (stored in kg).
   const signedWeight = (d: number) => `${d > 0 ? "+" : d < 0 ? "−" : ""}${weightText(Math.abs(d), profile.units)}`;
-
-  async function remove(id: string) {
-    setDeleting(id);
-    setError(null);
-    try {
-      await deleteWeight(id);
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete");
-    } finally {
-      setDeleting(null);
-    }
-  }
 
   return (
     <SubPage title="Weight history" back="/profile">
@@ -86,7 +80,10 @@ export default function WeightHistoryScreen({ profile, weights, openLog = false 
                 return (
                   <div key={r.id}>
                     {i > 0 ? <Hair /> : null}
-                    <div className="flex items-center gap-3 py-2.5">
+                    {dels.isPending(r.id) ? (
+                      <DeletedRow onUndo={() => dels.undo(r.id)} />
+                    ) : (
+                    <button type="button" className="press flex w-full items-center gap-3 py-2.5 text-left" style={{ background: "none", border: 0, color: "var(--ink)" }} aria-label={`Edit weigh-in: ${weightText(r.weight_kg, profile.units)}, ${relative(r.date)}`} onClick={() => setEditing(r)}>
                       <IconTile>
                         <Scale size={22} />
                       </IconTile>
@@ -102,17 +99,11 @@ export default function WeightHistoryScreen({ profile, weights, openLog = false 
                           {signed(d)}
                         </span>
                       ) : null}
-                      <button
-                        type="button"
-                        aria-label={`Delete weigh-in of ${fmt(r.weight_kg)} kg`}
-                        disabled={deleting === r.id}
-                        onClick={() => remove(r.id)}
-                        className="press grid place-items-center rounded-full"
-                        style={{ width: 32, height: 32, background: "none", border: 0, color: "var(--muted)" }}
-                      >
-                        <Trash size={18} />
-                      </button>
-                    </div>
+                      <span className="shrink-0" style={{ color: "var(--muted)", display: "inline-flex" }}>
+                        <ChevronRight size={18} />
+                      </span>
+                    </button>
+                    )}
                   </div>
                 );
               })}
@@ -120,16 +111,31 @@ export default function WeightHistoryScreen({ profile, weights, openLog = false 
           </Card>
         )}
       </Rise>
-      <AnimatePresence>{showLog ? <LogWeightDialog initialKg={latest} onClose={() => setShowLog(false)} /> : null}</AnimatePresence>
+      <AnimatePresence>
+        {showLog ? <LogWeightDialog initialKg={latest} onClose={() => setShowLog(false)} /> : null}
+        {editing ? (
+          <LogWeightDialog
+            key={editing.id}
+            entry={editing}
+            initialKg={editing.weight_kg}
+            onClose={() => setEditing(null)}
+            onDelete={() => {
+              dels.start(editing.id);
+              setEditing(null);
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
     </SubPage>
   );
 }
 
-function LogWeightDialog({ initialKg, onClose }: { initialKg: number | null; onClose: () => void }) {
+/** Log a weigh-in, or (v2.8, with `entry`) edit one: kg, date, note, and Delete (Undo in the list). */
+function LogWeightDialog({ initialKg, onClose, entry = null, onDelete }: { initialKg: number | null; onClose: () => void; entry?: WeightEntry | null; onDelete?: () => void }) {
   const router = useRouter();
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState(entry?.date ?? todayIso());
   const [kg, setKg] = useState(initialKg != null ? fmt(initialKg) : "");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(entry?.note ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const valid = Number.isFinite(Number(kg)) && Number(kg) >= 20 && Number(kg) <= 300;
@@ -138,7 +144,8 @@ function LogWeightDialog({ initialKg, onClose }: { initialKg: number | null; onC
     setBusy(true);
     setError(null);
     try {
-      await logWeight({ date, weight_kg: Number(kg), note });
+      if (entry) await updateWeight(entry.id, { date, weight_kg: Number(kg), note });
+      else await logWeight({ date, weight_kg: Number(kg), note });
       router.refresh();
       onClose();
     } catch (e) {
@@ -156,7 +163,7 @@ function LogWeightDialog({ initialKg, onClose }: { initialKg: number | null; onC
       exit={{ opacity: 0 }}
       role="dialog"
       aria-modal="true"
-      aria-label="Log weight"
+      aria-label={entry ? "Edit weigh-in" : "Log weight"}
       onClick={onClose}
     >
       <motion.form
@@ -172,7 +179,7 @@ function LogWeightDialog({ initialKg, onClose }: { initialKg: number | null; onC
           if (valid && !busy) void save();
         }}
       >
-        <h2 className="text-xl font-extrabold">Log weight</h2>
+        <h2 className="text-xl font-extrabold">{entry ? "Edit weigh-in" : "Log weight"}</h2>
         <div className="mt-3.5 flex items-center justify-between gap-3">
           <label htmlFor="lw-date" className="text-[15px] font-medium">
             Date
@@ -194,6 +201,11 @@ function LogWeightDialog({ initialKg, onClose }: { initialKg: number | null; onC
           <PillButton soft height={44} onClick={onClose}>
             Cancel
           </PillButton>
+          {entry && onDelete ? (
+            <button type="button" onClick={onDelete} disabled={busy} className="press min-h-[44px] py-2 text-[15px] font-semibold" style={{ color: "var(--red)", background: "none", border: 0 }}>
+              Delete
+            </button>
+          ) : null}
         </div>
       </motion.form>
     </motion.div>

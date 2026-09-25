@@ -1,91 +1,94 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import { deleteWorkout, saveWorkout } from "@/lib/actions";
+import { DURATIONS } from "@/lib/burn";
 import { POPULAR, exerciseDef, exercisesText, lastSets, musclesOf, searchExercises } from "@/lib/exercises";
 import { BAND_LEVELS, MUSCLES } from "@/lib/muscles";
-import type { Workout, WorkoutExercise, WorkoutKind } from "@/lib/types";
-import ExerciseForm, { type ExercisePick } from "./ExerciseForm";
-import { Band, Bat, Close, Dumbbell, Plus, Pushup, Refresh, Run, Search, Yoga } from "./icons";
+import type { ExerciseEntry, Workout, WorkoutExercise, WorkoutKind } from "@/lib/types";
+import ExerciseForm, { isCardioName, recentActivities, type ActivityGroup } from "./ExerciseForm";
+import { Band, Bat, Close, Dumbbell, Flame, Plus, Pushup, Refresh, Run, Search, Yoga } from "./icons";
+import { EditorDelete, MoreOptions, SAME_AS_LAST, SameAsLastChip, useEditorDelete } from "./LogBits";
 import { Card, Chip, ErrorNote, Hair, NumberField, PillButton, PillSwitch, Rise, SettingRow, fmt } from "./ui";
 
-/** v2.5: general-first. Gym and Bodyweight lead; Bands is one type among six. */
-const KINDS: { key: WorkoutKind; label: string; Icon: (p: { size?: number }) => React.ReactElement }[] = [
-  { key: "gym", label: "Gym", Icon: Dumbbell },
-  { key: "bodyweight", label: "Body\u00ADweight", Icon: Pushup },
-  { key: "bands", label: "Bands", Icon: Band },
-  { key: "cardio", label: "Cardio", Icon: Run },
-  { key: "sport", label: "Sport", Icon: Bat },
-  { key: "yoga", label: "Yoga / Stretch", Icon: Yoga },
-];
+/** v2.8 Log activity: one flow, the type picked inline. */
+export type ActivityType = "gym" | "bodyweight" | "bands" | "cardio" | "sport" | "yoga" | "other";
 
-/** Cardio / Sport / Yoga open the Exercise form with only their own quick picks (Compendium codes). */
-const QUICK: Record<"cardio" | "sport" | "yoga", ExercisePick[]> = {
-  cardio: [
-    { id: "run", label: "Run", name: "Running", code: "12150", met: 8.3 },
-    { id: "walk", label: "Walk", name: "Walking", code: "LI-17190", met: 3.5 },
-    { id: "cycle", label: "Cycle", name: "Cycling", code: "01015", met: 7.5 },
-    { id: "treadmill", label: "Treadmill", name: "Running · on treadmill", code: "12180", met: 8 },
-    { id: "elliptical", label: "Elliptical", name: "Elliptical trainer", code: "02090", met: 5 },
-    { id: "rowing", label: "Rowing", name: "Rowing machine", code: "02080", met: 7 },
-    { id: "skipping", label: "Skipping", name: "Jump rope", code: "LI-15551", met: 11 },
-    { id: "stairs", label: "Stairs", name: "Stair climbing", code: "LI-17133", met: 8.8 },
-  ],
-  sport: [
-    { id: "cricket", label: "Cricket", name: "Cricket", code: "LI-15150", met: 4.8 },
-    { id: "badminton", label: "Badminton", name: "Badminton", code: "LI-15030", met: 5.5 },
-    { id: "football", label: "Football", name: "Football", code: "15610", met: 7 },
-    { id: "basketball", label: "Basketball", name: "Basketball", code: "15055", met: 6 },
-    { id: "tennis", label: "Tennis", name: "Tennis", code: "15675", met: 7.3 },
-    { id: "table-tennis", label: "Table tennis", name: "Table tennis", code: "15660", met: 4 },
-    { id: "volleyball", label: "Volleyball", name: "Volleyball", code: "15710", met: 4 },
-    { id: "squash", label: "Squash", name: "Squash", code: "15652", met: 7.3 },
-  ],
-  yoga: [
-    { id: "yoga", label: "Yoga", name: "Yoga", code: "LI-02101", met: 2.5 },
-    { id: "stretching", label: "Stretching", name: "Stretching", code: "02170", met: 2.3 },
-    { id: "pilates", label: "Pilates", name: "Pilates", code: "02165", met: 3 },
-  ],
-};
+const TYPES: { key: ActivityType; label: string; Icon: (p: { size?: number }) => React.ReactElement }[] = [
+  { key: "gym", label: "Gym", Icon: Dumbbell },
+  { key: "bodyweight", label: "Body­weight", Icon: Pushup },
+  { key: "bands", label: "Bands", Icon: Band },
+  { key: "cardio", label: "Cardio / Run", Icon: Run },
+  { key: "sport", label: "Sport", Icon: Bat },
+  { key: "yoga", label: "Yoga", Icon: Yoga },
+  { key: "other", label: "Other", Icon: Flame },
+];
 
 type Payload = Parameters<typeof saveWorkout>[0];
 
+const byDateDesc = (a: Workout, b: Workout) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+
+/** Your own runs / activities (not workout burns or Health Connect). */
+function ownRows(entries: ExerciseEntry[]) {
+  return entries.filter((e) => (e.source === "manual" || e.source === "describe") && e.minutes > 0 && e.kcal > 0);
+}
+
+/**
+ * The type Log activity opens on: whatever you logged most recently (a workout's kind, or Cardio /
+ * Other for a run or activity), Gym for a first-timer.
+ */
+export function defaultActivityType(workouts: Workout[], entries: ExerciseEntry[]): ActivityType {
+  const w = [...workouts].sort(byDateDesc)[0];
+  const e = ownRows(entries)[0];
+  if (e && (!w || e.date >= w.date)) return isCardioName(e.name, e.activity_code) ? "cardio" : "other";
+  return w ? ((w.kind ?? "bands") as ActivityType) : "gym";
+}
+
+/**
+ * v2.8 Log activity (replaces the Workout / Exercise split): Gym · Bodyweight · Bands · Cardio / Run
+ * · Sport · Yoga · Other, picked inline. Gym, Bodyweight, Bands, Sport and Yoga save to `workouts`
+ * (streaks); Cardio / Run and Other save to `exercise_log`. The same component edits a logged
+ * workout (`existing`) or a logged run / activity (`editingExercise`).
+ */
 export default function WorkoutForm({
   existing,
-  last = null,
+  editingExercise = null,
   initialDate,
   target,
   onClose,
+  onCreated,
   weightKg = null,
-  recent = [],
+  workouts = [],
+  entries = [],
   history = [],
+  initialType,
 }: {
   existing: Workout | null;
-  /** The most recent workout: "Same as last time" copies it into a new one. */
-  last?: Workout | null;
+  /** v2.8: a logged run / activity row to edit. */
+  editingExercise?: ExerciseEntry | null;
   initialDate: string;
   target: number;
   onClose: () => void;
+  /** After a brand-new session saves (Home celebrates the streak). */
+  onCreated: () => void;
   weightKg?: number | null;
-  /** Recent exercise-log activities, for Cardio / Sport / Yoga. */
-  recent?: ExercisePick[];
+  /** Recent workouts of every kind (for "Same as last time" and the default type). */
+  workouts?: Workout[];
+  /** Recent exercise_log rows (60 days), newest first. */
+  entries?: ExerciseEntry[];
   /** Recent gym / bodyweight sessions: the set grid's "last time" ghost values. */
   history?: Workout[];
+  initialType?: ActivityType;
 }) {
-  const router = useRouter();
-  const lastKind = last?.kind === "gym" || last?.kind === "bodyweight" ? last.kind : null;
-  const [kind, setKind] = useState<WorkoutKind>((existing?.kind as WorkoutKind | null) ?? lastKind ?? "gym");
+  const editingKind = existing ? ((existing.kind ?? "bands") as WorkoutKind) : null;
+  const [type, setType] = useState<ActivityType>(
+    editingKind ?? (editingExercise ? (isCardioName(editingExercise.name, editingExercise.activity_code) ? "cardio" : "other") : (initialType ?? defaultActivityType(workouts, entries))),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState(false);
-  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => {
-    if (deleteTimer.current) clearTimeout(deleteTimer.current);
-  }, []);
-
-  async function persist(payload: Payload) {
+  /** Saves a workout; on success leaves the form. Returns the error text (or null). */
+  async function persist(payload: Payload): Promise<string | null> {
     setBusy(true);
     setError(null);
     try {
@@ -94,105 +97,98 @@ export default function WorkoutForm({
         console.error("[WorkoutForm] save failed:", res.error);
         setError(res.error);
         setBusy(false);
-        return;
+        return res.error;
       }
+      const done = existing ? onClose : onCreated;
       if (res.warning) {
         // Saved, but the auto-burn row didn't make it: say so here instead of leaving silently.
         console.error("[WorkoutForm] saved with a warning:", res.warning);
         setError(res.warning);
-        setTimeout(() => router.push(existing ? "/" : "/?celebrate=1"), 2500);
-        return;
+        setTimeout(done, 2500);
+        return null;
       }
-      // A new session earns the streak celebration on Home; edits just go back.
-      router.push(existing ? "/" : "/?celebrate=1");
+      done();
+      return null;
     } catch (e) {
       console.error("[WorkoutForm] save threw:", e);
-      setError(e instanceof Error && e.message ? `Couldn't save the workout: ${e.message}` : "Couldn't save the workout — check your connection and try again.");
+      const msg = e instanceof Error && e.message ? `Couldn't save the workout: ${e.message}` : "Couldn't save the workout — check your connection and try again.";
+      setError(msg);
       setBusy(false);
+      return msg;
     }
   }
 
-  /** Undoable delete: the confirm button turns into "Deleted" with an Undo button for ~5s; only then does the
-   * real delete happen and the editor close. */
-  function remove() {
-    if (!existing) return;
-    setError(null);
-    setPendingDelete(true);
-    deleteTimer.current = setTimeout(() => void finalizeRemove(), 5000);
-  }
-
-  function undoRemove() {
-    if (deleteTimer.current) clearTimeout(deleteTimer.current);
-    deleteTimer.current = null;
-    setPendingDelete(false);
-  }
-
-  async function finalizeRemove() {
-    if (!existing) return;
-    setBusy(true);
-    try {
-      const res = await deleteWorkout(existing.id);
-      if (!res.ok) {
-        console.error("[WorkoutForm] delete failed:", res.error);
-        setError(res.error);
-        setBusy(false);
-        setPendingDelete(false);
-        return;
-      }
-      onClose();
-    } catch (e) {
-      console.error("[WorkoutForm] delete threw:", e);
-      setError(e instanceof Error && e.message ? e.message : "Could not delete");
-      setBusy(false);
-      setPendingDelete(false);
+  const lastOf = (k: WorkoutKind) => workouts.filter((w) => (w.kind ?? "bands") === k && w.id !== existing?.id).sort(byDateDesc)[0] ?? null;
+  const burnOf = (w: Workout | null) => (w ? (entries.find((e) => e.source === "workout" && e.note === w.id) ?? null) : null);
+  const own = ownRows(entries);
+  const lastExercise = (g: ActivityGroup): ExerciseEntry | null => {
+    if (g === "sport" || g === "yoga") {
+      const w = lastOf(g);
+      const b = burnOf(w);
+      return b && w ? { ...b, name: w.exercises || b.name, minutes: w.minutes ?? b.minutes } : null;
     }
-  }
+    return own.find((e) => (g === "cardio") === isCardioName(e.name, e.activity_code)) ?? null;
+  };
 
-  // An existing session can move between Gym / Bodyweight / Bands; the log-only types can't hold it.
-  const kinds = existing ? KINDS.filter((k) => k.key === "gym" || k.key === "bodyweight" || k.key === "bands") : KINDS;
-  const shared = { existing, initialDate, busy, error, target, persist, remove, pendingDelete, undoRemove };
+  // An existing session can move between Gym / Bodyweight / Bands; nothing else switches type in an editor.
+  const liftEdit = editingKind === "gym" || editingKind === "bodyweight" || editingKind === "bands";
+  const types = existing ? (liftEdit ? TYPES.filter((k) => k.key === "gym" || k.key === "bodyweight" || k.key === "bands") : []) : editingExercise ? [] : TYPES;
+  const del = useEditorDelete(async () => {
+    if (!existing) return;
+    const res = await deleteWorkout(existing.id);
+    if (!res.ok) throw new Error(res.error);
+  }, onClose);
+  const shared = { existing, initialDate, busy, error: error ?? del.error, target, persist, del };
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="px-4 pb-1 pt-1.5">
-        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Workout type">
-          {kinds.map(({ key, label, Icon }) => {
-            const on = kind === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => {
-                  setKind(key);
-                  setError(null);
-                }}
-                className="press flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2.5"
-                style={{ minHeight: 64, background: on ? "var(--btn)" : "var(--card)", color: on ? "var(--btn-ink)" : "var(--ink)", boxShadow: on ? "none" : "var(--shadow-sm)", border: 0 }}
-              >
-                <Icon size={20} />
-                <span className="w-full text-center text-[12px] font-semibold leading-tight" style={{ hyphens: "manual" }}>{label}</span>
-              </button>
-            );
-          })}
+      {types.length ? (
+        <div className="px-4 pb-1 pt-1.5">
+          <div className={`grid gap-2 ${types.length > 3 ? "grid-cols-4" : "grid-cols-3"}`} role="radiogroup" aria-label="Activity type">
+            {types.map(({ key, label, Icon }) => {
+              const on = type === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => {
+                    setType(key);
+                    setError(null);
+                  }}
+                  className="press flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2"
+                  style={{ minHeight: 58, background: on ? "var(--btn)" : "var(--card)", color: on ? "var(--btn-ink)" : "var(--ink)", boxShadow: on ? "none" : "var(--shadow-sm)", border: 0 }}
+                >
+                  <Icon size={19} />
+                  <span className="w-full text-center text-[11.5px] font-semibold leading-tight" style={{ hyphens: "manual" }}>
+                    {label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {kind === "cardio" || kind === "sport" || kind === "yoga" ? (
+      {existing && !liftEdit ? (
+        <KindEditForm {...shared} existing={existing} burn={burnOf(existing)} />
+      ) : type === "cardio" || type === "other" || type === "sport" || type === "yoga" ? (
         <ExerciseForm
-          key={kind}
+          key={type}
           date={initialDate}
           weightKg={weightKg}
           onClose={onClose}
-          quick={QUICK[kind]}
-          recent={recent.filter((r) => QUICK[kind].some((q) => q.code === r.code || q.name.toLowerCase() === r.name.toLowerCase()))}
-          placeholder={kind === "cardio" ? "Search cardio — run, cycle, swim…" : kind === "sport" ? "Search a sport — cricket, football…" : "Search yoga, stretching, pilates…"}
+          group={type}
+          editing={editingExercise}
+          last={editingExercise ? null : lastExercise(type)}
+          recent={type === "other" ? recentActivities(entries.filter((e) => !isCardioName(e.name, e.activity_code)), weightKg ?? null, 8) : []}
+          saveAsWorkout={type === "sport" || type === "yoga" ? { kind: type, persist } : undefined}
         />
-      ) : kind === "bands" ? (
-        <BandsForm {...shared} last={last?.kind == null || last.kind === "bands" ? last : null} />
+      ) : type === "bands" ? (
+        <BandsForm {...shared} last={lastOf("bands")} />
       ) : (
-        <LiftForm key={kind} {...shared} kind={kind} history={history} />
+        <LiftForm key={type} {...shared} kind={type} history={history} last={lastOf(type)} />
       )}
     </div>
   );
@@ -204,35 +200,20 @@ type Shared = {
   busy: boolean;
   error: string | null;
   target: number;
-  persist: (p: Payload) => Promise<void>;
-  remove: () => void;
-  pendingDelete: boolean;
-  undoRemove: () => void;
+  persist: (p: Payload) => Promise<string | null>;
+  del: ReturnType<typeof useEditorDelete>;
 };
 
-function Footer({ existing, busy, error, target, remove, pendingDelete, undoRemove, onSave, label = "Save workout" }: Shared & { onSave: () => void; label?: string }) {
+function Footer({ existing, busy, error, target, del, onSave, label = "Save workout" }: Shared & { onSave: () => void; label?: string }) {
   return (
     <>
       <div className="flex flex-col gap-3 px-4 pb-4">
         <ErrorNote text={error} />
         <p className="text-xs muted">Target {target} sessions a week.</p>
-        {existing ? (
-          pendingDelete ? (
-            <div className="flex items-center justify-between gap-2 py-1">
-              <span className="text-[15px] font-semibold muted">Deleted</span>
-              <button type="button" onClick={undoRemove} className="press text-[15px] font-bold" style={{ color: "var(--btn)", background: "none", border: 0 }}>
-                Undo
-              </button>
-            </div>
-          ) : (
-            <button type="button" onClick={remove} disabled={busy} className="press py-2 text-[15px] font-semibold" style={{ color: "var(--red)", background: "none", border: 0 }}>
-              Delete workout
-            </button>
-          )
-        ) : null}
+        {existing ? <EditorDelete label="Delete workout" del={del} disabled={busy} /> : null}
       </div>
       <div className="sticky bottom-0 mt-auto px-4 pb-[calc(12px+env(safe-area-inset-bottom,0px))] pt-3" style={{ background: "var(--bg)" }}>
-        <PillButton onClick={onSave} disabled={busy}>
+        <PillButton onClick={onSave} disabled={busy || del.pending}>
           {busy ? "Saving…" : label}
         </PillButton>
       </div>
@@ -240,27 +221,104 @@ function Footer({ existing, busy, error, target, remove, pendingDelete, undoRemo
   );
 }
 
-function DateMinutes({ date, setDate, minutes, setMinutes, initialDate, children }: { date: string; setDate: (v: string) => void; minutes: string; setMinutes: (v: string) => void; initialDate: string; children?: React.ReactNode }) {
+function DateRow({ date, setDate, initialDate }: { date: string; setDate: (v: string) => void; initialDate: string }) {
   return (
-    <Card padding={0}>
-      <div className="px-4">
-        <SettingRow label="Date">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value || initialDate)}
-            aria-label="Workout date"
-            className="rounded-[10px] px-2.5 py-1.5 text-[15px] font-semibold"
-            style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }}
-          />
-        </SettingRow>
-        {children}
-        <Hair />
-        <SettingRow label="Duration">
-          <NumberField value={minutes} onChange={(v) => setMinutes(v.slice(0, 3))} unit="min" label="Duration in minutes" />
-        </SettingRow>
+    <SettingRow label="Date">
+      <input
+        type="date"
+        value={date}
+        onChange={(e) => setDate(e.target.value || initialDate)}
+        aria-label="Workout date"
+        className="rounded-[10px] px-2.5 py-1.5 text-[15px] font-semibold"
+        style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }}
+      />
+    </SettingRow>
+  );
+}
+
+function DurationRow({ minutes, setMinutes }: { minutes: string; setMinutes: (v: string) => void }) {
+  return (
+    <div className="py-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[15px] font-medium">Duration</span>
+        <NumberField value={minutes} onChange={(v) => setMinutes(v.slice(0, 3))} unit="min" label="Duration in minutes" />
       </div>
-    </Card>
+      <div className="mt-2.5 grid grid-cols-4 gap-1.5" role="radiogroup" aria-label="Duration">
+        {DURATIONS.map((d) => (
+          <button key={d} type="button" role="radio" aria-checked={minutes === String(d)} className="chip press justify-center whitespace-nowrap" style={{ height: 34, padding: "0 6px" }} onClick={() => setMinutes(String(d))}>
+            {d} min
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NotesField({ id, value, onChange, placeholder }: { id: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <div className="py-3">
+      <label className="text-[13px] font-semibold muted" htmlFor={id}>
+        Notes
+      </label>
+      <textarea id={id} className="field mt-1.5" rows={2} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
+    </div>
+  );
+}
+
+// ---- Sport / Yoga (and older Cardio) sessions: editing a saved one ----
+
+/** A saved Sport / Yoga / Cardio workout: minutes (the burn follows them), date and notes, or delete. */
+function KindEditForm({ existing, burn, ...shared }: Shared & { existing: Workout; burn: ExerciseEntry | null }) {
+  const [minutes, setMinutes] = useState(String(existing.minutes ?? burn?.minutes ?? 30));
+  const [date, setDate] = useState(existing.date);
+  const [notes, setNotes] = useState(existing.notes ?? "");
+  const [more, setMore] = useState(false);
+  const mins = Number(minutes) || 0;
+  const kcal = burn ? (burn.minutes > 0 ? (burn.kcal / burn.minutes) * mins : burn.kcal) : null;
+  const name = existing.exercises || burn?.name || (existing.kind ?? "Workout");
+
+  function save() {
+    void shared.persist({
+      id: existing.id,
+      date,
+      muscles: existing.muscles ?? [],
+      band_level: existing.band_level ?? "Medium",
+      resistance_kg: null,
+      minutes: Math.max(1, mins),
+      exercises: existing.exercises ?? "",
+      notes: notes.trim(),
+      kind: (existing.kind ?? "sport") as WorkoutKind,
+      exercises_json: null,
+      burn: burn && kcal != null ? { activity_code: burn.activity_code, name: burn.name, intensity: burn.intensity, kcal, intensity_pct: burn.intensity_pct ?? null, started_at: burn.started_at ?? null, distance_km: burn.distance_km ?? null, steps: burn.steps ?? null } : null,
+    });
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-3 px-4 pb-3 pt-2.5">
+        <Card padding={0}>
+          <div className="px-4">
+            <p className="py-3.5 text-[17px] font-bold">{name.charAt(0).toUpperCase() + name.slice(1)}</p>
+            <Hair />
+            <DurationRow minutes={minutes} setMinutes={setMinutes} />
+            {kcal != null ? (
+              <>
+                <Hair />
+                <SettingRow label="Burned">
+                  <span className="num text-[15px] font-bold">{Math.round(kcal)} kcal</span>
+                </SettingRow>
+              </>
+            ) : null}
+          </div>
+        </Card>
+        <MoreOptions open={more} onToggle={() => setMore((v) => !v)} hint="Date, notes">
+          <DateRow date={date} setDate={setDate} initialDate={existing.date} />
+          <Hair />
+          <NotesField id="kind-notes" value={notes} onChange={setNotes} placeholder="How did it feel?" />
+        </MoreOptions>
+      </div>
+      <Footer {...shared} existing={existing} onSave={save} label="Save" />
+    </>
   );
 }
 
@@ -276,7 +334,7 @@ function blankSets(n: number): SetRow[] {
   return Array.from({ length: n }, () => ({ kg: "", reps: "" }));
 }
 
-function LiftForm({ kind, history, ...shared }: Shared & { kind: "gym" | "bodyweight"; history: Workout[] }) {
+function LiftForm({ kind, history, last, ...shared }: Shared & { kind: "gym" | "bodyweight"; history: Workout[]; last: Workout | null }) {
   const { existing, initialDate } = shared;
   const [date, setDate] = useState(existing?.date ?? initialDate);
   const [minutes, setMinutes] = useState(existing?.minutes != null ? String(existing.minutes) : "45");
@@ -285,6 +343,8 @@ function LiftForm({ kind, history, ...shared }: Shared & { kind: "gym" | "bodywe
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  const [copied, setCopied] = useState(false);
   const seq = useRef(1000);
 
   const added = new Set(rows.map((r) => r.name.toLowerCase()));
@@ -314,6 +374,15 @@ function LiftForm({ kind, history, ...shared }: Shared & { kind: "gym" | "bodywe
     setRows((cur) => cur.map((r) => (r.key === key ? { ...r, sets: prev.map((s) => ({ kg: s.kg != null ? fmt(s.kg) : "", reps: String(s.reps) })) } : r)));
   }
 
+  /** "Same as last time": last session's exercises and sets, all still editable. */
+  function sameAsLast() {
+    if (!last?.exercises_json?.length) return;
+    setRows(toRows(last.exercises_json).map((r) => ({ ...r, key: seq.current++ })));
+    if (last.minutes != null) setMinutes(String(last.minutes));
+    setCopied(true);
+    setLocalError(null);
+  }
+
   function save() {
     const list: WorkoutExercise[] = rows.map((r) => ({
       name: r.name,
@@ -339,6 +408,11 @@ function LiftForm({ kind, history, ...shared }: Shared & { kind: "gym" | "bodywe
   return (
     <>
       <div className="flex flex-col gap-3 px-4 pb-3 pt-2.5">
+        {!existing && last?.exercises_json?.length ? (
+          <div className="flex">
+            <SameAsLastChip applied={copied} onClick={sameAsLast} detail={last.exercises_json.map((x) => x.name).slice(0, 3).join(", ")} />
+          </div>
+        ) : null}
         <Rise index={0}>
           <div className="searchbar">
             <Search size={17} className="muted shrink-0" />
@@ -438,7 +512,7 @@ function LiftForm({ kind, history, ...shared }: Shared & { kind: "gym" | "bodywe
                   </button>
                   {prev ? (
                     <button type="button" className="press flex h-9 min-w-[88px] flex-1 items-center justify-center gap-1 rounded-xl text-[13px] font-semibold" style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }} onClick={() => copyLast(r.key, prev)}>
-                      <Refresh size={13} /> <span className="whitespace-nowrap">Last time</span>
+                      <Refresh size={13} /> <span className="whitespace-nowrap">{SAME_AS_LAST}</span>
                     </button>
                   ) : null}
                 </div>
@@ -447,14 +521,17 @@ function LiftForm({ kind, history, ...shared }: Shared & { kind: "gym" | "bodywe
           );
         })}
 
-        <DateMinutes date={date} setDate={setDate} minutes={minutes} setMinutes={setMinutes} initialDate={initialDate} />
-
-        <Card>
-          <label className="text-[13px] font-semibold muted" htmlFor="lift-notes">
-            Notes
-          </label>
-          <textarea id="lift-notes" className="field mt-1.5" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Felt strong on bench — go up next time" />
+        <Card padding={0}>
+          <div className="px-4">
+            <DurationRow minutes={minutes} setMinutes={setMinutes} />
+          </div>
         </Card>
+
+        <MoreOptions open={more} onToggle={() => setMore((v) => !v)} hint="Date, notes">
+          <DateRow date={date} setDate={setDate} initialDate={initialDate} />
+          <Hair />
+          <NotesField id="lift-notes" value={notes} onChange={setNotes} placeholder="Felt strong on bench — go up next time" />
+        </MoreOptions>
       </div>
       <Footer {...shared} error={localError ?? shared.error} onSave={save} label={rows.length ? `Save · ${rows.length} exercise${rows.length === 1 ? "" : "s"}` : "Save workout"} />
     </>
@@ -490,6 +567,7 @@ function BandsForm({ last, ...shared }: Shared & { last: Workout | null }) {
   const [exercises, setExercises] = useState(existing?.exercises ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [copied, setCopied] = useState(false);
+  const [more, setMore] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   /** Pre-fill everything but the date from the most recent band workout. */
@@ -528,18 +606,9 @@ function BandsForm({ last, ...shared }: Shared & { last: Workout | null }) {
     <>
       <div className="flex flex-col gap-3.5 px-4 pb-3 pt-2.5">
         {!existing && last ? (
-          <Rise index={0}>
-            <button type="button" onClick={sameAsLast} aria-pressed={copied} className="chip press w-full justify-between" style={{ height: 48, padding: "0 16px", ...(copied ? {} : { background: "var(--card)", boxShadow: "var(--shadow-sm)" }) }}>
-              <span className="flex min-w-0 items-center gap-2">
-                <Refresh size={16} />
-                <span className="font-semibold">{copied ? "Copied from last time" : "Same as last time"}</span>
-              </span>
-              <span className="min-w-0 truncate pl-2 text-xs" style={{ opacity: 0.7 }}>
-                {last.muscles.join(" · ")}
-                {last.minutes != null ? ` · ${last.minutes} min` : ""}
-              </span>
-            </button>
-          </Rise>
+          <div className="flex">
+            <SameAsLastChip applied={copied} onClick={sameAsLast} detail={`${last.muscles.join(" · ")}${last.minutes != null ? ` · ${last.minutes} min` : ""}`} />
+          </div>
         ) : null}
         <Rise index={0}>
           <Card>
@@ -553,35 +622,33 @@ function BandsForm({ last, ...shared }: Shared & { last: Workout | null }) {
         </Rise>
 
         <Rise index={1}>
-          <DateMinutes date={date} setDate={setDate} minutes={minutes} setMinutes={setMinutes} initialDate={initialDate}>
-            <Hair />
-            <SettingRow label="Band">
-              <PillSwitch options={[...BAND_LEVELS]} value={band} onChange={setBand} label="Band level" />
-            </SettingRow>
-            <Hair />
-            <SettingRow label="Resistance">
-              <NumberField value={kg} onChange={setKg} unit="kg" label="Resistance in kilograms" decimal />
-            </SettingRow>
-          </DateMinutes>
+          <Card padding={0}>
+            <div className="px-4">
+              <SettingRow label="Band">
+                <PillSwitch options={[...BAND_LEVELS]} value={band} onChange={setBand} label="Band level" />
+              </SettingRow>
+              <Hair />
+              <DurationRow minutes={minutes} setMinutes={setMinutes} />
+            </div>
+          </Card>
         </Rise>
 
-        <Rise index={2}>
-          <Card>
+        <MoreOptions open={more} onToggle={() => setMore((v) => !v)} hint="Resistance, exercises, date, notes">
+          <SettingRow label="Resistance">
+            <NumberField value={kg} onChange={setKg} unit="kg" label="Resistance in kilograms" decimal />
+          </SettingRow>
+          <Hair />
+          <div className="py-3">
             <label className="text-[13px] font-semibold muted" htmlFor="exercises">
               Exercises
             </label>
             <textarea id="exercises" className="field mt-1.5" rows={2} value={exercises} onChange={(e) => setExercises(e.target.value)} placeholder="Rows, chest press, lateral raise" />
-          </Card>
-        </Rise>
-
-        <Rise index={3}>
-          <Card>
-            <label className="text-[13px] font-semibold muted" htmlFor="notes">
-              Notes
-            </label>
-            <textarea id="notes" className="field mt-1.5" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Rows felt heavy, try heavy band next time" />
-          </Card>
-        </Rise>
+          </div>
+          <Hair />
+          <DateRow date={date} setDate={setDate} initialDate={initialDate} />
+          <Hair />
+          <NotesField id="notes" value={notes} onChange={setNotes} placeholder="Rows felt heavy, try heavy band next time" />
+        </MoreOptions>
       </div>
       <Footer {...shared} error={localError ?? shared.error} onSave={save} />
     </>
