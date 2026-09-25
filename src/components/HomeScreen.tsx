@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { addDays, longDate, shortDate } from "@/lib/dates";
 import { dismiss, useDismissed } from "@/lib/dismiss";
 import { calorieBudget, totalsFor } from "@/lib/totals";
+import { calorieWords } from "@/lib/goals";
 import { logWater } from "@/lib/actions";
 import { toggleMacroMode, useMacroMode, type MacroMode } from "@/lib/macroMode";
 import { litres, WaterBottle } from "./WaterBottle";
@@ -98,6 +99,11 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       : kcalOver > 0
         ? { value: kcalOver, word: "over" }
         : { value: Math.max(0, Math.round(budget.budget - totals.calories)), word: "left" };
+  // v2.10 "Hide calorie numbers" (schema_v34 opt-in): the calorie card shows words instead of kcal in
+  // both left and eaten modes. The ring stays; macro cards still show grams (science spec).
+  const hideNumbers = profile.hide_numbers === true;
+  const kcalWords = calorieWords(totals.calories, budget.budget);
+  const kcalLabel = mode === "eaten" ? "Calories eaten" : "Calories left";
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -136,22 +142,26 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
           className="card press block w-full text-left"
           style={{ padding: 20, color: "var(--ink)" }}
           onClick={flip}
-          aria-label={`${kcal.value} calories ${kcal.word}. Tap to show ${mode === "eaten" ? "what's left" : "what you've eaten"}`}
+          aria-label={`${hideNumbers ? `${kcalLabel}: ${kcalWords}` : `${kcal.value} calories ${kcal.word}`}. Tap to show ${mode === "eaten" ? "what's left" : "what you've eaten"}`}
         >
           <div className="flex items-center justify-between gap-3">
             <FlipFace mode={mode} animate={flipped}>
-              <p className="num text-[40px] font-extrabold leading-none">
-                {kcal.value.toLocaleString("en-IN")}
-              </p>
+              {hideNumbers ? (
+                <p className="text-[22px] font-extrabold leading-tight">{kcalWords}</p>
+              ) : (
+                <p className="num text-[40px] font-extrabold leading-none">
+                  {kcal.value.toLocaleString("en-IN")}
+                </p>
+              )}
               <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium muted">
-                {`Calories ${kcal.word}`}
+                {hideNumbers ? kcalLabel : `Calories ${kcal.word}`}
                 {isToday ? "" : ` · ${shortDate(selected)}`}
-                {burnedKcal > 0 ? (
+                {!hideNumbers && burnedKcal > 0 ? (
                   <span className="num rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }} title="Burned calories added to your goal">
                     +{Math.round(burnedKcal)} burned
                   </span>
                 ) : null}
-                {budget.rollover > 0 ? (
+                {!hideNumbers && budget.rollover > 0 ? (
                   <span className="num rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }} title="Left over from yesterday">
                     +{budget.rollover} rollover
                   </span>
