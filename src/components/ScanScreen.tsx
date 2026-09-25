@@ -8,6 +8,7 @@ import { today } from "@/lib/dates";
 import { decodeBarcode, makeThumb, postJson, toJpegBase64 } from "@/lib/image";
 import { mealItemFromPlate, priceItem, type QuantityFood } from "@/lib/quantity";
 import { initialLens, type Fit, type LabelReport, type Lens, type MealItem, type PlateEstimate, type PlateItem, type Profile, type ScanHistoryItem } from "@/lib/types";
+import { applyFollowUpEffect, gramsRangeLabel, totalKcalRange } from "@/lib/scanFollowUp";
 import { Alert, Barcode, Camera, Check, ChevronDown, Close, Scan, Spinner, Spoon, Tag, Trash } from "./icons";
 import QuantitySheet from "./QuantitySheet";
 import FoodImage from "./FoodImage";
@@ -463,6 +464,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
         </Card>
       </Rise>
 
+      <ValidationBanner flags={r.validation} />
       <SummaryGrid r={r} />
 
       {food ? (
@@ -513,6 +515,36 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
       </Rise>
       <QuantitySheet food={logFood} title="Log from this scan" cta="Log" onClose={() => setLogFood(null)} onDone={(item) => void logServing(item)} />
     </>
+  );
+}
+
+/**
+ * v2.8: the deterministic sanity-check flags from src/lib/ai/validate/label.ts (kJ read as kcal,
+ * decimal slips, ...), shown as one small non-blocking "Check this" banner in plain words — never a
+ * dialog, never stops the scan from being saved or logged.
+ */
+function ValidationBanner({ flags }: { flags?: { field: string; issue: string; suggestion: string }[] }) {
+  if (!flags || !flags.length) return null;
+  return (
+    <Rise index={2}>
+      <Card padding={14}>
+        <div className="flex items-start gap-2.5">
+          <span style={{ color: "var(--orange)" }}>
+            <Alert size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-bold">Check this 👀</p>
+            <ul className="mt-1 list-none p-0">
+              {flags.map((f, i) => (
+                <li key={i} className="mt-1 text-[13px] leading-relaxed muted">
+                  {f.issue}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </Card>
+    </Rise>
   );
 }
 
@@ -811,15 +843,27 @@ const MICRO_LABELS: [keyof PlateItem["micros"], string, string][] = [
 const CONF_STYLE: Record<PlateItem["confidence"], { color: string; label: string }> = {
   high: { color: "var(--green)", label: "High" },
   medium: { color: "var(--orange)", label: "Med" },
-  low: { color: "var(--muted)", label: "Low" },
+  low: { color: "var(--orange)", label: "Low" },
 };
+/** Low confidence sorts first — the rows that most need a second look. */
+const CONF_RANK: Record<PlateItem["confidence"], number> = { low: 0, medium: 1, high: 2 };
 
 function scaleItem(it: PlateItem, grams: number): PlateItem {
   if (it.grams <= 0) return { ...it, grams };
   const k = grams / it.grams;
   const micros: PlateItem["micros"] = {};
   for (const [key, v] of Object.entries(it.micros)) if (v != null) micros[key as keyof PlateItem["micros"]] = Math.round(v * k * 10) / 10;
-  return { ...it, grams, calories: Math.round(it.calories * k), protein_g: Math.round(it.protein_g * k * 10) / 10, carbs_g: Math.round(it.carbs_g * k * 10) / 10, fat_g: Math.round(it.fat_g * k * 10) / 10, micros };
+  return {
+    ...it,
+    grams,
+    grams_low: it.grams_low != null ? Math.round(it.grams_low * k) : it.grams_low,
+    grams_high: it.grams_high != null ? Math.round(it.grams_high * k) : it.grams_high,
+    calories: Math.round(it.calories * k),
+    protein_g: Math.round(it.protein_g * k * 10) / 10,
+    carbs_g: Math.round(it.carbs_g * k * 10) / 10,
+    fat_g: Math.round(it.fat_g * k * 10) / 10,
+    micros,
+  };
 }
 
 /**
@@ -856,7 +900,11 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
   const [open, setOpen] = useState<number | null>(null);
   const [saving, startSave] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const kcal = items.reduce((a, i) => a + i.calories, 0);
+  // v2.8: the follow-up chip the user picked, if any — re-applying is a no-op since effects always
+  // scale from the current items (picking a different chip after one, e.g. "Bigger" then "No oil",
+  // composes rather than replaces).
+  const [pickedEffect, setPickedEffect] = useState<string | null>(null);
+  const kcalTotal = totalKcalRange(items);
   const prot = items.reduce((a, i) => a + i.protein_g, 0);
 
   if (!plate.items.length) {
@@ -868,6 +916,15 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
         </Card>
       </Rise>
     );
+  }
+
+  // Low-confidence items sorted first (and outlined below), everything else keeping its own order.
+  const order = items.map((_, i) => i).sort((a, b) => CONF_RANK[items[a].confidence] - CONF_RANK[items[b].confidence]);
+
+  function pickFollowUp(effect: string) {
+    setPickedEffect(effect);
+    setItems((cur) => applyFollowUpEffect(cur, effect, plate.follow_up?.question));
+    setOriginals((cur) => applyFollowUpEffect(cur, effect, plate.follow_up?.question));
   }
 
   return (
@@ -886,13 +943,15 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
       <Rise index={4}>
         <Card padding={0}>
           <div className="px-4">
-            {items.map((it, idx) => {
+            {order.map((idx, pos) => {
+              const it = items[idx];
               const c = CONF_STYLE[it.confidence];
+              const low = it.confidence === "low";
               const micros = MICRO_LABELS.filter(([k]) => it.micros[k] != null);
               return (
-                <div key={idx}>
-                  {idx > 0 ? <Hair /> : null}
-                  <div className="flex items-center gap-2 py-3">
+                <div key={idx} style={low ? { outline: `1px solid ${c.color}`, outlineOffset: -1, borderRadius: 12, background: "color-mix(in srgb, var(--orange) 5%, transparent)" } : undefined}>
+                  {pos > 0 ? <Hair /> : null}
+                  <div className="flex items-center gap-2 py-3 px-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="truncate text-[15px] font-semibold">
@@ -914,6 +973,8 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                           </button>
                         ) : null}
                       </div>
+                      {it.grams_low != null && it.grams_high != null ? <p className="mt-0.5 text-[11px] muted">{gramsRangeLabel(it)}</p> : null}
+                      {it.uncertainties?.length ? <p className="mt-0.5 text-[11px]" style={{ color: "var(--orange)" }}>{it.uncertainties.join(" · ")}</p> : null}
                       {open === idx ? (
                         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs muted">
                           {micros.map(([k, label, unit]) => (
@@ -956,6 +1017,28 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
           </div>
         </Card>
       </Rise>
+      {plate.follow_up && plate.follow_up.options.length ? (
+        <Rise index={5}>
+          <p className="px-1 text-xs font-semibold muted">{plate.follow_up.question}</p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {plate.follow_up.options.map((o) => (
+              <button
+                key={o.effect + o.label}
+                type="button"
+                className="hit press rounded-full px-3.5 py-2 text-[13px] font-semibold"
+                style={
+                  pickedEffect === o.effect
+                    ? { background: "var(--ink)", color: "var(--card)" }
+                    : { background: "var(--card2)", color: "var(--ink)" }
+                }
+                onClick={() => pickFollowUp(o.effect)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </Rise>
+      ) : null}
       {plate.notes.length ? (
         <Rise index={5}>
           <p className="px-1 text-xs muted">{plate.notes.join(" · ")}</p>
@@ -966,7 +1049,9 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
         <Rise index={6}>
           <div className="flex items-center gap-3">
             <div>
-              <span className="num block text-[20px] font-extrabold tracking-tight">{Math.round(kcal)} kcal</span>
+              <span className="num block text-[20px] font-extrabold tracking-tight">
+                {kcalTotal.plusMinus > 0 ? `~${kcalTotal.center} kcal ±${kcalTotal.plusMinus}` : `${kcalTotal.center} kcal`}
+              </span>
               <span className="block text-xs muted">{fmt(prot)} g protein</span>
             </div>
             <PillButton

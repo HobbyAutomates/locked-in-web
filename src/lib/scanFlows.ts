@@ -184,7 +184,7 @@ export async function labelFlow(input: {
  * or clears them with a `needs_back_of_pack` flag when the transcript has no real nutrition
  * table. Mutates `report` in place; shared by labelFlow and, for the OFF path, barcodeFlow.
  */
-function applyParsedNutrition(report: Record<string, unknown>, parsed: ReturnType<typeof parseNutritionLabel>): void {
+export function applyParsedNutrition(report: Record<string, unknown>, parsed: ReturnType<typeof parseNutritionLabel>): void {
   if (parsed.coreComplete) {
     const gate = sanityCheckPer100(parsed.per_100g);
     if (gate.ok) {
@@ -350,6 +350,28 @@ export async function barcodeFlow(input: {
 // ---------------------------------------------------------------------------------------------
 
 const MICRO = { type: "number" } as const;
+const FOLLOW_UP_SCHEMA = {
+  type: "object",
+  description:
+    "OPTIONAL: one short clarifying question, only when the answer would meaningfully change the calorie estimate (homemade vs restaurant, ghee added or not, portion bigger/smaller than it looks). Omit entirely when nothing is genuinely ambiguous.",
+  properties: {
+    question: { type: "string", description: "One short question, e.g. 'Homemade or restaurant?'" },
+    options: {
+      type: "array",
+      description: "2-3 short answers. `effect` MUST be one of: restaurant, homemade, add_ghee, no_oil, smaller, bigger — never invent a new one.",
+      items: {
+        type: "object",
+        properties: {
+          label: { type: "string", description: "Short answer text, e.g. 'Restaurant'" },
+          effect: { type: "string", enum: ["restaurant", "homemade", "add_ghee", "no_oil", "smaller", "bigger"] },
+        },
+        required: ["label", "effect"],
+      },
+    },
+  },
+  required: ["question", "options"],
+} as const;
+
 const PLATE_TOOL: Anthropic.Tool = {
   name: "plate_estimate",
   description: "Return every food visible on the plate with an estimated portion and nutrition.",
@@ -362,8 +384,11 @@ const PLATE_TOOL: Anthropic.Tool = {
           type: "object",
           properties: {
             name: { type: "string", description: "Real dish name: 'dal tadka', 'jeera rice', 'aloo gobi', 'roti', 'chicken breast, grilled'. Not 'lentil soup'." },
-            grams: { type: "number", description: "Estimated weight of THIS portion in grams" },
+            grams: { type: "number", description: "Your best-estimate weight of THIS portion in grams" },
+            grams_low: { type: "number", description: "OPTIONAL: low end of a plausible gram range for this portion" },
+            grams_high: { type: "number", description: "OPTIONAL: high end of a plausible gram range for this portion" },
             confidence: { type: "string", enum: ["high", "medium", "low"] },
+            uncertainties: { type: "array", items: { type: "string" }, description: "OPTIONAL: what's genuinely uncertain about THIS item, e.g. 'portion could be bigger than it looks', 'oil amount unclear'" },
             calories: { type: "number", description: "kcal per 100 g of this food" },
             protein_g: { type: "number", description: "per 100 g" },
             carbs_g: { type: "number", description: "per 100 g" },
@@ -380,6 +405,7 @@ const PLATE_TOOL: Anthropic.Tool = {
       notes: { type: "array", items: { type: "string" }, description: "Assumptions: what you used as scale, hidden ingredients (ghee, oil), anything you could not see" },
       plate_note: { type: "string", description: "One sentence: what this meal is" },
       is_food: { type: "boolean" },
+      follow_up: FOLLOW_UP_SCHEMA,
     },
     required: ["items", "notes", "plate_note", "is_food"],
   },
@@ -387,13 +413,15 @@ const PLATE_TOOL: Anthropic.Tool = {
 
 const PLATE_SYSTEM = `You estimate the food on a plate from one photo for a 17-year-old in Bengaluru who eats mostly home-cooked Indian food, plus some Western meals.
 
-Identify each distinct food and call it by its real name — Indian dishes by their actual names ("dal tadka", "jeera rice", "aloo gobi", "roti", "curd", "paneer bhurji", "rajma", "sambar", "idli", "poha"), Western ones plainly ("grilled chicken breast", "scrambled eggs", "toast"). Never invent a dish you cannot see; combine what is clearly one dish into one item.
+Identify each distinct food and call it by its real name — Indian dishes by their actual names ("dal tadka", "jeera rice", "aloo gobi", "roti", "curd", "paneer bhurji", "rajma", "sambar", "idli", "poha"), Western ones plainly ("grilled chicken breast", "scrambled eggs", "toast"). Never invent a dish you cannot see; combine what is clearly one dish into one item. Your job is to identify the food and its portion as a gram range — the app's own food database, not your macro numbers, decides the final nutrition whenever it has a confident match, and it always does the actual per-gram arithmetic.
 
-Portion in grams. Use these as scale: a dinner plate is ~27 cm across, a roti ~18 cm, a katori (small steel bowl) holds ~150 ml, a tablespoon ~15 g, a hand's palm ~100 g of meat. Typical portions: roti 40 g each, paratha 80 g, idli 40 g, dosa 100 g, egg 50 g, a katori of dal or sabzi 150 g, a heap of rice on a plate 150–200 g, a piece of paneer 30 g. Count items you can count (3 rotis = 120 g).
+Portion in grams. Use these as scale: a dinner plate is ~27 cm across, a roti ~18 cm, a katori (small steel bowl) holds ~150 ml, a tablespoon ~15 g, a hand's palm ~100 g of meat. Typical portions: roti 40 g each, paratha 80 g, idli 40 g, dosa 100 g, egg 50 g, a katori of dal or sabzi 150 g, a heap of rice on a plate 150–200 g, a piece of paneer 30 g. Count items you can count (3 rotis = 120 g). Alongside your best-estimate grams, give a plausible grams_low/grams_high range — wider when the angle, occlusion or portion size is unclear, tight (or omitted) when it's obvious.
 
-Nutrition per 100 g from your knowledge of the dish as cooked at home (with oil / ghee). Give macros and the micros you can estimate.
+Nutrition per 100 g from your knowledge of the dish as cooked at home (with oil / ghee). Give macros and the micros you can estimate — this is the fallback the app uses only when it can't match the dish in its own database.
 
-Confidence: high when the dish and portion are clear, medium when the dish is clear but the portion is a guess, low when either is uncertain. If the picture is not food, set is_food=false with an empty items list.`;
+Confidence: high when the dish and portion are clear, medium when the dish is clear but the portion is a guess, low when either is uncertain. List anything uncertain about an item in its uncertainties. If the picture is not food, set is_food=false with an empty items list.
+
+follow_up: only when ONE short question would meaningfully change the numbers (homemade vs restaurant, ghee added or not, a portion that could be much bigger or smaller than it looks) — 2-3 short options, each with an effect from the fixed list in the tool schema. Skip it when nothing is genuinely ambiguous; don't ask just to ask.`;
 
 const CONF = new Set(["high", "medium", "low"]);
 
@@ -412,7 +440,18 @@ function n(v: unknown, fallback = 0) {
  *      kind='photo', so the History list can show it and "Save as meal" can reuse the photo.
  */
 export type PlateInput = { admin: AdminClient; userId: string; image: string; mediaType?: string | null; note?: string | null; thumb?: string | null };
-type PlateRaw = { items?: Record<string, unknown>[]; notes?: string[]; plate_note?: string; is_food?: boolean };
+type PlateRaw = { items?: Record<string, unknown>[]; notes?: string[]; plate_note?: string; is_food?: boolean; follow_up?: { question?: string; options?: { label?: string; effect?: string }[] } };
+
+/** A well-formed `follow_up`: a non-empty question and 2+ options with a label and a recognised effect. */
+const KNOWN_EFFECTS = new Set(["restaurant", "homemade", "add_ghee", "no_oil", "smaller", "bigger"]);
+function cleanFollowUp(raw: PlateRaw["follow_up"]): PlateEstimate["follow_up"] {
+  const question = String(raw?.question ?? "").trim();
+  const options = (raw?.options ?? [])
+    .map((o) => ({ label: String(o?.label ?? "").trim(), effect: String(o?.effect ?? "") }))
+    .filter((o) => o.label && KNOWN_EFFECTS.has(o.effect));
+  if (!question || options.length < 2) return null;
+  return { question, options };
+}
 
 /** Loose runtime shape check on `plate_estimate` output — every provider's structured JSON gets this,
  *  not just Anthropic's (which is schema-forced already, so this mostly matters for the others). */
@@ -490,9 +529,19 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
     for (const key of ["fiber_g", "sugar_g", "sodium_mg", "iron_mg", "calcium_mg", "vitamin_c_mg", "potassium_mg"] as const) {
       if (m[key] != null && Number.isFinite(Number(m[key]))) micros[key] = Math.round(Number(m[key]) * k * 10) / 10;
     }
+    // v2.8: an optional gram range around the point estimate — clamped so low <= grams <= high, and
+    // dropped (undefined) when the model didn't give usable numbers rather than showing a fake range.
+    const lowRaw = it.grams_low != null ? Number(it.grams_low) : null;
+    const highRaw = it.grams_high != null ? Number(it.grams_high) : null;
+    const grams_low = lowRaw != null && Number.isFinite(lowRaw) && lowRaw > 0 ? Math.min(Math.round(lowRaw), grams) : undefined;
+    const grams_high = highRaw != null && Number.isFinite(highRaw) && highRaw > 0 ? Math.max(Math.round(highRaw), grams) : undefined;
+    const uncertainties = Array.isArray(it.uncertainties) ? (it.uncertainties as unknown[]).map(String).filter(Boolean) : undefined;
     return {
       name: String(it.name ?? "food").trim(),
       grams,
+      ...(grams_low != null ? { grams_low } : {}),
+      ...(grams_high != null ? { grams_high } : {}),
+      ...(uncertainties && uncertainties.length ? { uncertainties } : {}),
       confidence: CONF.has(String(it.confidence)) ? (String(it.confidence) as PlateItem["confidence"]) : "medium",
       calories: Math.round(n(it.calories) * k),
       protein_g: Math.round(n(it.protein_g) * k * 10) / 10,
@@ -522,6 +571,8 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
         return {
           ...it,
           grams: Math.round(it.grams * k),
+          grams_low: it.grams_low != null ? Math.round(it.grams_low * k) : it.grams_low,
+          grams_high: it.grams_high != null ? Math.round(it.grams_high * k) : it.grams_high,
           calories: Math.round(it.calories * k + oil * 8.84),
           protein_g: Math.round(it.protein_g * k * 10) / 10,
           carbs_g: Math.round(it.carbs_g * k * 10) / 10,
@@ -545,7 +596,8 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
   if (restaurant) notes.unshift(`Restaurant portion: amounts ×${RESTAURANT_MULTIPLIER}, plus 1 tsp hidden oil on curries, dal and sabzi.`);
   const plate_note = String(raw.plate_note ?? "");
   const portion_hint = restaurant ? ("restaurant" as const) : null;
-  const report = { kind: "photo", items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, usage };
+  const follow_up = cleanFollowUp(raw.follow_up);
+  const report = { kind: "photo", items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, follow_up, usage };
   const id = await saveScan(admin, {
     userId: userId,
     kind: "photo",
@@ -556,7 +608,7 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
     imagePath: photo_path,
   });
   const thumb_path = await attachThumb(admin, userId, id, input.thumb);
-  const result: PlateEstimate & { thumb_path: string | null } = { id, items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, thumb_path };
+  const result: PlateEstimate & { thumb_path: string | null } = { id, items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, follow_up, thumb_path };
   return result;
 }
 

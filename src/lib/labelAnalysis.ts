@@ -219,13 +219,18 @@ function structureRules(targets: string, lens: Lens, compact: boolean) {
 /**
  * Steps 2 (analyse + research) and 3 (forced tool call). Always yields a report object.
  *
- * Two paths:
- *  - Label scans (and thin Open Food Facts records): a free-text analysis with up to two web
- *    searches, then a second forced `label_report` call that structures it.
- *  - Complete Open Food Facts records (`maxSearches` 1): ONE call that offers both web search
- *    (max 1 use, only for a plausible recall / counterfeit story) and `label_report`, asked to jot
- *    brief notes and call the tool. Half the output tokens, one round trip — a typical barcode
- *    scan lands well under 25 s. Falls back to the two-call path if the tool wasn't called.
+ * v2.8: ONE Haiku call does both the free-text analysis and the structured `label_report` tool
+ * call, for every input (label scan, thin OFF record, or a complete OFF record) — collapsed from
+ * the v2.7 analyse -> structure pair (2 Haiku calls) down to 1. Web search stays available on the
+ * same call (max_uses from `maxSearches`, 2 for a label/thin record, 1 for a complete OFF record)
+ * and stays OFF by default in the sense that matters: the prompt tells the model to reach for it
+ * only when a recall/counterfeit story is plausible, so most scans never trigger it. This is
+ * purely about the AI call shape — the numbers in `per_100g` are NEVER taken from this call. The
+ * deterministic parser in labelParse.ts (via `applyParsedNutrition` in scanFlows.ts) always runs
+ * AFTER this returns and overwrites/clears per_100g with its own sanity-gated numbers; the model's
+ * report is only the narrative + structure around them.
+ * Falls back to a second `label_structure` call only in the rare case the model writes prose but
+ * never calls the tool.
  */
 /** Loose runtime shape check on `label_report` output for providers other than Anthropic (which is
  *  schema-forced already via tool_choice). */
@@ -253,45 +258,30 @@ export async function analyseTranscript(input: AnalysisInput): Promise<{ report:
     : "";
   const userText = `LABEL TRANSCRIPT${provenance}:\n${transcript}\n\n${note ? `User note: ${note.slice(0, 300)}\n\n` : ""}${targets}${searchHint}`;
   const webSearch = { type: "web_search_20250305", name: "web_search", max_uses: maxSearches } as unknown as Anthropic.Tool;
+  const notesLimit = compact ? "under 150 words in total" : "under 220 words in total";
 
-  // Both the "compact" combined call and the free-text analyse call use Anthropic's `web_search`
-  // server tool, which no other provider offers — this task always runs on Claude (see tasks.ts),
-  // but still goes through router.run for timing + the usage log line.
-  let analysis = "";
-  if (compact) {
-    const one = await run<Anthropic.Message>("label_analysis", {
-      kind: "anthropic_native",
-      build: (client) =>
-        client.messages.create({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 2500,
-          system: analyseSystem(profile, lens) + "\n\nFor this record: write your notes as short bullets (under 150 words in total — the numbers, the trust call, one line per lens), then call the label_report tool exactly once with the full report. Every number in the report comes from the record.",
-          tools: [webSearch, REPORT_TOOL],
-          messages: [{ role: "user", content: `${userText}\n\nAnalyse it briefly, then call label_report.\n\n${structureRules(targets, lens, true)}` }],
-        }),
-    });
-    usage.push(toUsageEntry("label_analysis", one.model, one.usage));
-    const msg = one.data;
-    analysis = text(msg).trim();
-    const block = msg.content.find((b) => b.type === "tool_use" && b.name === "label_report");
-    if (block && block.type === "tool_use") return { report: block.input as Record<string, unknown>, analysis, usage };
-    // The model wrote prose but skipped the tool: structure what it wrote, below.
-  } else {
-    const a = await run<Anthropic.Message>("label_analysis", {
-      kind: "anthropic_native",
-      build: (client) =>
-        client.messages.create({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 3000,
-          system: analyseSystem(profile, lens),
-          tools: [webSearch],
-          messages: [{ role: "user", content: `${userText}\n\nAnalyse it.` }],
-        }),
-    });
-    usage.push(toUsageEntry("label_analysis", a.model, a.usage));
-    analysis = text(a.data).trim();
-  }
+  // One call: `web_search` is Anthropic-only, so this task always runs on Claude (see tasks.ts), but
+  // still goes through router.run for timing + the usage log line.
+  const call = await run<Anthropic.Message>("label_analysis", {
+    kind: "anthropic_native",
+    build: (client) =>
+      client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 3000,
+        system:
+          analyseSystem(profile, lens) +
+          `\n\nWrite your analysis as short bullets (${notesLimit} — the numbers, the trust call, one line per lens), then call the label_report tool exactly once with the full report. Every number in the report comes from the transcript above.`,
+        tools: [webSearch, REPORT_TOOL],
+        messages: [{ role: "user", content: `${userText}\n\nAnalyse it briefly, then call label_report.\n\n${structureRules(targets, lens, compact)}` }],
+      }),
+  });
+  usage.push(toUsageEntry("label_analysis", call.model, call.usage));
+  const msg = call.data;
+  const analysis = text(msg).trim();
+  const block = msg.content.find((b) => b.type === "tool_use" && b.name === "label_report");
+  if (block && block.type === "tool_use") return { report: block.input as Record<string, unknown>, analysis, usage };
 
+  // Rare fallback: the model wrote prose but never called the tool — structure it in a second call.
   // Structuring has no Anthropic-only feature — a generic structured-JSON task, provider-flexible.
   const s = await run<Record<string, unknown>>(
     "label_structure",

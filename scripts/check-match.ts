@@ -6,6 +6,7 @@
  */
 import { isAcceptableMatch, sourceBonus, type FoodHit } from "../src/lib/foodSearch";
 import { crossValidatePlateItem } from "../src/lib/plateMatch";
+import { applyFollowUpEffect, gramsRangeLabel, totalKcalRange } from "../src/lib/scanFollowUp";
 import type { PlateItem } from "../src/lib/types";
 
 function hit(name: string, source: FoodHit["source"], sim: number, exact = false): FoodHit {
@@ -130,8 +131,106 @@ async function runPlateCases() {
   }
 }
 
+// ---- v2.8: gram ranges + total kcal uncertainty band (src/lib/scanFollowUp.ts) ----
+
+function rangeItem(name: string, grams: number, grams_low?: number, grams_high?: number, calories = grams * 2): PlateItem {
+  return { name, grams, grams_low, grams_high, confidence: "medium", calories, protein_g: 0, carbs_g: 0, fat_g: 0, micros: {}, source: "estimated", food_id: null };
+}
+
+console.log("\nGram range label");
+{
+  const withRange = gramsRangeLabel(rangeItem("roti", 150, 120, 190));
+  const ok1 = withRange === "150 g (120–190)";
+  if (!ok1) failures++;
+  console.log(`${ok1 ? "PASS" : "FAIL"}  "150 g (120-190)" formatting -> "${withRange}"`);
+
+  const noRange = gramsRangeLabel(rangeItem("dal", 150));
+  const ok2 = noRange === "150 g";
+  if (!ok2) failures++;
+  console.log(`${ok2 ? "PASS" : "FAIL"}  no range -> "${noRange}" (want "150 g")`);
+}
+
+console.log("\nTotal kcal ± band, computed from each item's own gram range");
+{
+  // roti: 150 kcal at 150g nominal (1 kcal/g), range 120-190 -> 120-190 kcal.
+  // rice: 300 kcal at 200g nominal (1.5 kcal/g), no range -> 300-300 kcal.
+  const items = [rangeItem("roti", 150, 120, 190, 150), rangeItem("rice", 200, undefined, undefined, 300)];
+  const t = totalKcalRange(items);
+  const ok = t.center === 450 && t.low === 420 && t.high === 490 && t.plusMinus === 35;
+  if (!ok) failures++;
+  console.log(`${ok ? "PASS" : "FAIL"}  center ${t.center} low ${t.low} high ${t.high} ±${t.plusMinus} (want center 450, low 420, high 490, ±35)`);
+}
+
+// ---- v2.8: follow-up quick-reply effects (src/lib/scanFollowUp.ts) — deterministic, no model call ----
+
+console.log("\nFollow-up effects");
+{
+  type FCase = { why: string; effect: string; items: PlateItem[]; question?: string; check: (out: PlateItem[]) => boolean };
+  const curry = () => rangeItem("chicken curry", 200, undefined, undefined, 300);
+  const dal = () => ({ ...rangeItem("dal tadka", 150, undefined, undefined, 150), fat_g: 5 });
+  const salad = () => ({ ...rangeItem("cucumber salad", 100, undefined, undefined, 40), fat_g: 1 });
+
+  const fcases: FCase[] = [
+    {
+      why: "restaurant: ×1.25 fat and kcal on curries/fried items, untouched on a salad",
+      effect: "restaurant",
+      items: [curry(), salad()],
+      check: (out) => out[0].calories === 375 && out[1].calories === 40,
+    },
+    {
+      why: "homemade: no change",
+      effect: "homemade",
+      items: [curry()],
+      check: (out) => out[0].calories === 300,
+    },
+    {
+      why: "add_ghee: +45 kcal and +5 g fat on the item the question names",
+      effect: "add_ghee",
+      items: [dal(), salad()],
+      question: "Add ghee to the dal tadka?",
+      check: (out) => out[0].calories === 195 && out[0].fat_g === 10 && out[1].calories === 40,
+    },
+    {
+      why: "add_ghee with no item named in the question falls back to the biggest item",
+      effect: "add_ghee",
+      items: [salad(), dal()],
+      check: (out) => out[1].calories === 195 && out[0].calories === 40,
+    },
+    {
+      why: "no_oil: -35% fat on every item, with the removed fat's kcal taken off",
+      effect: "no_oil",
+      items: [dal()],
+      check: (out) => out[0].fat_g === 3.3 && out[0].calories === 135,
+    },
+    {
+      why: "smaller: x0.8 grams on all items",
+      effect: "smaller",
+      items: [rangeItem("rice", 200, 180, 220, 300)],
+      check: (out) => out[0].grams === 160 && out[0].grams_low === 144 && out[0].grams_high === 176 && out[0].calories === 240,
+    },
+    {
+      why: "bigger: x1.25 grams on all items",
+      effect: "bigger",
+      items: [rangeItem("rice", 200, 180, 220, 300)],
+      check: (out) => out[0].grams === 250 && out[0].grams_low === 225 && out[0].grams_high === 275 && out[0].calories === 375,
+    },
+    {
+      why: "an unknown effect is ignored — items come back unchanged",
+      effect: "make_it_double",
+      items: [curry()],
+      check: (out) => out[0].calories === 300,
+    },
+  ];
+  for (const c of fcases) {
+    const out = applyFollowUpEffect(c.items, c.effect, c.question);
+    const ok = c.check(out);
+    if (!ok) failures++;
+    console.log(`${ok ? "PASS" : "FAIL"}  ${c.effect} — ${c.why}`);
+  }
+}
+
 runPlateCases().then(() => {
-  const total = cases.length + plateCases.length;
+  const total = cases.length + plateCases.length + 3 + 8; // + gram-range/kcal-band checks + follow-up effect cases
   console.log(`\n${total - failures}/${total} passed.`);
   if (failures) process.exit(1);
 });

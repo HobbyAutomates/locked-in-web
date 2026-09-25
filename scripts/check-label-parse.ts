@@ -4,6 +4,7 @@
  * scan that still produced a full nutrition table, a kJ-only label, and a per-serving-only label.
  */
 import { extractBarcode, parseNutritionLabel, reportNutritionTrusted, sanityCheckPer100 } from "../src/lib/labelParse";
+import { applyParsedNutrition } from "../src/lib/scanFlows";
 
 const FRONT_OF_PACK_ONLY = `Omega loaded NIX SEEDS Roasted & Salted 21g Non GMO Protein
 Healthy Snack with loaded Nutrient
@@ -158,6 +159,31 @@ console.log("\nBarcode __reports cache only takes gate-passing or needs_back_of_
   check("needs_back_of_pack with no numbers is cacheable", reportNutritionTrusted({ needs_back_of_pack: true }) === true);
   check("needs_back_of_pack but still carrying numbers is NOT cacheable", reportNutritionTrusted({ needs_back_of_pack: true, per_100g: IMPOSSIBLE_MUESLI }) === false);
   check("no per_100g and no flag is NOT cacheable", reportNutritionTrusted({ verdict: "ok" }) === false);
+}
+
+console.log("\nv2.8: applyParsedNutrition — the deterministic parser always wins over whatever the model wrote");
+{
+  // The model's structured call hallucinated numbers that don't match the label at all (this is
+  // exactly what the v2.8 one-call label_report collapse must not let through unchecked): the
+  // parser re-reads the SAME transcript and its numbers overwrite the model's per_100g outright.
+  const modelReport: Record<string, unknown> = {
+    product: "Seeds",
+    per_100g: { calories: 999, protein_g: 1, carbs_g: 1, fat_g: 1, sugar_g: 1, sodium_mg: 1 },
+    nutrition_source: "label",
+    needs_back_of_pack: false,
+  };
+  const parsed = parseNutritionLabel(SEEDS_BACK_LABEL);
+  applyParsedNutrition(modelReport, parsed);
+  const per100 = modelReport.per_100g as Record<string, number>;
+  check("parsed calories (~587) replace the model's fabricated 999", Math.abs(per100.calories - 586.76) < 0.5, String(per100.calories));
+  check("parsed fat (~43.4) replace the model's fabricated 1", Math.abs(per100.fat_g - 43.4) < 0.5, String(per100.fat_g));
+  check("nutrition_source is 'label', not whatever the model said", modelReport.nutrition_source === "label");
+
+  // And the reverse: when the transcript has no real table, the model's numbers are CLEARED, not kept.
+  const modelReportNoTable: Record<string, unknown> = { product: "Seeds", per_100g: { calories: 250, protein_g: 5, carbs_g: 20, fat_g: 8 }, verdict_reason: "" };
+  applyParsedNutrition(modelReportNoTable, parseNutritionLabel(FRONT_OF_PACK_ONLY));
+  check("no table -> per_100g is deleted even though the model supplied numbers", !("per_100g" in modelReportNoTable));
+  check("no table -> needs_back_of_pack is set", modelReportNoTable.needs_back_of_pack === true);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -317,6 +317,8 @@ export type LabelReport = {
   thumb_url?: string | null;
   barcode?: string | null;
   transcript?: string;
+  /** v2.8: deterministic sanity-check flags from src/lib/ai/validate/label.ts — never blocks the scan. */
+  validation?: { field: string; issue: string; suggestion: string }[];
 };
 
 /** One detected item on a food photo (see /api/photo-meal). */
@@ -333,7 +335,17 @@ export type PlateItem = {
   food_id: string | null;
   /** v2.0: "restaurant" when the portion was scaled up and the hidden oil added. */
   cooked_in?: string | null;
+  /** v2.8: a plausible gram range for this portion, from the model — optional, older reports have none. */
+  grams_low?: number | null;
+  grams_high?: number | null;
+  /** v2.8: what's uncertain about this item, e.g. "oil amount unclear". */
+  uncertainties?: string[];
 };
+
+/** v2.8: one clarifying question the model can ask after a plate scan, with a fixed effect vocabulary
+ *  the client applies deterministically (see src/lib/scanFollowUp.ts). Unknown effects are ignored. */
+export type FollowUpEffect = "restaurant" | "homemade" | "add_ghee" | "no_oil" | "smaller" | "bigger";
+export type FollowUp = { question: string; options: { label: string; effect: string }[] };
 
 export type PlateEstimate = {
   id?: string | null;
@@ -345,6 +357,8 @@ export type PlateEstimate = {
   photo_path?: string | null;
   /** v2.0: "restaurant" when the note or the plate description said it was eaten out. */
   portion_hint?: "restaurant" | null;
+  /** v2.8: one optional clarifying question, shown as quick-reply chips. */
+  follow_up?: FollowUp | null;
 };
 
 // ---- v2.0: squads ----
