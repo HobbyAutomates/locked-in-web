@@ -47,6 +47,8 @@ type Row = {
   unit_name: string | null;
   unit_grams: number | null;
   barcode: null;
+  /** v2.9 (schema_v32): the dataset's own id — USDA fdc_id, IFCT food code. Feeds the "Where's this from?" links. */
+  source_ref?: string | null;
 };
 
 // ---------- helpers ----------
@@ -329,6 +331,7 @@ function ifctRows(): Row[] {
     const dev = devanagari(name, aliases);
     if (dev) local.hi = dev;
     else delete local.hi;
+    const code = ix("code") >= 0 ? (r[ix("code")] ?? "").trim() : "";
     out.push({
       id: "ifct-" + slug(name),
       name: rawish ? name + " (raw)" : name,
@@ -348,6 +351,7 @@ function ifctRows(): Row[] {
       unit_name: all[0]?.name ?? null,
       unit_grams: all[0]?.grams ?? null,
       barcode: null,
+      source_ref: code || null,
     });
   }
   return out;
@@ -482,6 +486,7 @@ function usdaRows(): Row[] {
       unit_name: all[0]?.name ?? null,
       unit_grams: all[0]?.grams ?? null,
       barcode: null,
+      source_ref: id,
     });
   }
   return out;
@@ -531,9 +536,17 @@ async function main() {
   if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing (.env.local)");
   const { createClient } = require("@supabase/supabase-js") as typeof import("@supabase/supabase-js");
   const sb = createClient(url, key, { db: { schema: "bandlog" }, auth: { persistSession: false } });
+  // v2.9: source_ref needs supabase/schema_v32.sql; before it's applied the rows go up without it.
+  let withRef = true;
   for (let i = 0; i < rows.length; i += 500) {
     const batch = rows.slice(i, i + 500);
-    const { error } = await sb.from("foods").upsert(batch, { onConflict: "id" });
+    const strip = (b: Row[]) => b.map(({ source_ref, ...rest }) => (void source_ref, rest));
+    let { error } = await sb.from("foods").upsert(withRef ? batch : strip(batch), { onConflict: "id" });
+    if (error && withRef && /source_ref/.test(error.message)) {
+      withRef = false;
+      console.warn("foods.source_ref missing (schema_v32 not applied) - importing without it");
+      ({ error } = await sb.from("foods").upsert(strip(batch), { onConflict: "id" }));
+    }
     if (error) throw new Error(`batch ${i}: ${error.message}`);
     console.log(`upserted ${Math.min(i + 500, rows.length)}/${rows.length}`);
   }

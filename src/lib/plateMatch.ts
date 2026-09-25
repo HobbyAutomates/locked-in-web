@@ -1,4 +1,5 @@
 import { isAcceptableMatch, microsFor, type FoodHit } from "@/lib/foodSearch";
+import { sourceInfoFor } from "@/lib/sourceInfo";
 import type { PlateItem } from "@/lib/types";
 
 /** Injected so scripts/check-match.ts can exercise this offline (no DB, no model). */
@@ -33,5 +34,7 @@ export async function crossValidatePlateItem(it: PlateItem, deps: PlateMatchDeps
     micros: { ...it.micros, ...microsFor(match, it.grams) },
     source: match.source === "ai" ? "estimated" : "table",
     food_id: match.source === "ai" ? null : match.id,
+    // v2.9: provenance for the ⓘ sheet (metadata only — the numbers above are the rule).
+    source_info: sourceInfoFor({ name: match.name, food_id: match.id, source: match.source, item_source: "table" }),
   };
 }
