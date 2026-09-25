@@ -16,6 +16,7 @@ import { checkChallengeCompletions } from "./challenges";
 import { battleLine } from "./battleLines";
 import { battleTarget, type BattleGoal } from "./battle";
 import { defaultMealType, isMealType, missingMealTypeColumn, type MealType } from "./mealType";
+import { POST_HINT_COOKIE, POST_HINT_SEEN_COOKIE, autoPostAllowed, editRepostPlan, missingColumn, parseAutoShare } from "./squadSharing";
 
 /** v2.5: Compendium rows for the auto-burn of gym / bodyweight sessions. */
 const LIFT_BURN: Record<"gym" | "bodyweight", { code: string; met: number; label: string }> = {
@@ -179,7 +180,14 @@ export async function saveWorkout(input: {
     }
   }
   await rollupQuietly(supabase, user.id, before && before !== input.date ? [input.date, before] : [input.date]);
-  if (workoutId) await postWorkoutToSquads(supabase, user.id, workoutId, kind, exercisesJson, input.muscles, input.minutes);
+  if (workoutId && input.id) {
+    // v2.9: an edit updates the posts it already has rather than posting again.
+    const pr = await workoutPrBody(supabase, user.id, workoutId, kind, exercisesJson);
+    await repostEdited(supabase, user.id, workoutId, [
+      { kind: "workout", body: workoutPostBody(kind, exercisesJson, input.muscles, input.minutes) },
+      { kind: "pr", body: pr },
+    ]);
+  } else if (workoutId) await postWorkoutToSquads(supabase, user.id, workoutId, kind, exercisesJson, input.muscles, input.minutes);
   revalidatePath("/", "layout");
   return { ok: true, id: workoutId, warning };
 }
@@ -367,6 +375,7 @@ export async function updateMeal(input: { id: string; date: string; meal_type: M
   const { error: e3 } = await supabase.from("meal_items").insert(mealItemRows(input.id, user.id, items));
   if (e3) throw new Error(e3.message);
   await rollupQuietly(supabase, user.id, [old.date as string, input.date]);
+  await repostEdited(supabase, user.id, input.id, [{ kind: "meal", body: mealPostBody(mealItemRows(input.id, user.id, items), input.raw_text ?? "") }]);
   revalidatePath("/", "layout");
   return { id: input.id };
 }
@@ -412,6 +421,7 @@ const PROFILE_KEYS: (keyof Profile)[] = [
   "water_reminder_from",
   "water_reminder_to",
   "water_reminder_every_min",
+  "auto_share",
 ];
 
 /** Upserts the given profile columns for the signed-in user (a partial patch is fine). */
@@ -423,6 +433,11 @@ export async function saveProfile(patch: Partial<Profile>) {
   if ("water_reminder_every_min" in row && ![0, 30, 60, 120, 180, 240].includes(Number(row.water_reminder_every_min))) throw new Error("Pick a reminder interval from the list");
   for (const k of ["water_reminder_from", "water_reminder_to"] as const) if (k in row && !/^\d{2}:\d{2}$/.test(String(row[k]))) throw new Error("Pick a valid time");
   if ("water_glass_ml" in row) row.water_glass_ml = Math.max(50, Math.min(2000, Math.round(Number(row.water_glass_ml) || 250)));
+  // v2.9: null means "column not there yet" (see getProfile) — never write it.
+  if ("auto_share" in row) {
+    if (Array.isArray(row.auto_share)) row.auto_share = parseAutoShare(row.auto_share);
+    else delete row.auto_share;
+  }
   if ("water_goal_ml" in row) row.water_goal_ml = Math.max(250, Math.min(10000, Math.round(Number(row.water_goal_ml) || 2500)));
   const { error } = await supabase.from("profiles").upsert(row);
   if (error) throw new Error(error.message);
@@ -721,19 +736,45 @@ export async function joinPublicSquad(groupId: string): Promise<string> {
 
 type Sb = Awaited<ReturnType<typeof createClient>>;
 
-/** Is the user in any squad and sharing more than streaks? (No squads → no posts, no photo copies.) */
-async function postsWanted(supabase: Sb, userId: string) {
-  const [{ data: member }, { data: prof }] = await Promise.all([
-    supabase.from("group_members").select("group_id").eq("user_id", userId).limit(1),
-    supabase.from("profiles").select("share_stats").eq("id", userId).maybeSingle(),
-  ]);
-  return !!member?.length && prof?.share_stats !== false;
+/**
+ * Would a log of `kind` auto-post anywhere? In a squad, not "streaks only", and (v2.9) that kind's
+ * switch on in Squad sharing. No squads means no posts and no photo copies. Before schema_v31 there
+ * is no auto_share column and every kind counts as on (the v2.8 behaviour).
+ */
+async function postsWanted(supabase: Sb, userId: string, kind: string) {
+  const [{ data: member }, prof] = await Promise.all([supabase.from("group_members").select("group_id").eq("user_id", userId).limit(1), sharingProfile(supabase, userId)]);
+  return !!member?.length && autoPostAllowed({ shareStats: prof.shareStats, autoShare: prof.autoShare, kind });
+}
+
+async function sharingProfile(supabase: Sb, userId: string): Promise<{ shareStats: boolean; autoShare: string[] }> {
+  const res = await supabase.from("profiles").select("share_stats, auto_share").eq("id", userId).maybeSingle();
+  if (res.error && missingColumn(res.error, "auto_share")) {
+    const { data } = await supabase.from("profiles").select("share_stats").eq("id", userId).maybeSingle();
+    return { shareStats: data?.share_stats !== false, autoShare: parseAutoShare(null) };
+  }
+  const row = res.data as { share_stats?: boolean | null; auto_share?: unknown } | null;
+  return { shareStats: row?.share_stats !== false, autoShare: parseAutoShare(row?.auto_share) };
+}
+
+/**
+ * v2.9 first-time hint: a save that really posted leaves a short-lived cookie that <SquadPostHint>
+ * (root layout) turns into "Posted to your squads · Change", once. Skipped after the hint was seen.
+ */
+async function notePosted(rows: number) {
+  if (!(rows > 0)) return;
+  try {
+    const jar = await cookies();
+    if (jar.get(POST_HINT_SEEN_COOKIE)) return;
+    jar.set(POST_HINT_COOKIE, "1", { maxAge: 120, path: "/", sameSite: "lax" });
+  } catch {
+    // Not in a request that can set cookies; the hint waits for the next post.
+  }
 }
 
 /** "Ayaan logged Dal + 2 roti · 420 kcal" on every squad; the plate photo is copied into group-photos. Never throws. */
 async function postMealToSquads(supabase: Sb, userId: string, mealId: string, body: string, photoPath: string | null) {
   try {
-    if (!(await postsWanted(supabase, userId))) return;
+    if (!(await postsWanted(supabase, userId, "meal"))) return;
     let groupPhoto: string | null = null;
     if (photoPath) {
       const dest = `${userId}/meal-${mealId}.jpg`;
@@ -741,28 +782,60 @@ async function postMealToSquads(supabase: Sb, userId: string, mealId: string, bo
       if (copy.error) console.error("[postMealToSquads] photo copy failed", copy.error);
       else groupPhoto = dest;
     }
-    const { error } = await supabase.rpc("post_to_my_groups", { p_kind: "meal", p_body: body, p_ref: mealId, p_photo: groupPhoto });
+    const { data, error } = await supabase.rpc("post_to_my_groups", { p_kind: "meal", p_body: body, p_ref: mealId, p_photo: groupPhoto });
     if (error) console.error("[postMealToSquads]", error);
+    else await notePosted(Number(data ?? 0));
   } catch (e) {
     console.error("[postMealToSquads] threw", e);
   }
 }
 
+/** The PR line for a gym session, or null when no lift beats every earlier session. */
+async function workoutPrBody(supabase: Sb, userId: string, workoutId: string, kind: WorkoutKind, exercises: WorkoutExercise[] | null) {
+  if (kind !== "gym" || !exercises?.length) return null;
+  const { data: prev } = await supabase.from("workouts").select("exercises_json").eq("user_id", userId).eq("kind", "gym").neq("id", workoutId).order("date", { ascending: false }).limit(200);
+  return prPostBody(exercises, (prev ?? []).map((r) => (r.exercises_json as WorkoutExercise[] | null) ?? null));
+}
+
 /** "Gym · 5 exercises · 42 min", plus a PR post when a lift beats every earlier session. Never throws. */
 async function postWorkoutToSquads(supabase: Sb, userId: string, workoutId: string, kind: WorkoutKind, exercises: WorkoutExercise[] | null, muscles: string[], minutes: number | null) {
   try {
-    if (!(await postsWanted(supabase, userId))) return;
-    const { error } = await supabase.rpc("post_to_my_groups", { p_kind: "workout", p_body: workoutPostBody(kind, exercises, muscles, minutes), p_ref: workoutId, p_photo: null });
-    if (error) console.error("[postWorkoutToSquads]", error);
-    if (kind !== "gym" || !exercises?.length) return;
-    const { data: prev } = await supabase.from("workouts").select("exercises_json").eq("user_id", userId).eq("kind", "gym").neq("id", workoutId).order("date", { ascending: false }).limit(200);
-    const pr = prPostBody(exercises, (prev ?? []).map((r) => (r.exercises_json as WorkoutExercise[] | null) ?? null));
-    if (pr) {
-      const res = await supabase.rpc("post_to_my_groups", { p_kind: "pr", p_body: pr, p_ref: workoutId, p_photo: null });
-      if (res.error) console.error("[postWorkoutToSquads] pr", res.error);
+    let posted = 0;
+    if (await postsWanted(supabase, userId, "workout")) {
+      const { data, error } = await supabase.rpc("post_to_my_groups", { p_kind: "workout", p_body: workoutPostBody(kind, exercises, muscles, minutes), p_ref: workoutId, p_photo: null });
+      if (error) console.error("[postWorkoutToSquads]", error);
+      else posted += Number(data ?? 0);
     }
+    if (kind === "gym" && exercises?.length && (await postsWanted(supabase, userId, "pr"))) {
+      const pr = await workoutPrBody(supabase, userId, workoutId, kind, exercises);
+      if (pr) {
+        const res = await supabase.rpc("post_to_my_groups", { p_kind: "pr", p_body: pr, p_ref: workoutId, p_photo: null });
+        if (res.error) console.error("[postWorkoutToSquads] pr", res.error);
+        else posted += Number(res.data ?? 0);
+      }
+    }
+    await notePosted(posted);
   } catch (e) {
     console.error("[postWorkoutToSquads] threw", e);
+  }
+}
+
+/**
+ * v2.9: after an edit saves, the posts that already point at this log get the new body (the RPC
+ * upserts on ref_id and keeps the photo). A log that was never posted stays unposted, and a PR
+ * that stopped being one is taken down. Never throws.
+ */
+async function repostEdited(supabase: Sb, userId: string, refId: string, next: { kind: string; body: string | null }[]) {
+  try {
+    const { data } = await supabase.from("group_posts").select("kind").eq("user_id", userId).eq("ref_id", refId);
+    const plan = editRepostPlan([...new Set((data ?? []).map((r) => r.kind as string))], next);
+    for (const r of plan.repost) {
+      const { error } = await supabase.rpc("post_to_my_groups", { p_kind: r.kind, p_body: r.body, p_ref: refId, p_photo: null });
+      if (error) console.error("[repostEdited]", r.kind, error);
+    }
+    if (plan.remove.length) await supabase.from("group_posts").delete().eq("user_id", userId).eq("ref_id", refId).in("kind", plan.remove);
+  } catch (e) {
+    console.error("[repostEdited] threw", e);
   }
 }
 
@@ -895,6 +968,15 @@ export async function postSquadPhoto(groupId: string, base64: string, caption: s
     return { ok: false, error: describe(error) };
   }
   return { ok: true };
+}
+
+/** v2.9: "Auto-post my logs here" for one squad (my own group_members row; RLS "members update self"). */
+export async function setSquadAutoPost(groupId: string, on: boolean) {
+  const { supabase, user } = await userOrThrow();
+  const { data, error } = await supabase.from("group_members").update({ auto_post: on }).eq("group_id", groupId).eq("user_id", user.id).select("group_id");
+  if (error) throw new Error(missingColumn(error, "auto_post") ? "This switch needs the latest update on the server. Try again soon." : error.message);
+  if (!data?.length) throw new Error("You're not in this squad any more");
+  revalidatePath(`/squad/${groupId}`, "layout");
 }
 
 export async function deleteSquadPost(id: string) {

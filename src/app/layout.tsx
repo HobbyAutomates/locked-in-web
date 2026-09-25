@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { APP_VERSION } from "@/lib/version";
+import { SquadPostHint } from "@/components/SquadPostHint";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist", weight: ["400", "500", "600", "700", "800"] });
 
@@ -40,7 +41,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <SquadPostHint />
+      </body>
     </html>
   );
 }

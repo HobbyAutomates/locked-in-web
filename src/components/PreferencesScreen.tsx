@@ -6,9 +6,10 @@ import { saveProfile, signOut } from "@/lib/actions";
 import { onCount } from "@/lib/reminders";
 import { THEME_MODES, setThemeMode, useThemeMode, type ThemeMode } from "@/lib/theme";
 import { LENS_DEFAULTS, type LensDefault, type Profile, type Units } from "@/lib/types";
+import { AUTO_SHARE_KINDS, AUTO_SHARE_LABELS, withAutoShareKind, type AutoShareKind } from "@/lib/squadSharing";
 import { displayName } from "@/lib/display";
 import type { PrefSection } from "@/lib/preferences";
-import { Bell, Check, Exit, Flame, Glass, Lock, Mail, Moon, Person, Refresh, Scale, Scan, Share, Steps, Target, Trash } from "./icons";
+import { Bell, Bowl, Check, Dumbbell, Exit, Flame, Glass, Lock, Mail, Medal, Moon, Person, Refresh, Scale, Scan, Share, Steps, Target, Trash } from "./icons";
 import { NameField } from "./ProfileScreen";
 import SubPage from "./SubPage";
 import { BottomSheet, Card, Chevron, ErrorNote, Hair, PillSwitch, Rise, SettingRow, Toggle } from "./ui";
@@ -56,7 +57,7 @@ function PreferencesIndex({ profile }: { profile: Profile }) {
               </span>
             </SettingRow>
             <Hair />
-            <SettingRow icon={<Lock size={20} />} label="Privacy" subtitle="What your squads see" href="/profile/preferences/privacy">
+            <SettingRow icon={<Lock size={20} />} label="Privacy" subtitle="Squad sharing: what your squads see" href="/profile/preferences/privacy">
               <span className="flex items-center gap-1 text-[13px] muted">
                 {profile.share_stats ? "Stats" : "Streaks"}
                 <Chevron />
@@ -290,30 +291,60 @@ function Tracking({ profile }: { profile: Profile }) {
 
 // ---- Privacy ----
 
+/**
+ * v2.9 Squad sharing: one card. "Share my calories & protein" is share_stats (off = streaks only,
+ * and nothing auto-posts, as before); the three auto-post switches are profiles.auto_share, shown
+ * once schema_v31 is in (auto_share null = not yet). Per-squad mutes live on each squad's info page.
+ */
 function Privacy({ profile }: { profile: Profile }) {
   const { save, error } = useSave();
   const [share, setShare] = useState(profile.share_stats);
+  const [kinds, setKinds] = useState<AutoShareKind[] | null>(profile.auto_share);
   return (
     <>
       <ErrorNote text={error} />
       <Rise index={0}>
+        <p className="px-1 text-xs font-semibold muted">Squad sharing</p>
+      </Rise>
+      <Rise index={0}>
         <Card padding={0}>
           <div className="px-4">
-            <SettingRow icon={<Share size={20} />} label="Share stats with squad" subtitle={share ? "Streaks + protein & calories" : "Streaks only"}>
+            <SettingRow icon={<Share size={20} />} label="Share my calories & protein" subtitle={share ? "Squads see today's calories & protein" : "Streaks only, and nothing auto-posts"}>
               <Toggle
                 on={share}
                 onChange={(v) => {
                   setShare(v);
                   void save({ share_stats: v });
                 }}
-                label="Share stats with squad"
+                label="Share my calories & protein"
               />
             </SettingRow>
+            {kinds
+              ? AUTO_SHARE_KINDS.map((k) => (
+                  <div key={k}>
+                    <Hair />
+                    <SettingRow icon={k === "meal" ? <Bowl size={20} /> : k === "workout" ? <Dumbbell size={20} /> : <Medal size={20} />} label={AUTO_SHARE_LABELS[k]} subtitle={share ? undefined : "Off while you share streaks only"}>
+                      <Toggle
+                        on={share && kinds.includes(k)}
+                        disabled={!share}
+                        onChange={(v) => {
+                          const next = withAutoShareKind(kinds, k, v);
+                          setKinds(next);
+                          void save({ auto_share: next });
+                        }}
+                        label={AUTO_SHARE_LABELS[k]}
+                      />
+                    </SettingRow>
+                  </div>
+                ))
+              : null}
           </div>
         </Card>
       </Rise>
       <Rise index={1}>
-        <p className="px-1 text-[13px] leading-relaxed muted">Your squads always see your name, photo and streak. With this on they also see today&apos;s protein and calories. Meals, photos, weight and scans are never shared.</p>
+        <p className="px-1 text-[13px] leading-relaxed muted">
+          Your squads always see your name, photo and streak. Auto-posts put what you log in each squad&apos;s Feed: meal names with kcal, workouts and gym PRs. To stop posting in one squad, open it, tap its name and turn off &quot;Auto-post my logs here&quot;. Weight and scans are never shared.
+        </p>
       </Rise>
     </>
   );

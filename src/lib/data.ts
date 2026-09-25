@@ -6,6 +6,7 @@ import { parse as parseReminders } from "./reminders";
 import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 import { scanName } from "./scanNames";
 import { isMealType, missingMealTypeColumn } from "./mealType";
+import { parseAutoPost, parseAutoShare } from "./squadSharing";
 
 const PROFILE_COLS =
   "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml, units, username, water_glass_ml, water_reminder_from, water_reminder_to, water_reminder_every_min";
@@ -17,10 +18,12 @@ const hhmm = (v: unknown, fallback: string): string => (typeof v === "string" &&
 /** The signed-in user's `profiles` row with Android's defaults filled in for anything unset. */
 export async function getProfile(): Promise<Profile> {
   const supabase = await createClient();
-  const { data } = await supabase.from("profiles").select(PROFILE_COLS).maybeSingle();
+  // v2.9: auto_share comes in its own query so a database without schema_v31 still loads the profile.
+  const [{ data }, share] = await Promise.all([supabase.from("profiles").select(PROFILE_COLS).maybeSingle(), supabase.from("profiles").select("auto_share").maybeSingle()]);
   if (!data) return { ...DEFAULT_PROFILE };
   const d = data as Record<string, unknown>;
   return {
+    auto_share: share.error ? null : parseAutoShare((share.data as { auto_share?: unknown } | null)?.auto_share),
     weekly_workout_target: num(d.weekly_workout_target) ?? DEFAULT_PROFILE.weekly_workout_target,
     protein_target_g: num(d.protein_target_g) ?? DEFAULT_PROFILE.protein_target_g,
     calorie_target: num(d.calorie_target) ?? DEFAULT_PROFILE.calorie_target,
@@ -415,6 +418,17 @@ export async function getSentNudges(): Promise<string[]> {
 const SQUAD_COLS = "id, name, code, owner_id, created_at, description, icon, cover_url, tagline, is_public, join_policy, battle_enabled";
 
 /** One squad I'm in (RLS hides the rest), with its member count. */
+/**
+ * v2.9: my "Auto-post my logs here" switch for one squad. null = schema_v31 not applied yet
+ * (no group_members.auto_post), so the switch is hidden and everything posts as before.
+ */
+export async function getMyAutoPost(groupId: string, userId: string): Promise<boolean | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("group_members").select("auto_post").eq("group_id", groupId).eq("user_id", userId).maybeSingle();
+  if (error || !data) return null;
+  return parseAutoPost((data as { auto_post?: unknown }).auto_post);
+}
+
 export async function getSquad(id: string): Promise<Squad | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("groups").select(SQUAD_COLS).eq("id", id).maybeSingle();

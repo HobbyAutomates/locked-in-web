@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { approveJoin, declineJoin, leaveSquad, toggleBattle, updateSquad } from "@/lib/actions";
+import { approveJoin, declineJoin, leaveSquad, setSquadAutoPost, toggleBattle, updateSquad } from "@/lib/actions";
 import { inviteLink } from "@/lib/squadPosts";
 import type { JoinRequest, Squad, SquadMemberDetail } from "@/lib/types";
 import { Avatar } from "./Avatar";
@@ -10,14 +10,22 @@ import { ArrowLeft, Chat, Check, Copy, Flame, Globe, LinkIcon, Padlock, Pencil, 
 import { SQUAD_ICON_KEYS, SQUAD_ICON_LABELS, SquadIcon, SquadIconArt, isSquadIcon } from "./SquadIcon";
 import { BottomSheet, BreathingFlame, Card, ErrorNote, PillButton, Rise, Toggle } from "./ui";
 
-type Props = { me: string; squad: Squad; members: SquadMemberDetail[]; requests: JoinRequest[]; justCreated: boolean };
+type Props = {
+  me: string;
+  squad: Squad;
+  members: SquadMemberDetail[];
+  requests: JoinRequest[];
+  justCreated: boolean;
+  /** v2.9: my "Auto-post my logs here" for this squad; null = schema_v31 not applied yet (switch hidden). */
+  autoPost?: boolean | null;
+};
 
 /**
  * v2.6 squad details (Cal AI's group info + Strava club page): the squad's icon and name, "Invite
  * your friends" with the link and Share / WhatsApp / Copy, the owner's pending requests
  * (Approve / Decline), Members with an Owner badge and 🔥 day streaks, Edit (owner) and Leave.
  */
-export default function SquadMembers({ me, squad, members, requests: requests0, justCreated }: Props) {
+export default function SquadMembers({ me, squad, members, requests: requests0, justCreated, autoPost = null }: Props) {
   const router = useRouter();
   const isOwner = squad.owner_id === me;
   const link = inviteLink(squad.code);
@@ -28,6 +36,18 @@ export default function SquadMembers({ me, squad, members, requests: requests0, 
   const [error, setError] = useState<string | null>(null);
   const [edit, setEdit] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [posting, setPosting] = useState(autoPost);
+
+  async function toggleAutoPost(on: boolean) {
+    setError(null);
+    setPosting(on);
+    try {
+      await setSquadAutoPost(squad.id, on);
+    } catch (e) {
+      setPosting(!on);
+      setError(e instanceof Error ? e.message : "Could not change that");
+    }
+  }
 
   async function copy() {
     try {
@@ -155,6 +175,20 @@ export default function SquadMembers({ me, squad, members, requests: requests0, 
                     )}
                   </div>
                 ))}
+              </div>
+            </Card>
+          </Rise>
+        ) : null}
+
+        {posting !== null ? (
+          <Rise index={3}>
+            <Card padding={0}>
+              <div className="flex min-h-[64px] items-center gap-3 px-4 py-3">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[15px] font-bold">Auto-post my logs here</span>
+                  <span className="text-xs muted">{posting ? "Your meals, workouts and PRs show in this squad's Feed" : "Nothing you log posts here. Chat and photos still work"}</span>
+                </span>
+                <Toggle on={posting} onChange={(v) => void toggleAutoPost(v)} label="Auto-post my logs here" />
               </div>
             </Card>
           </Rise>

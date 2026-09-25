@@ -1,4 +1,5 @@
 import type { BandLevel, Muscle } from "./muscles";
+import type { AutoShareKind } from "./squadSharing";
 
 export type Workout = {
   id: string;
@@ -154,6 +155,8 @@ export type Profile = {
   water_reminder_from: string;
   water_reminder_to: string;
   water_reminder_every_min: number;
+  /** v2.9 Squad sharing: kinds that auto-post (meal / workout / pr). null = schema_v31 not applied yet (everything posts). */
+  auto_share: AutoShareKind[] | null;
 };
 
 export type Units = "metric" | "imperial";
@@ -183,6 +186,7 @@ export const DEFAULT_PROFILE: Profile = {
   rollover_calories: false,
   water_goal_ml: 2500,
   units: "metric",
+  auto_share: null,
   username: null,
   water_glass_ml: 250,
   water_reminder_from: "08:00",

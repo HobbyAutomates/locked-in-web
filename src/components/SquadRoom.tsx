@@ -7,11 +7,13 @@ import { AnimatePresence, motion } from "motion/react";
 import { deleteSquadPost, loadChallenges, loadLeaderboard, loadSquadPosts, nudgeMember, postSquadPhoto, sendSquadMessage } from "@/lib/actions";
 import { postStamp } from "@/lib/display";
 import { CHAT_KINDS, FEED_KINDS } from "@/lib/squadPosts";
+import { SQUAD_SHARING_HREF, canDeletePost } from "@/lib/squadSharing";
 import { toJpegBase64 } from "@/lib/image";
 import type { BattleWinner, Challenge, ChallengeBoardRow, LeaderRow, Squad, SquadPost } from "@/lib/types";
 import { Avatar } from "./Avatar";
 import { BattleTab } from "./BattleTab";
-import { ArrowLeft, Bowl, Chat, Check, ChevronRight, Dumbbell, Fist, Flame, Medal, People, Photo, Plus, Send, Spinner, Target, Trash } from "./icons";
+import { UndoSnackbar, usePendingDeletes } from "./LogBits";
+import { ArrowLeft, Bowl, Chat, Check, ChevronRight, Dumbbell, Fist, Flame, Medal, People, Photo, Plus, Send, Target, Trash } from "./icons";
 import { ChallengesTab } from "./SquadChallenges";
 import { SquadRankRow } from "./SquadRankRow";
 import { SquadIcon } from "./SquadIcon";
@@ -70,6 +72,29 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
   const [photoSheet, setPhotoSheet] = useState<null | { base64: string; preview: string }>(null);
   const [profileSheet, setProfileSheet] = useState<LeaderRow | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
+  const isOwner = squad.owner_id === me;
+
+  // v2.9: delete your own post (or any post, as the owner) with the v2.7 undo: it hides at once,
+  // "Post deleted · Undo" shows for 5 s, then the real delete runs (still runs if you leave first).
+  const [deletedSnack, setDeletedSnack] = useState<string | null>(null);
+  const dels = usePendingDeletes(
+    deleteSquadPost,
+    (id) => {
+      setChat((c) => c.filter((p) => p.id !== id));
+      setFeed((f) => f.filter((p) => p.id !== id));
+    },
+    setError,
+  );
+  function deletePost(id: string) {
+    setError(null);
+    dels.start(id);
+    setDeletedSnack(id);
+  }
+  useEffect(() => {
+    if (!deletedSnack) return;
+    const t = setTimeout(() => setDeletedSnack(null), 5000);
+    return () => clearTimeout(t);
+  }, [deletedSnack]);
 
   // A remembered tab (this browser's last choice on this squad) wins over the Challenges/Leaderboard
   // default, but a deep link — a notification, a shared "?tab=" link — always wins over both. This
@@ -200,7 +225,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
       ) : null}
 
       {tab === "chat" ? (
-        <ChatTab me={me} today={today} posts={chat} onPhoto={() => photoRef.current?.click()} onSent={() => void refresh("chat")} squadId={squad.id} setPosts={setChat} onError={setError} />
+        <ChatTab me={me} today={today} posts={chat.filter((p) => !dels.isPending(p.id))} isOwner={isOwner} onDelete={deletePost} onPhoto={() => photoRef.current?.click()} onSent={() => void refresh("chat")} squadId={squad.id} setPosts={setChat} onError={setError} />
       ) : tab === "challenges" ? (
         <ChallengesTab
           me={me}
@@ -215,7 +240,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           }}
         />
       ) : tab === "feed" ? (
-        <FeedTab me={me} today={today} squadId={squad.id} posts={feed} shareStats={shareStats} isOwner={squad.owner_id === me} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDeleted={(id) => setFeed((f) => f.filter((p) => p.id !== id))} onError={setError} />
+        <FeedTab me={me} today={today} squadId={squad.id} posts={feed.filter((p) => !dels.isPending(p.id))} shareStats={shareStats} isOwner={isOwner} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDelete={deletePost} />
       ) : tab === "leaderboard" ? (
         <LeaderboardTab me={me} squadId={squad.id} rows={board} sentNudges={sentNudges} onError={setError} onOpenProfile={setProfileSheet} />
       ) : (
@@ -246,6 +271,13 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
         }}
       />
       <MemberProfileSheet squadId={squad.id} row={profileSheet} onClose={() => setProfileSheet(null)} />
+      <UndoSnackbar
+        text={deletedSnack ? "Post deleted" : null}
+        onUndo={() => {
+          if (deletedSnack) dels.undo(deletedSnack);
+          setDeletedSnack(null);
+        }}
+      />
     </div>
   );
 }
@@ -301,6 +333,8 @@ function ChatTab({
   me,
   today,
   posts,
+  isOwner,
+  onDelete,
   squadId,
   onPhoto,
   onSent,
@@ -310,6 +344,8 @@ function ChatTab({
   me: string;
   today: string;
   posts: SquadPost[];
+  isOwner: boolean;
+  onDelete: (id: string) => void;
   squadId: string;
   onPhoto: () => void;
   onSent: () => void;
@@ -364,6 +400,7 @@ function ChatTab({
             return (
               <div key={p.id} className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`} style={{ marginTop: grouped ? -4 : 4 }}>
                 {!mine ? <span className="w-8 shrink-0">{!grouped ? <Avatar path={p.author_avatar_path} name={p.author_name} size={32} /> : null}</span> : null}
+                {mine && canDeletePost(p, me, isOwner) ? <PostMenu up align="left" onDelete={() => onDelete(p.id)} /> : null}
                 <div className={`flex max-w-[78%] flex-col ${mine ? "items-end" : "items-start"}`}>
                   {!mine && !grouped ? <span className="mb-0.5 px-1 text-[11px] font-bold muted">{p.author_name}</span> : null}
                   {p.kind === "photo" && p.photo_url ? (
@@ -380,6 +417,7 @@ function ChatTab({
                   ) : null}
                   {!grouped || i === ordered.length - 1 ? <span className="mt-0.5 px-1 text-[10px] muted">{p.id.startsWith("temp-") ? "Sending…" : postStamp(p.created_at, today)}</span> : null}
                 </div>
+                {!mine && canDeletePost(p, me, isOwner) ? <PostMenu up align="right" onDelete={() => onDelete(p.id)} /> : null}
               </div>
             );
           })
@@ -429,8 +467,7 @@ function FeedTab({
   isOwner,
   onPhoto,
   onChallenges,
-  onDeleted,
-  onError,
+  onDelete,
 }: {
   me: string;
   today: string;
@@ -440,21 +477,8 @@ function FeedTab({
   isOwner: boolean;
   onPhoto: () => void;
   onChallenges: () => void;
-  onDeleted: (id: string) => void;
-  onError: (e: string | null) => void;
+  onDelete: (id: string) => void;
 }) {
-  const [deleting, setDeleting] = useState<string | null>(null);
-  async function remove(id: string) {
-    setDeleting(id);
-    try {
-      await deleteSquadPost(id);
-      onDeleted(id);
-    } catch (e) {
-      onError(e instanceof Error ? e.message : "Could not delete that");
-    } finally {
-      setDeleting(null);
-    }
-  }
   return (
     <div className="flex flex-col gap-3 px-4 pb-10 pt-3">
       <button type="button" className="card press flex items-center gap-3 text-left" style={{ padding: "12px 14px", color: "var(--ink)" }} onClick={onPhoto}>
@@ -469,7 +493,7 @@ function FeedTab({
       {!shareStats ? (
         <p className="px-1 text-[12px] muted">
           You share streaks only, so your meals and workouts don&apos;t post here.{" "}
-          <Link href="/profile" className="font-semibold underline" style={{ color: "var(--ink)" }}>
+          <Link href={SQUAD_SHARING_HREF} className="font-semibold underline" style={{ color: "var(--ink)" }}>
             Change
           </Link>
         </p>
@@ -487,7 +511,7 @@ function FeedTab({
           {posts.map((p) => {
             const meta = KIND_META[p.kind] ?? KIND_META.photo;
             const verb = isCompletion(p) ? "crushed a challenge" : meta.verb;
-            const canDelete = p.user_id === me || isOwner;
+            const canDelete = canDeletePost(p, me, isOwner);
             return (
               <motion.article key={p.id} layout className="card" style={{ padding: 14 }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0, padding: 0 }}>
                 <div className="flex items-center gap-2.5">
@@ -504,6 +528,7 @@ function FeedTab({
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)", color: meta.tint }}>
                     <meta.Icon size={16} />
                   </span>
+                  {canDelete ? <PostMenu align="right" onDelete={() => onDelete(p.id)} /> : null}
                 </div>
                 {p.photo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
@@ -525,19 +550,57 @@ function FeedTab({
                     </button>
                   )
                 ) : null}
-                {canDelete ? (
-                  <div className="mt-1 flex justify-end">
-                    <button type="button" className="hit press flex items-center gap-1 px-1 py-1 text-[11px] font-semibold muted" disabled={deleting === p.id} onClick={() => void remove(p.id)} aria-label="Delete post">
-                      {deleting === p.id ? <Spinner size={12} /> : <Trash size={13} />}
-                      Delete
-                    </button>
-                  </div>
-                ) : null}
               </motion.article>
             );
           })}
         </AnimatePresence>
       )}
+    </div>
+  );
+}
+
+/**
+ * v2.9: the "⋯" on a post you may delete (yours, or any post in a squad you own). One item,
+ * Delete, and no confirm: the Undo snackbar covers a slip.
+ */
+function PostMenu({ onDelete, align, up = false }: { onDelete: () => void; align: "left" | "right"; up?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className="relative shrink-0 self-center">
+      <button type="button" aria-label="Post options" aria-haspopup="menu" aria-expanded={open} className="hit press grid h-8 w-8 place-items-center rounded-full text-[18px] font-bold leading-none muted" style={{ background: "none", border: 0 }} onClick={() => setOpen((o) => !o)}>
+        ⋯
+      </button>
+      {open ? (
+        <div role="menu" className="absolute z-30 min-w-[132px] rounded-2xl py-1" style={{ [align]: 0, ...(up ? { bottom: "100%" } : { top: "100%" }), background: "var(--card)", boxShadow: "var(--shadow-lg)" }}>
+          <button
+            type="button"
+            role="menuitem"
+            className="press flex min-h-[44px] w-full items-center gap-2 px-3.5 text-[14px] font-semibold"
+            style={{ background: "none", border: 0, color: "var(--red)" }}
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+          >
+            <Trash size={15} />
+            Delete
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

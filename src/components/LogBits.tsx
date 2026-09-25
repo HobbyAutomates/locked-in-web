@@ -194,8 +194,8 @@ export function usePendingDeletes(action: (id: string) => Promise<void>, onDone?
   return { isPending: (id: string) => pending.includes(id), start, undo };
 }
 
-/** Bottom snackbar with an optional Undo, above the tab bar. */
-export function UndoSnackbar({ text, onUndo, undoDisabled }: { text: string | null; onUndo?: () => void; undoDisabled?: boolean }) {
+/** Bottom snackbar with an optional Undo (or another one-word action, e.g. v2.9's "Change"), above the tab bar. */
+export function UndoSnackbar({ text, onUndo, undoDisabled, actionLabel = "Undo" }: { text: string | null; onUndo?: () => void; undoDisabled?: boolean; actionLabel?: string }) {
   return (
     <AnimatePresence>
       {text ? (
@@ -211,7 +211,7 @@ export function UndoSnackbar({ text, onUndo, undoDisabled }: { text: string | nu
           <span className="min-w-0 truncate">{text}</span>
           {onUndo ? (
             <button type="button" className="hit press shrink-0 font-bold underline" style={{ background: "none", border: 0, color: "inherit", opacity: undoDisabled ? 0.5 : 1 }} disabled={undoDisabled} onClick={onUndo}>
-              Undo
+              {actionLabel}
             </button>
           ) : null}
         </motion.div>
