@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.7";
+export const APP_VERSION = "2.8";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.8",
+    date: "2026-09-25",
+    lines: [
+      "Home now groups your food into Breakfast, Lunch, Dinner and Snacks, each with its calories and protein and its own + Add. We guess the meal from the time and you can switch it with one tap.",
+      "Tap anything you logged to fix it: change the grams or items in a meal, the minutes of a workout, a glass of water or a weigh-in. Delete lives inside, with Undo.",
+      "Simpler everywhere: one Log activity button for every kind of workout, water in one tap from +, Progress down to four cards, and photo scans show a gram range and ask one quick question like homemade or restaurant.",
+    ],
+  },
   {
     version: "2.7",
     date: "2026-09-25",
