@@ -76,6 +76,14 @@ end $$;
 grant execute on function bandlog.post_to_my_groups(text, text, uuid, text) to authenticated;
 
 -- ---------------------------------------------------------------------------------------------
+-- Authors can edit their own posts (body/photo). Without this, the Food Battle snap enrichment
+-- (postBattleSnap on web, BattleRepo on Android) silently updated nothing under RLS.
+-- ---------------------------------------------------------------------------------------------
+drop policy if exists "posts author update" on bandlog.group_posts;
+create policy "posts author update" on bandlog.group_posts for update
+  using (user_id = auth.uid()) with check (user_id = auth.uid() and bandlog.is_member(group_id));
+
+-- ---------------------------------------------------------------------------------------------
 -- Grants + reload
 -- ---------------------------------------------------------------------------------------------
 grant all on all tables in schema bandlog to anon, authenticated, service_role;

@@ -36,4 +36,5 @@ alter table bandlog.profiles drop column if exists auto_share;
 alter table bandlog.group_members drop column if exists auto_post;
 notify pgrst, 'reload schema';
 
+drop policy if exists "posts author update" on bandlog.group_posts;
 commit;
