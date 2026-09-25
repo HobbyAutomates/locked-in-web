@@ -17,6 +17,7 @@ import { Card, ErrorNote, Hair, MacroDot, PillButton, Ring, Rise, SPRING, fmt } 
 import { InfoButton, SourceSheet, VariantChips } from "./SourceSheet";
 import { needsCheck, reportSourceInfo, sourceInfoFor } from "@/lib/sourceInfo";
 import { swapToVariant, type FoodVariant } from "@/lib/variants";
+import { track } from "@/lib/track";
 
 const LENSES: { key: Lens; label: string }[] = [
   { key: "protein", label: "Protein" },
@@ -94,6 +95,7 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
       const r = await postJson<Record<string, unknown>>("/api/scan", { image: pl?.base64, media_type: pl?.media_type, thumb: pl?.thumb ?? undefined, lens, note: note.trim() || undefined, ...extra });
       if (typeof r.barcode === "string" && r.barcode) setDigits(r.barcode);
       setRes(toResult(r));
+      track("scan_done", { kind: String(r.kind ?? "label"), found: r.found !== false, forced: extra.kind ?? null });
       // A saved scan (it has an id) belongs in History with its new thumbnail.
       if (r.id) router.refresh();
     } catch (e) {
@@ -417,6 +419,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
     setLogErr(null);
     try {
       await saveMeal({ date: today(), raw_text: `${r.product || "Scanned product"} (scan)`, items: [item] });
+      track("meal_logged", { method: r.kind === "barcode" ? "barcode" : "label", items: 1, from: "scan" });
       setLogged(`Logged ${item.servings != null && item.unit === "serving" ? `${fmt(item.servings)} serving${item.servings === 1 ? "" : "s"}` : `${Math.round(item.grams)} g`} · ${Math.round(item.calories)} kcal`);
       router.refresh();
     } catch (e) {
@@ -481,7 +484,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
               const serving = food.servings[0];
               const item = priceItem(food, serving ? { unit: "serving", value: 1 } : { unit: "g", value: 100 });
               // v2.9: the plate's ⓘ shows where these numbers came from (the label, or Open Food Facts).
-              openOnPlate(router, { items: [{ ...item, image_url: r.image_url ?? null, source_info: r.source_info ?? reportSourceInfo(r as { nutrition_source?: unknown; barcode?: unknown }) }], label: `${r.product || "Scanned product"} (scan)`, kind: "product" });
+              openOnPlate(router, { items: [{ ...item, image_url: r.image_url ?? null, source_info: r.source_info ?? reportSourceInfo(r as { nutrition_source?: unknown; barcode?: unknown }) }], label: `${r.product || "Scanned product"} (scan)`, kind: "product", method: r.kind === "barcode" ? "barcode" : "label" });
             }}
           >
             Add to plate with other food
@@ -1097,6 +1100,7 @@ export function PlateReview({ plate, onSaved, readOnly }: { plate: PlateEstimate
                       photo_path: plate.photo_path ?? null,
                       items: items.map(mealItemFromPlate),
                     });
+                    track("meal_logged", { method: "photo", items: items.length, from: "scan" });
                     onSaved?.();
                     router.push("/");
                   } catch (e) {

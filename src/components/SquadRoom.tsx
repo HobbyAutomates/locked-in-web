@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
+import { track } from "@/lib/track";
 import { deleteSquadPost, loadChallenges, loadLeaderboard, loadSquadPosts, nudgeMember, postSquadPhoto, sendSquadMessage } from "@/lib/actions";
 import { postStamp } from "@/lib/display";
 import { CHAT_KINDS, FEED_KINDS } from "@/lib/squadPosts";
@@ -73,6 +74,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
   const [profileSheet, setProfileSheet] = useState<LeaderRow | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const isOwner = squad.owner_id === me;
+  useEffect(() => track("squad_opened", { squad_id: squad.id, owner: isOwner }), [squad.id, isOwner]);
 
   // v2.9: delete your own post (or any post, as the owner) with the v2.7 undo: it hides at once,
   // "Post deleted · Undo" shows for 5 s, then the real delete runs (still runs if you leave first).

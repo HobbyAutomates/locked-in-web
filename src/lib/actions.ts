@@ -7,6 +7,7 @@ import { createClient } from "./supabase/server";
 import { ONBOARD_SKIP_COOKIE } from "./onboarding";
 import { bandCode, bandIntensity, bandKcal, burnKcal } from "./burn";
 import { rollupQuietly } from "./rollup";
+import { trackServer } from "./trackServer";
 import { adminClient } from "./apiAuth";
 import { today as todayIso } from "./dates";
 import type { Activity, BattleBoardRow, BattleWinner, Challenge, ChallengeBoardRow, ChallengeKind, DescribedExercise, FoodSearchHit, GraffitiEntry, LeaderRow, MealItem, Profile, SavedMeal, SquadMember, SquadPost, WaterEntry, WaterVessel, WorkoutExercise, WorkoutKind } from "./types";
@@ -188,6 +189,7 @@ export async function saveWorkout(input: {
       { kind: "pr", body: pr },
     ]);
   } else if (workoutId) await postWorkoutToSquads(supabase, user.id, workoutId, kind, exercisesJson, input.muscles, input.minutes);
+  if (!input.id) trackServer(supabase, user.id, "activity_logged", { kind, minutes: input.minutes });
   revalidatePath("/", "layout");
   return { ok: true, id: workoutId, warning };
 }
@@ -246,6 +248,7 @@ export async function saveExercise(input: {
     steps: input.steps == null || !(input.steps > 0) ? null : Math.round(input.steps),
   });
   if (error) throw new Error(error.message);
+  trackServer(supabase, user.id, "activity_logged", { kind: "exercise", source: input.source, activity: input.activity_code, minutes: input.minutes });
   await rollupQuietly(supabase, user.id, [input.date]);
   revalidatePath("/", "layout");
 }
@@ -269,6 +272,7 @@ export async function saveDescribedExercises(date: string, items: DescribedExerc
   if (!rows.length) return;
   const { error } = await supabase.from("exercise_log").insert(rows);
   if (error) throw new Error(error.message);
+  trackServer(supabase, user.id, "activity_logged", { kind: "exercise", source: "describe", count: rows.length });
   await rollupQuietly(supabase, user.id, [date]);
   revalidatePath("/", "layout");
 }
@@ -376,6 +380,7 @@ export async function updateMeal(input: { id: string; date: string; meal_type: M
   if (e3) throw new Error(e3.message);
   await rollupQuietly(supabase, user.id, [old.date as string, input.date]);
   await repostEdited(supabase, user.id, input.id, [{ kind: "meal", body: mealPostBody(mealItemRows(input.id, user.id, items), input.raw_text ?? "") }]);
+  trackServer(supabase, user.id, "meal_edited", { items: items.length, moved: old.date !== input.date });
   revalidatePath("/", "layout");
   return { id: input.id };
 }
@@ -386,6 +391,7 @@ export async function deleteMeal(id: string) {
   const { error } = await supabase.from("meals").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw new Error(error.message);
   await supabase.from("group_posts").delete().eq("user_id", user.id).eq("ref_id", id);
+  trackServer(supabase, user.id, "meal_deleted");
   await rollupQuietly(supabase, user.id, date ? [date] : []);
   revalidatePath("/", "layout");
 }
@@ -473,6 +479,7 @@ export async function logWeight(input: { date: string; weight_kg: number; note: 
   if (error) throw new Error(error.message);
   const { error: e2 } = await supabase.from("profiles").upsert({ id: user.id, weight_kg: kg });
   if (e2) throw new Error(e2.message);
+  trackServer(supabase, user.id, "weight_logged");
   revalidatePath("/", "layout");
 }
 
@@ -662,6 +669,7 @@ export async function logWater(ml: number, date?: string, vessel?: WaterVessel |
   const v = vessel && ["glass", "bottle", "large", "custom"].includes(vessel) ? vessel : null;
   const { data, error } = await supabase.from("water_log").insert({ user_id: user.id, date: day, ml: amount, vessel: v }).select("id, date, ml, created_at, vessel").single();
   if (error) throw new Error(error.message);
+  trackServer(supabase, user.id, "water_added", { ml: amount, vessel: v });
   revalidatePath("/", "layout");
   return { id: data.id as string, date: data.date as string, ml: Number(data.ml), created_at: data.created_at as string, vessel: (data.vessel as WaterVessel | null) ?? null };
 }
@@ -980,9 +988,10 @@ export async function setSquadAutoPost(groupId: string, on: boolean) {
 }
 
 export async function deleteSquadPost(id: string) {
-  const { supabase } = await userOrThrow();
+  const { supabase, user } = await userOrThrow();
   const { error } = await supabase.from("group_posts").delete().eq("id", id);
   if (error) throw new Error(error.message);
+  trackServer(supabase, user.id, "post_deleted");
 }
 
 export async function loadLeaderboard(groupId: string): Promise<LeaderRow[]> {
@@ -1022,7 +1031,7 @@ export async function loadChallengeBoard(challengeId: string): Promise<Challenge
 
 /** Start a challenge (bandlog.create_challenge checks the rules and posts "🏁 started" to the feed). */
 export async function createChallenge(input: { groupId: string; kind: ChallengeKind; title: string; targetDays: number; proteinTarget: number | null; startsOn: string; endsOn: string }): Promise<ActionResult> {
-  const { supabase } = await userOrThrow();
+  const { supabase, user } = await userOrThrow();
   const { data, error } = await supabase.rpc("create_challenge", {
     g: input.groupId,
     kind: input.kind,
@@ -1033,6 +1042,7 @@ export async function createChallenge(input: { groupId: string; kind: ChallengeK
     ends_on: input.endsOn,
   });
   if (error) return { ok: false, error: error.message };
+  trackServer(supabase, user.id, "challenge_created", { kind: input.kind, days: input.targetDays });
   revalidatePath(`/squad/${input.groupId}`);
   return { ok: true, id: data as string };
 }

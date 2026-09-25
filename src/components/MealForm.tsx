@@ -20,6 +20,8 @@ import { BottomSheet, ErrorNote, Hair, MacroDot, PillButton, fmt } from "./ui";
 import { InfoButton, SourceSheet, VariantChips, lookUpSources } from "./SourceSheet";
 import { needsCheck, sourceInfoFor } from "@/lib/sourceInfo";
 import { swapToVariant, type FoodVariant } from "@/lib/variants";
+import { track } from "@/lib/track";
+import type { MealMethod } from "@/lib/analytics";
 
 const CATEGORIES: { key: PresetCategory; label: string }[] = [
   { key: "breakfast", label: "Breakfast" },
@@ -146,6 +148,9 @@ export default function MealForm({
   const [notes, setNotes] = useState<string[]>([]);
   const [rawParts, setRawParts] = useState<string[]>([]);
   const [photoPath, setPhotoPath] = useState<string | null>(existing?.photo_path ?? null);
+  /** v2.10 beta events: how this meal got onto the plate (voice / a scan's label or barcode); else worked out at save. */
+  const via = useRef<MealMethod | null>(null);
+  const mealMethod = (): MealMethod => via.current ?? (photoPath || jobs.some((j) => j.kind === "photo") ? "photo" : rawParts.length ? "text" : "search");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -197,6 +202,7 @@ export default function MealForm({
     // Hydrating from storage once on mount is the point of this effect.
     setRows((cur) => [...cur, ...d.items.map((item) => ({ item, key: seq.current++, image: item.image_url ?? null, imageKind: d.kind ?? "generic" }))]);
     if (d.photo_path) setPhotoPath(d.photo_path);
+    if (d.method) via.current = d.method;
     tapped.current.push(d.label);
   }, [prefill]);
 
@@ -354,6 +360,7 @@ export default function MealForm({
   }
 
   const dictation = useDictation((chunk) => {
+    via.current ??= "voice";
     const cur = text.trim();
     const next = (cur ? cur + (/[,।]$/.test(cur) ? " " : ", ") : "") + chunk;
     if (looksLikeSentence(next)) workItOut(next);
@@ -379,7 +386,7 @@ export default function MealForm({
     if (promises.current.size) {
       // Still working something out: close now, Home shows the pending row, the save lands when it's done.
       handedOff.current = true;
-      saveWhenReady({ label: jobs.map((j) => j.label).join(", ") || raw, date, raw_text: raw, items, photo_path: photoPath, meal_type: type, jobs: [...promises.current.values()] });
+      saveWhenReady({ label: jobs.map((j) => j.label).join(", ") || raw, date, raw_text: raw, items, photo_path: photoPath, meal_type: type, jobs: [...promises.current.values()], method: mealMethod() });
       onClose();
       return;
     }
@@ -387,6 +394,7 @@ export default function MealForm({
     setError(null);
     try {
       await saveMeal({ date, raw_text: raw, items, photo_path: photoPath, meal_type: type });
+      track("meal_logged", { method: mealMethod(), items: items.length });
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
