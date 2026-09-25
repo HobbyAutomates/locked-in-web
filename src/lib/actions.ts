@@ -22,6 +22,13 @@ const LIFT_BURN: Record<"gym" | "bodyweight", { code: string; met: number; label
   bodyweight: { code: "02020", met: 7.5, label: "Bodyweight" },
 };
 
+/** v2.8: fallback burn for a Sport / Yoga / Cardio session saved without a priced activity (same METs as Android). */
+const KIND_BURN: Partial<Record<WorkoutKind, { met: number; label: string }>> = {
+  cardio: { met: 7, label: "Cardio" },
+  sport: { met: 6, label: "Sport" },
+  yoga: { met: 2.5, label: "Yoga" },
+};
+
 /** Keep only well-formed sets: a name, reps > 0 (whole), kg ≥ 0 or null. */
 function cleanExercises(list: WorkoutExercise[] | null | undefined): WorkoutExercise[] {
   return (list ?? [])
@@ -69,6 +76,8 @@ export async function saveWorkout(input: {
   /** v2.5: gym | bodyweight | bands (cardio / sport / yoga go through the exercise log). Default bands. */
   kind?: WorkoutKind;
   exercises_json?: WorkoutExercise[] | null;
+  /** v2.8: Sport / Yoga (and legacy Cardio) sessions carry the burn the activity form priced. */
+  burn?: { activity_code: string | null; name: string; intensity: "low" | "medium" | "high"; kcal: number; intensity_pct?: number | null; started_at?: string | null; distance_km?: number | null; steps?: number | null } | null;
 }): Promise<ActionResult> {
   const supabase = await createClient();
   const {
@@ -80,10 +89,10 @@ export async function saveWorkout(input: {
   const lift = kind === "gym" || kind === "bodyweight" ? kind : null;
   const exercisesJson = lift ? cleanExercises(input.exercises_json) : null;
   if (lift && !exercisesJson?.length) return { ok: false, error: "Add at least one exercise" };
-  if (!lift && !input.muscles.length) return { ok: false, error: "Pick at least one muscle" };
-  const { id: _id, ...fields } = input;
+  if (kind === "bands" && !input.muscles.length) return { ok: false, error: "Pick at least one muscle" };
+  const { id: _id, burn: priced, ...fields } = input;
   void _id;
-  const row = { ...fields, muscles: input.muscles.length ? input.muscles : ["Other"], kind, exercises_json: exercisesJson, user_id: user.id };
+  const row = { ...fields, muscles: input.muscles.length || kind !== "bands" ? input.muscles : ["Other"], kind, exercises_json: exercisesJson, user_id: user.id };
   const before = input.id ? ((await supabase.from("workouts").select("date").eq("id", input.id).maybeSingle()).data?.date as string | undefined) : undefined;
   const { data, error } = input.id
     ? await supabase.from("workouts").update(row).eq("id", input.id).eq("user_id", user.id).select("id").single()
@@ -107,7 +116,23 @@ export async function saveWorkout(input: {
       const weight = prof?.weight_kg == null ? null : Number(prof.weight_kg);
       const minutes = Math.max(1, input.minutes ?? (lift ? 45 : 30));
       const burn = await supabase.from("exercise_log").insert(
-        lift
+        priced && !lift && kind !== "bands"
+          ? {
+              user_id: user.id,
+              date: input.date,
+              activity_code: priced.activity_code,
+              name: priced.name.slice(0, 120),
+              minutes,
+              intensity: priced.intensity,
+              kcal: Math.round(priced.kcal * 10) / 10,
+              source: "workout",
+              note: workoutId,
+              ...(priced.intensity_pct != null ? { intensity_pct: Math.max(0, Math.min(100, Math.round(priced.intensity_pct))) } : {}),
+              ...(priced.started_at ? { started_at: priced.started_at } : {}),
+              ...(priced.distance_km != null && priced.distance_km > 0 ? { distance_km: Math.round(priced.distance_km * 100) / 100 } : {}),
+              ...(priced.steps != null && priced.steps > 0 ? { steps: Math.round(priced.steps) } : {}),
+            }
+          : lift
           ? {
               user_id: user.id,
               date: input.date,
@@ -116,6 +141,18 @@ export async function saveWorkout(input: {
               minutes,
               intensity: "medium",
               kcal: burnKcal(LIFT_BURN[lift].met, weight, minutes),
+              source: "workout",
+              note: workoutId,
+            }
+          : kind !== "bands"
+          ? {
+              user_id: user.id,
+              date: input.date,
+              activity_code: null,
+              name: (input.exercises || KIND_BURN[kind]?.label || "Workout").slice(0, 120),
+              minutes,
+              intensity: "medium",
+              kcal: burnKcal(KIND_BURN[kind]?.met ?? 5, weight, minutes),
               source: "workout",
               note: workoutId,
             }

@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { logWater, saveProfile, undoLastWater } from "@/lib/actions";
+import { deleteWater, logWater, saveProfile, undoLastWater } from "@/lib/actions";
+import { updateWater } from "@/lib/activityActions";
 import { formatTime } from "@/lib/display";
 import { shortDate } from "@/lib/dates";
 import type { WaterEntry, WaterVessel } from "@/lib/types";
@@ -10,7 +11,8 @@ import { hasServiceWorker, notificationsSupported, scheduleWaterReminders, WATER
 import { ConfettiBurst } from "./Confetti";
 import { Check, Minus, Plus, Spinner } from "./icons";
 import { litres, WaterBottle } from "./WaterBottle";
-import { Card, ErrorNote, Rise } from "./ui";
+import { BottomSheet, Card, ErrorNote, NumberField, Rise } from "./ui";
+import { DeletedRow, EditorDelete, usePendingDeletes } from "./LogBits";
 
 const GLASS_SIZES = [150, 200, 250, 300, 350, 400, 500];
 
@@ -41,7 +43,8 @@ type Props = {
  * v2.6 Water page — Fittr's "Your daily water intake" blended with the vessel sheet: the goal as
  * glasses (editable), a bottle that fills with + / − beside it, one-tap vessels with a + under
  * each (and a custom amount), confetti when the goal is hit, and the reminder window + interval.
- * Every add is one water_log row; − removes the latest (an undo).
+ * Every add is one water_log row; − removes the latest (an undo). v2.8: tap a logged drink to change
+ * its amount or delete it (with Undo).
  */
 export default function WaterScreen({ date, isToday, entries: initial, goalMl: initialGoal, glassMl: initialGlass, reminder }: Props) {
   const [entries, setEntries] = useState<WaterEntry[]>(initial);
@@ -52,7 +55,13 @@ export default function WaterScreen({ date, isToday, entries: initial, goalMl: i
   const [confetti, setConfetti] = useState(0);
   const [customOpen, setCustomOpen] = useState(false);
   const [custom, setCustom] = useState("");
-  const total = entries.reduce((a, e) => a + e.ml, 0);
+  const [editing, setEditing] = useState<WaterEntry | null>(null);
+  const dels = usePendingDeletes(
+    (id) => deleteWater(id),
+    (id) => setEntries((list) => list.filter((x) => x.id !== id)),
+    (msg) => setError(msg),
+  );
+  const total = entries.filter((e) => !dels.isPending(e.id)).reduce((a, e) => a + e.ml, 0);
   const goal = Math.max(glassMl, goalMl || 2500);
   const done = total >= goal;
   const glasses = Math.max(1, Math.round(goal / glassMl));
@@ -78,11 +87,11 @@ export default function WaterScreen({ date, isToday, entries: initial, goalMl: i
   }
 
   async function undo() {
-    if (!entries.length) return;
+    const removed = entries.find((e) => !dels.isPending(e.id));
+    if (!removed) return;
     setError(null);
     setBusy("minus");
-    const [removed, ...rest] = entries;
-    setEntries(rest);
+    setEntries((list) => list.filter((x) => x.id !== removed.id));
     try {
       await undoLastWater(date);
     } catch (e) {
@@ -176,7 +185,7 @@ export default function WaterScreen({ date, isToday, entries: initial, goalMl: i
                   <RoundButton label={`Add a ${glassMl} mL glass`} onClick={() => void add(glassMl, "glass")} busy={busy === "glass"}>
                     <Plus size={18} />
                   </RoundButton>
-                  <RoundButton label="Remove the last one" onClick={() => void undo()} busy={busy === "minus"} disabled={!entries.length}>
+                  <RoundButton label="Remove the last one" onClick={() => void undo()} busy={busy === "minus"} disabled={!entries.some((e) => !dels.isPending(e.id))}>
                     <Minus size={18} />
                   </RoundButton>
                 </div>
@@ -247,12 +256,25 @@ export default function WaterScreen({ date, isToday, entries: initial, goalMl: i
           </div>
           {entries.length ? (
             <ul className="mt-3 flex flex-col">
-              {entries.slice(0, 8).map((e, i) => (
-                <li key={e.id} className="flex items-center justify-between py-1.5 text-[13px]" style={{ borderTop: i ? "1px solid var(--hair)" : "none" }}>
-                  <span className="muted">{formatTime(e.created_at)}</span>
-                  <span className="font-semibold">
-                    {VESSELS.find((v) => v.key === e.vessel)?.label ?? "Water"} · <span className="num">{e.ml} mL</span>
-                  </span>
+              {entries.map((e, i) => (
+                <li key={e.id} style={{ borderTop: i ? "1px solid var(--hair)" : "none" }}>
+                  {dels.isPending(e.id) ? (
+                    <DeletedRow onUndo={() => dels.undo(e.id)} />
+                  ) : (
+                    <button
+                      type="button"
+                      className="press flex min-h-[44px] w-full items-center justify-between py-1.5 text-left text-[13px]"
+                      style={{ background: "none", border: 0, color: "var(--ink)" }}
+                      disabled={e.id.startsWith("temp-")}
+                      aria-label={`Edit ${e.ml} mL logged at ${formatTime(e.created_at)}`}
+                      onClick={() => setEditing(e)}
+                    >
+                      <span className="muted">{formatTime(e.created_at)}</span>
+                      <span className="font-semibold">
+                        {VESSELS.find((v) => v.key === e.vessel)?.label ?? "Water"} · <span className="num">{e.ml} mL</span>
+                      </span>
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -265,7 +287,74 @@ export default function WaterScreen({ date, isToday, entries: initial, goalMl: i
       </Rise>
 
       {confetti ? <ConfettiBurst key={confetti} /> : null}
+      <WaterEntrySheet
+        entry={editing}
+        onClose={() => setEditing(null)}
+        onSaved={(row) => {
+          setEntries((list) => list.map((x) => (x.id === row.id ? row : x)));
+          setEditing(null);
+        }}
+        onDelete={(row) => {
+          setEditing(null);
+          dels.start(row.id);
+        }}
+      />
     </>
+  );
+}
+
+/** v2.8: tap a logged drink — change the amount, or delete it (the list shows Undo for a few seconds). */
+function WaterEntrySheet({ entry, onClose, onSaved, onDelete }: { entry: WaterEntry | null; onClose: () => void; onSaved: (row: WaterEntry) => void; onDelete: (row: WaterEntry) => void }) {
+  const [ml, setMl] = useState("");
+  const [prevId, setPrevId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if ((entry?.id ?? null) !== prevId) {
+    setPrevId(entry?.id ?? null);
+    setMl(entry ? String(entry.ml) : "");
+    setError(null);
+    setBusy(false);
+  }
+  const amount = Number(ml);
+  const valid = amount > 0 && amount <= 5000;
+
+  async function save() {
+    if (!entry || !valid) return;
+    setBusy(true);
+    setError(null);
+    const preset = VESSELS.find((v) => v.ml === amount);
+    const vessel: WaterVessel = preset ? preset.key : "custom";
+    try {
+      await updateWater(entry.id, amount, vessel);
+      onSaved({ ...entry, ml: amount, vessel });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet open={!!entry} title="Edit water" subtitle={entry ? `Logged ${formatTime(entry.created_at)}` : undefined} onClose={onClose} primary={{ label: busy ? "Saving\u2026" : "Save", onClick: () => void save(), disabled: busy || !valid }}>
+      <div className="flex items-center justify-between py-2">
+        <span className="text-[15px] font-medium">Amount</span>
+        <NumberField value={ml} onChange={(v) => setMl(v.slice(0, 4))} unit="mL" label="Amount in mL" />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        {VESSELS.filter((v) => v.ml).map((v) => (
+          <button key={v.key} type="button" aria-pressed={amount === v.ml} className="chip press justify-center" style={{ height: 36 }} onClick={() => setMl(String(v.ml))}>
+            {v.ml} mL
+          </button>
+        ))}
+      </div>
+      {error ? (
+        <div className="mt-2">
+          <ErrorNote text={error} />
+        </div>
+      ) : null}
+      <div className="mt-2">
+        <EditorDelete label="Delete" del={{ pending: false, start: () => entry && onDelete(entry), undo: () => undefined, error: null }} disabled={busy} />
+      </div>
+    </BottomSheet>
   );
 }
 

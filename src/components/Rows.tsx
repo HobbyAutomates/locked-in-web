@@ -3,18 +3,18 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { deleteExercise, deleteMeal } from "@/lib/actions";
+import { deleteMeal } from "@/lib/actions";
 import { RUN_CODE, intensityLabel } from "@/lib/burn";
 import type { ExerciseEntry, Meal, Workout } from "@/lib/types";
 import { formatTime } from "@/lib/display";
-import { Band, Bowl, ChevronDown, ChevronRight, Dumbbell, Pushup, Run, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
+import { ActivityIcon, Band, Bowl, ChevronDown, ChevronRight, Dumbbell, Pushup, Run, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
 import { workoutTitle } from "@/lib/exercises";
 import { Hair, MacroDot, SPRING, fmt } from "./ui";
 import FoodImage, { FoodFallback } from "./FoodImage";
 
 /**
  * Logged rows on Home and Calendar: one line each (icon, title, kcal, time) and a chevron. Meals
- * and exercise expand in place for the details and delete; a workout row opens its editor.
+ * expand in place for the details and delete; v2.8: workout and exercise rows open their editor.
  */
 
 function Tile({ children, tint = "var(--ink)", bg = "var(--card2)" }: { children: React.ReactNode; tint?: string; bg?: string }) {
@@ -110,7 +110,7 @@ export function WorkoutRow({ workout, onOpen, burnKcal }: { workout: Workout; on
   return (
     <div className="card" style={{ padding: 0 }}>
       <Summary
-        icon={<Tile>{w.kind === "gym" ? <Dumbbell size={22} /> : w.kind === "bodyweight" ? <Pushup size={22} /> : <Band size={22} />}</Tile>}
+        icon={<Tile>{w.kind === "gym" ? <Dumbbell size={22} /> : w.kind === "bodyweight" ? <Pushup size={22} /> : w.kind == null || w.kind === "bands" ? <Band size={22} /> : <ActivityIcon activity={`${w.kind} ${w.exercises ?? ""}`} size={22} />}</Tile>}
         title={workoutTitle(w)}
         kcal={burnKcal != null && burnKcal > 0 ? burnKcal : null}
         time={w.minutes != null ? `${w.minutes} min` : ""}
@@ -220,41 +220,32 @@ export function MealRow({ meal, feedback = true }: { meal: Meal & { photo_url?: 
   );
 }
 
-/** A logged burn (run / activity / described / manual). */
+/** A logged burn (run / activity / described / manual). v2.8: tapping it opens its editor (delete lives there). */
 export function ExerciseRow({ entry }: { entry: ExerciseEntry }) {
-  const [open, setOpen] = useState(false);
-  const del = useUndoDelete(() => deleteExercise(entry.id));
+  const router = useRouter();
   const e = entry;
   const lower = e.name.toLowerCase();
   const isRun = e.activity_code === RUN_CODE || lower.includes("run") || lower.includes("jog");
   const isBands = (e.activity_code ?? "").startsWith("LI-BAND") || lower.includes("lifting") || lower.includes("band");
   const neutral = isRun || isBands;
   const title = e.name.charAt(0).toUpperCase() + e.name.slice(1);
-  if (del.pending) return <UndoRow onUndo={del.undo} />;
+  const editable = e.source !== "health";
+  const href = e.source === "workout" && e.note ? `/log?workout=${encodeURIComponent(e.note)}` : `/log?exercise=${encodeURIComponent(e.id)}`;
   return (
     <div className="card" style={{ padding: 0 }}>
       <Summary
         icon={
           <Tile tint={neutral ? "var(--ink)" : "var(--green)"} bg={neutral ? "var(--card2)" : "var(--green-bg)"}>
-            {isBands ? <Dumbbell size={22} /> : <Run size={22} />}
+            {isBands ? <Dumbbell size={22} /> : isRun ? <Run size={22} /> : <ActivityIcon activity={`${e.activity_code ?? ""} ${e.name}`} size={22} />}
           </Tile>
         }
         title={title}
         kcal={e.kcal}
-        time={formatTime(e.created_at)}
-        open={open}
-        expands
-        onClick={() => setOpen((o) => !o)}
-        ariaLabel={`${title}, ${Math.round(e.kcal)} kcal. ${open ? "Hide" : "Show"} details`}
+        time={`${e.minutes} min`}
+        expands={false}
+        onClick={() => editable && router.push(href)}
+        ariaLabel={`Edit ${title}: ${Math.round(e.kcal)} kcal, ${e.minutes} min${e.intensity ? `, ${intensityLabel(e.intensity)} intensity` : ""}`}
       />
-      <Expand open={open}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[13px] muted">
-            {e.source === "manual" && !e.activity_code ? "Entered by hand" : `Intensity: ${intensityLabel(e.intensity)}`} · {e.minutes} min
-          </span>
-          <DeleteButton label="Delete exercise" busy={false} onClick={del.start} />
-        </div>
-      </Expand>
     </div>
   );
 }

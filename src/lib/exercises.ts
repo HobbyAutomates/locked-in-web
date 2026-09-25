@@ -155,5 +155,7 @@ export function workoutTitle(w: Workout): string {
     const n = w.exercises_json?.length ?? 0;
     return `${KIND_LABEL[kind]} · ${n} exercise${n === 1 ? "" : "s"}`;
   }
-  return [KIND_LABEL[kind], ...w.muscles].join(" · ");
+  // v2.8 Sport / Yoga (and older Cardio) sessions: the activity and its minutes, as on Android.
+  if (kind !== "bands" && w.exercises) return [w.exercises.charAt(0).toUpperCase() + w.exercises.slice(1), w.minutes != null ? `${w.minutes} min` : null].filter(Boolean).join(" · ");
+  return [KIND_LABEL[kind], ...w.muscles.filter((m) => kind === "bands" || m !== "Other")].join(" · ");
 }
