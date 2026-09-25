@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "./supabase/server";
 import { rollupQuietly } from "./rollup";
+import { trackServer } from "./trackServer";
 import { today as todayIso } from "./dates";
 import type { ExerciseEntry, WaterEntry, WaterVessel } from "./types";
 
@@ -88,6 +89,7 @@ export async function logDefaultGlass(): Promise<{ entry: WaterEntry; glassMl: n
   // The vessel column isn't there yet: log the glass without it.
   if (res.error && /vessel|column|PGRST204/i.test(`${res.error.message} ${res.error.code ?? ""}`)) res = await supabase.from("water_log").insert({ user_id: user.id, date: day, ml: glassMl }).select("id, date, ml, created_at").single();
   if (res.error || !res.data) throw new Error(res.error?.message ?? "Could not log water");
+  trackServer(supabase, user.id, "water_added", { ml: glassMl, vessel: "glass", via: "fab" });
   revalidatePath("/", "layout");
   return { entry: { id: res.data.id as string, date: res.data.date as string, ml: Number(res.data.ml), created_at: res.data.created_at as string, vessel: "glass" }, glassMl };
 }

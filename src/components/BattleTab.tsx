@@ -6,6 +6,7 @@ import { loadBattleBoard, postBattleSnap, saveMeal } from "@/lib/actions";
 import { pointsToLead, scoreRow, type ScoredBattleRow } from "@/lib/battle";
 import { toJpegBase64 } from "@/lib/image";
 import { mealItemFromPlate } from "@/lib/quantity";
+import { track } from "@/lib/track";
 import type { BattleBoardRow, BattleWinner, PlateEstimate, PlateItem, Squad } from "@/lib/types";
 import { Avatar } from "./Avatar";
 import { Camera, Crown, Spinner, Trash } from "./icons";
@@ -224,6 +225,7 @@ function SnapSheet({ open, squadId, file, onClose, onSaved }: { open: boolean; s
     try {
       const dateIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
       const { id: mealId } = await saveMeal({ date: dateIso, raw_text: plate.plate_note || items.map((i) => i.name).join(", "), photo_path: plate.photo_path ?? null, items: items.map(mealItemFromPlate) });
+      track("meal_logged", { method: "photo", items: items.length, from: "battle" });
       const summary = items.slice(0, 3).map((i) => i.name).join(" + ") + (items.length > 3 ? ` + ${items.length - 3} more` : "");
       const res = await postBattleSnap({ groupId: squadId, mealId: String(mealId ?? ""), photoPath: plate.photo_path ?? null, itemsSummary: summary, kcal, kcalLow: low, kcalHigh: high });
       if (!("ok" in res) || !res.ok) throw new Error("ok" in res && !res.ok ? res.error : "Couldn't post that");

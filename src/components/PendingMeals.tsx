@@ -4,6 +4,8 @@ import { useSyncExternalStore } from "react";
 import { saveMeal } from "@/lib/actions";
 import type { MealItem } from "@/lib/types";
 import type { MealType } from "@/lib/mealType";
+import type { MealMethod } from "@/lib/analytics";
+import { track } from "@/lib/track";
 
 export type Pending = { id: number; text: string; date: string };
 
@@ -42,7 +44,7 @@ export function usePendingMeals(): State {
 }
 
 /** Save the plate once every running job has finished; Home shows a pending row meanwhile. */
-export function saveWhenReady(input: { label: string; date: string; raw_text: string; items: MealItem[]; photo_path: string | null; meal_type?: MealType | null; jobs: Promise<PlateJob>[] }) {
+export function saveWhenReady(input: { label: string; date: string; raw_text: string; items: MealItem[]; photo_path: string | null; meal_type?: MealType | null; jobs: Promise<PlateJob>[]; method?: MealMethod }) {
   const entry: Pending = { id: nextId++, text: input.label, date: input.date };
   set({ pending: [entry, ...state.pending], error: null });
   void (async () => {
@@ -59,6 +61,7 @@ export function saveWhenReady(input: { label: string; date: string; raw_text: st
       }
       if (!items.length) throw new Error(`Couldn't work out "${input.label}" — try again.`);
       await saveMeal({ date: input.date, raw_text: input.raw_text || input.label, items, photo_path: photo, meal_type: input.meal_type ?? null });
+      track("meal_logged", { method: input.method ?? (photo ? "photo" : "text"), items: items.length, pending: true });
       set({ savedCount: state.savedCount + 1, error: failed ? `Saved "${input.label}", but part of it couldn't be worked out.` : null });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : "Could not log that meal" });

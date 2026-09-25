@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronRight as ChevronRightIcon, Flame as FlameIcon } from "./icons";
+import { track } from "@/lib/track";
 
 /** Spring used for anything spatial (rings, bars, rising cards) — mirrors Motion.spatialSlow(). */
 export const SPRING = { type: "spring" as const, stiffness: 190, damping: 22 };
@@ -272,6 +273,7 @@ export function IconTile({ children, tint = "var(--ink)", bg = "var(--card2)" }:
 }
 
 export function ErrorNote({ text }: { text?: string | null }) {
+  useEffect(() => void (text && track("error_shown", { message: text })), [text]);
   if (!text) return null;
   return (
     <p role="alert" className="rounded-xl px-3 py-3 text-[13px]" style={{ background: "var(--red-bg)", color: "var(--red)" }}>
