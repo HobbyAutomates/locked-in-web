@@ -176,6 +176,7 @@ function Tracking({ profile }: { profile: Profile }) {
   const [lens, setLens] = useState<LensDefault>(profile.lens_default);
   const [addBurned, setAddBurned] = useState(profile.add_burned_to_goal);
   const [rollover, setRollover] = useState(profile.rollover_calories);
+  const [hideNumbers, setHideNumbers] = useState(profile.hide_numbers === true);
   const [units, setUnits] = useState<Units>(profile.units);
   const lensLabel = LENS_DEFAULTS.find((l) => l.key === lens)?.label ?? "Protein";
   return (
@@ -223,6 +224,19 @@ function Tracking({ profile }: { profile: Profile }) {
                   void save({ rollover_calories: v });
                 }}
                 label="Rollover calories"
+              />
+            </SettingRow>
+            <Hair />
+            {/* v2.10: opt-in only. hide_numbers null = schema_v34 not applied yet, so the switch waits. */}
+            <SettingRow icon={<Lock size={20} />} label="Hide calorie numbers" subtitle={profile.hide_numbers === null ? "Coming with the next update" : "Show progress bars and words instead of kcal"}>
+              <Toggle
+                on={hideNumbers}
+                onChange={(v) => {
+                  setHideNumbers(v);
+                  void save({ hide_numbers: v });
+                }}
+                label="Hide calorie numbers"
+                disabled={profile.hide_numbers === null}
               />
             </SettingRow>
           </div>

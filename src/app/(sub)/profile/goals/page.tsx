@@ -1,9 +1,10 @@
-import { getProfile } from "@/lib/data";
+import { getProfile, getWeights } from "@/lib/data";
 import NutritionGoalsScreen from "@/components/NutritionGoalsScreen";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const profile = await getProfile();
-  return <NutritionGoalsScreen profile={profile} />;
+  // v2.10: recent weigh-ins feed the "rapid loss" safety flag.
+  const [profile, weights] = await Promise.all([getProfile(), getWeights(60)]);
+  return <NutritionGoalsScreen profile={profile} weights={weights} />;
 }

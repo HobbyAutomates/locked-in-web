@@ -428,7 +428,13 @@ const PROFILE_KEYS: (keyof Profile)[] = [
   "water_reminder_to",
   "water_reminder_every_min",
   "auto_share",
+  "hide_numbers",
+  "waist_cm",
 ];
+
+/** v2.10 columns from schema_v34; a database without them gets the rest of the patch saved. */
+const SCIENCE_KEYS = ["hide_numbers", "waist_cm"] as const;
+const missingScienceColumn = (e: { message?: string; code?: string } | null) => !!e && /hide_numbers|waist_cm/i.test(e.message ?? "") && (e.code === "42703" || e.code === "PGRST204" || /column|schema cache/i.test(e.message ?? ""));
 
 /** Upserts the given profile columns for the signed-in user (a partial patch is fine). */
 export async function saveProfile(patch: Partial<Profile>) {
@@ -445,7 +451,16 @@ export async function saveProfile(patch: Partial<Profile>) {
     else delete row.auto_share;
   }
   if ("water_goal_ml" in row) row.water_goal_ml = Math.max(250, Math.min(10000, Math.round(Number(row.water_goal_ml) || 2500)));
-  const { error } = await supabase.from("profiles").upsert(row);
+  // v2.10: null hide_numbers means "column not there yet" (see getProfile) — never write it.
+  if ("hide_numbers" in row && typeof row.hide_numbers !== "boolean") delete row.hide_numbers;
+  if ("waist_cm" in row) row.waist_cm = row.waist_cm == null || !(Number(row.waist_cm) > 0) ? null : Math.min(250, Math.max(30, Math.round(Number(row.waist_cm) * 10) / 10));
+  let { error } = await supabase.from("profiles").upsert(row);
+  if (error && missingScienceColumn(error)) {
+    const had = SCIENCE_KEYS.filter((k) => k in row);
+    for (const k of had) delete row[k];
+    if (Object.keys(row).length <= 1) throw new Error("This needs a quick app update on our side. Try again soon.");
+    ({ error } = await supabase.from("profiles").upsert(row));
+  }
   if (error) throw new Error(error.message);
   revalidatePath("/", "layout");
 }

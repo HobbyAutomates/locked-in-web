@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { completeOnboarding, skipOnboarding } from "@/lib/actions";
-import { generate, roundSpeed, type Targets } from "@/lib/goals";
+import { healthyRange } from "@/lib/bmi";
+import { ageYears, edFlags, effectiveGoal, goalOptions, isTeen, plan, roundSpeed, screenInput, speedMax, type EdFlag, type Plan } from "@/lib/goals";
 import type { Gender, GoalType, Profile } from "@/lib/types";
 import GoalSpeedPicker from "./GoalSpeedPicker";
+import { SafetyNote, ScienceButton, TeenNote } from "./Science";
 import { ArrowLeft, Check, Pencil } from "./icons";
 import { Card, ErrorNote, OptionCard, PillButton, Ring, Rise, SPRING, fmt } from "./ui";
 
@@ -25,7 +27,9 @@ type Answers = {
 };
 
 type Step = "GENDER" | "WORKOUTS" | "GOAL" | "BODY" | "DOB" | "DESIRED" | "SPEED" | "OBSTACLES" | "BUILDING" | "READY";
-const ALL_STEPS: Step[] = ["GENDER", "WORKOUTS", "GOAL", "BODY", "DOB", "DESIRED", "SPEED", "OBSTACLES", "BUILDING", "READY"];
+// v2.10: birthday and body come before the goal, so the goal list can branch by age (no "lose"
+// under 18) and the pace slider can stop at the safe max for this body weight.
+const ALL_STEPS: Step[] = ["GENDER", "WORKOUTS", "DOB", "BODY", "GOAL", "DESIRED", "SPEED", "OBSTACLES", "BUILDING", "READY"];
 
 const OBSTACLES: [string, string][] = [
   ["Lack of consistency", "We'll keep the streak front and centre"],
@@ -43,8 +47,9 @@ const parseNum = (s: string, lo: number, hi: number) => {
 };
 
 /**
- * The Cal AI-shaped first run: gender → workouts → goal → body → birthday → target weight →
- * pace → obstacles → a plan being built → the plan itself. Nothing is written until the last
+ * The Cal AI-shaped first run: gender → workouts → birthday → body → goal → target weight →
+ * pace → obstacles → a plan being built → the plan itself. Under 18 the goal step offers only
+ * maintain / grow stronger and gain / build muscle, and target weight and pace drop out. Nothing is written until the last
  * screen, where the whole profile (details plus the Auto Generate targets) is saved in one go.
  */
 export default function OnboardingFlow({ profile }: { profile: Profile }) {
@@ -68,9 +73,14 @@ export default function OnboardingFlow({ profile }: { profile: Profile }) {
   const weight = parseNum(a.weightKg, 20, 300);
   const height = parseNum(a.heightCm, 80, 250);
   const maintaining = a.goalType === "maintain";
+  const age = ageYears(a.dob);
+  const teen = isTeen(age);
+  // A "lose" picked before the birthday was changed doesn't count for an under-18.
+  const goalType = a.goalType ? effectiveGoal(a.goalType, age) : null;
+  const goalPicked = a.goalType !== null && !(teen && a.goalType === "lose");
 
-  // Maintaining needs no target weight and no pace, so those two drop out of the flow.
-  const steps = useMemo(() => ALL_STEPS.filter((s) => !(maintaining && (s === "DESIRED" || s === "SPEED"))), [maintaining]);
+  // Maintaining (and anyone under 18) needs no target weight and no pace, so those two drop out.
+  const steps = ALL_STEPS.filter((s) => !((maintaining || teen) && (s === "DESIRED" || s === "SPEED")));
   const step = steps[Math.min(Math.max(index, 0), steps.length - 1)];
   const progress = (steps.indexOf(step) + 1) / steps.length;
   const back = () => {
@@ -83,22 +93,22 @@ export default function OnboardingFlow({ profile }: { profile: Profile }) {
   };
 
   // The profile as it would be saved right now — used for the generated targets on the last screen.
-  const draft: Profile = useMemo(
-    () => ({
-      ...profile,
-      gender: a.gender ?? "other",
-      weekly_workout_target: a.workouts ?? 3,
-      goal_type: a.goalType ?? "maintain",
-      height_cm: height,
-      weight_kg: weight,
-      dob: a.dob,
-      goal_weight_kg: maintaining ? weight : a.goalWeightKg,
-      // Kept even when maintaining, so switching to lose/gain later starts from a sane pace.
-      goal_speed_kg_wk: roundSpeed(a.speed),
-    }),
-    [profile, a, height, weight, maintaining],
-  );
-  const targets = useMemo(() => generate(draft), [draft]);
+  // Plain computation (cheap) — the React Compiler memoizes it.
+  const draft: Profile = {
+    ...profile,
+    gender: a.gender ?? "other",
+    weekly_workout_target: a.workouts ?? 3,
+    goal_type: goalType ?? "maintain",
+    height_cm: height,
+    weight_kg: weight,
+    dob: a.dob,
+    goal_weight_kg: teen ? profile.goal_weight_kg : maintaining ? weight : a.goalWeightKg,
+    // Kept even when maintaining, so switching to lose/gain later starts from a sane pace.
+    goal_speed_kg_wk: roundSpeed(a.speed, speedMax(goalType === "gain" ? "gain" : "lose", weight)),
+  };
+  const built = plan(draft);
+  const targets = built?.targets ?? null;
+  const flags = edFlags(screenInput(draft));
 
   async function start() {
     setBusy(true);
@@ -167,16 +177,11 @@ export default function OnboardingFlow({ profile }: { profile: Profile }) {
       break;
     case "GOAL":
       page = (
-        <Chassis progress={progress} onBack={back} title="What is your goal?" ctaEnabled={a.goalType !== null} onCta={next}>
-          {(
-            [
-              ["lose", "Lose weight"],
-              ["maintain", "Maintain"],
-              ["gain", "Gain weight"],
-            ] as [GoalType, string][]
-          ).map(([key, label]) => (
-            <OptionCard key={key} title={label} selected={a.goalType === key} onClick={() => setA({ ...a, goalType: key, goalWeightKg: key === "maintain" ? weight : a.goalWeightKg })} />
+        <Chassis progress={progress} onBack={back} title="What is your goal?" ctaEnabled={goalPicked} onCta={next}>
+          {goalOptions(age).map((o) => (
+            <OptionCard key={o.key} title={o.label} sub={o.sub} selected={a.goalType === o.key} onClick={() => setA({ ...a, goalType: o.key, goalWeightKg: o.key === "maintain" ? weight : a.goalWeightKg })} />
           ))}
+          {teen ? <TeenNote /> : null}
         </Chassis>
       );
       break;
@@ -214,6 +219,11 @@ export default function OnboardingFlow({ profile }: { profile: Profile }) {
             <TickRuler value={goal} min={Math.max(25, now - 30)} max={now + 30} step={0.5} onChange={(v) => setA({ ...a, goalWeightKg: v })} />
           </div>
           <p className="text-center text-xs muted">Drag the ruler</p>
+          {height ? (
+            <p className="text-center text-xs muted">
+              Healthy range for your height: {fmt(healthyRange(height).min)}–{fmt(healthyRange(height).max)} kg
+            </p>
+          ) : null}
         </Chassis>
       );
       break;
@@ -228,7 +238,7 @@ export default function OnboardingFlow({ profile }: { profile: Profile }) {
           ctaEnabled
           onCta={next}
         >
-          <GoalSpeedPicker speed={a.speed} onChange={(v) => setA({ ...a, speed: v })} />
+          <GoalSpeedPicker speed={a.speed} onChange={(v) => setA({ ...a, speed: v })} goal={goalType === "gain" ? "gain" : "lose"} weightKg={weight} />
         </Chassis>
       );
       break;
@@ -246,7 +256,7 @@ export default function OnboardingFlow({ profile }: { profile: Profile }) {
       page = <BuildingScreen progress={progress} onDone={next} />;
       break;
     case "READY":
-      page = <PlanScreen a={a} weight={weight} maintaining={maintaining} targets={targets} error={error} busy={busy} onBack={back} onStart={start} />;
+      page = <PlanScreen a={a} weight={weight} maintaining={maintaining} built={built} flags={flags} error={error} busy={busy} onBack={back} onStart={start} />;
       break;
   }
 
@@ -567,7 +577,8 @@ function PlanScreen({
   a,
   weight,
   maintaining,
-  targets,
+  built,
+  flags,
   error,
   busy,
   onBack,
@@ -576,18 +587,21 @@ function PlanScreen({
   a: Answers;
   weight: number | null;
   maintaining: boolean;
-  targets: Targets | null;
+  built: Plan | null;
+  flags: EdFlag[];
   error: string | null;
   busy: boolean;
   onBack: () => void;
   onStart: () => void;
 }) {
+  const targets = built?.targets ?? null;
   const current = weight ?? 60;
   const goal = maintaining ? current : (a.goalWeightKg ?? current);
   const delta = Math.abs(goal - current);
-  const pace = Math.max(0.1, roundSpeed(a.speed));
+  const pace = Math.max(0.1, built?.speed || roundSpeed(a.speed));
   let chip: string;
-  if (maintaining || delta < 0.25) chip = `Maintain ${fmt(current)} kg`;
+  if (built?.teen) chip = built.goal === "gain" ? "Build muscle, fuel growth" : "Grow stronger";
+  else if (maintaining || delta < 0.25) chip = `Maintain ${fmt(current)} kg`;
   else {
     const days = Math.min(3650, Math.max(7, Math.ceil((delta / pace) * 7)));
     const by = new Date();
@@ -619,8 +633,13 @@ function PlanScreen({
           </div>
         </Rise>
         <Rise index={1}>
-          <p className="text-[15px] font-bold">Daily recommendation</p>
-          <p className="text-xs muted">You can edit this anytime.</p>
+          <p className="flex items-center gap-1.5 text-[15px] font-bold">
+            Daily recommendation
+            <ScienceButton />
+          </p>
+          <p className="text-xs muted">
+            {built?.speedCapped ? `Paced at ${fmt(built.speed)} kg a week, the safe max for your body. ` : ""}You can edit this anytime.
+          </p>
         </Rise>
         {targets ? (
           <>
@@ -644,6 +663,11 @@ function PlanScreen({
             </Card>
           </Rise>
         )}
+        {flags.length ? (
+          <Rise index={4}>
+            <SafetyNote flags={flags} floor={built?.floorApplied ? built.targets.calories : null} />
+          </Rise>
+        ) : null}
         {obstacleLine ? (
           <Rise index={4}>
             <p className="rounded-2xl px-4 py-3.5 text-sm font-semibold" style={{ background: "var(--card2)" }}>
