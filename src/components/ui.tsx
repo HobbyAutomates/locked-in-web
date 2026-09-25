@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ChevronRight as ChevronRightIcon, Flame as FlameIcon } from "./icons";
 import { track } from "@/lib/track";
 
@@ -216,16 +216,22 @@ export function Ring({
   size,
   stroke,
   children,
+  draw,
 }: {
   fraction: number;
   color: string;
   size: number;
   stroke: number;
   children?: React.ReactNode;
+  /** v2.12: on first mount, draw in slowly like a pen after `draw` ms (later changes still spring). */
+  draw?: number;
 }) {
   const f = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
+  const reduce = useReducedMotion();
+  // The first draw is the slow pen stroke; once it lands, later changes use the usual spring.
+  const [slow, setSlow] = useState(draw != null);
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size, flex: "none" }}>
       <svg width={size} height={size} className="absolute -rotate-90" aria-hidden="true">
@@ -239,9 +245,12 @@ export function Ring({
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
-          initial={{ strokeDashoffset: c }}
+          initial={reduce ? false : { strokeDashoffset: c }}
           animate={{ strokeDashoffset: c * (1 - f) }}
-          transition={{ ...SPRING, delay: 0.12 }}
+          transition={slow ? { duration: 1.9, ease: [0.65, 0, 0.35, 1], delay: (draw ?? 0) / 1000 } : { ...SPRING, delay: 0.12 }}
+          onAnimationComplete={() => {
+            if (slow) setSlow(false);
+          }}
         />
       </svg>
       {children}

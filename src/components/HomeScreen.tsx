@@ -168,7 +168,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
                 ) : null}
               </p>
             </FlipFace>
-            <Ring fraction={totals.calories / Math.max(1, budget.budget)} color="var(--ink)" size={96} stroke={9}>
+            <Ring fraction={totals.calories / Math.max(1, budget.budget)} color="var(--ink)" size={96} stroke={9} draw={250}>
               <Flame size={26} />
             </Ring>
           </div>
@@ -177,9 +177,9 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
 
       <Rise index={3}>
         <div className="grid grid-cols-3 gap-2.5">
-          <MacroCard macro="Protein" consumed={totals.protein} target={profile.protein_target_g} color="var(--red)" mode={mode} animate={flipped} onFlip={flip} />
-          <MacroCard macro="Carbs" consumed={totals.carbs} target={carbTarget} color="var(--orange)" mode={mode} animate={flipped} onFlip={flip} />
-          <MacroCard macro="Fat" consumed={totals.fat} target={fatTarget} color="var(--blue)" mode={mode} animate={flipped} onFlip={flip} />
+          <MacroCard macro="Protein" consumed={totals.protein} target={profile.protein_target_g} color="var(--red)" mode={mode} animate={flipped} onFlip={flip} draw={420} />
+          <MacroCard macro="Carbs" consumed={totals.carbs} target={carbTarget} color="var(--orange)" mode={mode} animate={flipped} onFlip={flip} draw={590} />
+          <MacroCard macro="Fat" consumed={totals.fat} target={fatTarget} color="var(--blue)" mode={mode} animate={flipped} onFlip={flip} draw={760} />
         </div>
         {showHint ? <p className="mt-1.5 text-center text-[12px] muted">Tap a card to switch between left and eaten</p> : null}
       </Rise>
@@ -194,7 +194,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         >
           <span className="grid flex-1 grid-cols-2">
             <span className="flex min-w-0 items-center gap-2.5 pr-3">
-              <Ring fraction={burned / 400} color="var(--orange)" size={44} stroke={5}>
+              <Ring fraction={burned / 400} color="var(--orange)" size={44} stroke={5} draw={900}>
                 <span style={{ color: "var(--orange)" }}>
                   <Flame size={16} />
                 </span>
@@ -205,7 +205,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
               </span>
             </span>
             <span className="flex min-w-0 items-center gap-2.5 pl-3" style={{ borderLeft: "1px solid var(--hair)" }}>
-              <Ring fraction={activeMin / 60} color="var(--green)" size={44} stroke={5}>
+              <Ring fraction={activeMin / 60} color="var(--green)" size={44} stroke={5} draw={1060}>
                 <span style={{ color: "var(--green)" }}>
                   <Run size={16} />
                 </span>
@@ -561,7 +561,7 @@ function WeekStrip({
  * it shows the overshoot ("12g / Protein **over**") in the macro's own colour, like Cal AI. In
  * "eaten" mode it shows what's been eaten ("58g / Protein eaten"). Tapping flips every card.
  */
-function MacroCard({ macro, consumed, target, color, mode, animate, onFlip }: { macro: string; consumed: number; target: number; color: string; mode: MacroMode; animate: boolean; onFlip: () => void }) {
+function MacroCard({ macro, consumed, target, color, mode, animate, onFlip, draw }: { macro: string; consumed: number; target: number; color: string; mode: MacroMode; animate: boolean; onFlip: () => void; draw?: number }) {
   const safeTarget = Math.max(1, target);
   const over = mode === "left" && consumed > target && target > 0;
   const amount = mode === "eaten" ? Math.max(0, Math.round(consumed)) : Math.max(0, Math.round(over ? consumed - target : target - consumed));
@@ -584,7 +584,7 @@ function MacroCard({ macro, consumed, target, color, mode, animate, onFlip }: { 
         </p>
       </FlipFace>
       <div className="mt-2.5 flex justify-center">
-        <Ring fraction={consumed / safeTarget} color={color} size={56} stroke={6}>
+        <Ring fraction={consumed / safeTarget} color={color} size={56} stroke={6} draw={draw}>
           <span className="rounded-full" style={{ width: 8, height: 8, background: color }} />
         </Ring>
       </div>

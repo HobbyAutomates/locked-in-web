@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import "@/lib/motion.css";
 import { APP_VERSION } from "@/lib/version";
 import { SquadPostHint } from "@/components/SquadPostHint";
 import ScreenTracker from "@/components/ScreenTracker";
