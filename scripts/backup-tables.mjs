@@ -39,6 +39,7 @@ const ORDER_COL = {
   daily_stats: "user_id,date",
   group_members: "group_id,user_id",
   battle_wins: "group_id,date",
+  app_events: "id",
 };
 
 async function fetchAllRows(url, key, table, pageSize = 1000) {
