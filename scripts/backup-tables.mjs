@@ -31,7 +31,14 @@ function loadEnv() {
 }
 
 // Primary-key column per table, used only to keep Range-based paging stable across pages.
-const ORDER_COL = { food_aliases: "alias" };
+const ORDER_COL = {
+  food_aliases: "alias",
+  activities: "code",
+  barcode_cache: "barcode",
+  food_images: "key",
+  daily_stats: "user_id,date",
+  group_members: "group_id,user_id",
+};
 
 async function fetchAllRows(url, key, table, pageSize = 1000) {
   const rows = [];

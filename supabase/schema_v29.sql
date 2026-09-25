@@ -107,25 +107,27 @@ begin
     where m.group_id = g
   ),
   scored as (
+    -- Every column is qualified: the OUT params (eaten, r, score, ...) are plpgsql variables, and an
+    -- unqualified name that is also a column raises "column reference is ambiguous" at call time.
     select
-      uid, nm, av, gt, eaten, tgt,
-      case when tgt > 0 then eaten / tgt else 0 end as r,
-      mls, (mls >= 2) as elig, priv, upd, ja
-    from base
+      b.uid, b.nm, b.av, b.gt, b.eaten as ate, b.tgt,
+      case when b.tgt > 0 then b.eaten / b.tgt else 0 end as ratio,
+      b.mls, (b.mls >= 2) as elig, b.priv, b.upd, b.ja
+    from base b
   )
   select
-    uid, nm, av, gt, eaten, tgt, r,
-    case when elig then bandlog.battle_score(gt, r) else 0 end as score,
-    mls, elig, priv
-  from scored
+    sc.uid, sc.nm, sc.av, sc.gt, sc.ate, sc.tgt, sc.ratio,
+    case when sc.elig then bandlog.battle_score(sc.gt, sc.ratio) else 0 end,
+    sc.mls, sc.elig, sc.priv
+  from scored sc
   order by
     -- eligible non-private members who can actually win the crown rank first, by score;
     -- ties: more meals wins, then the earlier last-log time.
-    (elig and not priv) desc,
-    case when elig and not priv then bandlog.battle_score(gt, r) end desc,
-    mls desc,
-    upd asc nulls last,
-    ja asc;
+    (sc.elig and not sc.priv) desc,
+    case when sc.elig and not sc.priv then bandlog.battle_score(sc.gt, sc.ratio) end desc,
+    sc.mls desc,
+    sc.upd asc nulls last,
+    sc.ja asc;
 end $$;
 grant execute on function bandlog.battle_board(uuid, date) to authenticated;
 
