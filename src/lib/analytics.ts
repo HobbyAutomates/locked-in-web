@@ -21,6 +21,7 @@ export type EventName =
   | "squad_opened"
   | "challenge_created"
   | "post_deleted"
+  | "reaction_added"
   | "error_shown";
 
 export type MealMethod = "search" | "voice" | "text" | "photo" | "barcode" | "label";

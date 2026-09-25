@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { track } from "@/lib/track";
-import { deleteSquadPost, loadChallenges, loadLeaderboard, loadSquadPosts, nudgeMember, postSquadPhoto, sendSquadMessage } from "@/lib/actions";
+import { deleteSquadPost, loadChallenges, loadChat, loadLeaderboard, loadSquadPosts, markSquadRead, nudgeMember, postSquadPhoto, reactToPost, sendSquadMessage } from "@/lib/actions";
 import { postStamp } from "@/lib/display";
 import { CHAT_KINDS, FEED_KINDS } from "@/lib/squadPosts";
+import { chatRuns, quickHeart, seenBy, toggleReaction, unreadLabel, type ReactionState, type ReadRow } from "@/lib/reactions";
 import { SQUAD_SHARING_HREF, canDeletePost } from "@/lib/squadSharing";
 import { toJpegBase64 } from "@/lib/image";
 import type { BattleWinner, Challenge, ChallengeBoardRow, LeaderRow, Squad, SquadPost } from "@/lib/types";
@@ -18,6 +19,7 @@ import { ArrowLeft, Bowl, Chat, Check, ChevronRight, Crown, Dumbbell, Fist, Flam
 import { ChallengesTab } from "./SquadChallenges";
 import { SquadRankRow } from "./SquadRankRow";
 import { SquadIcon } from "./SquadIcon";
+import { AddReactionButton, ReactionBar, ReactionChips, ReactorsSheet, SeenSheet, Ticks, useLongPress } from "./SquadReactions";
 import { BottomSheet, BreathingFlame, ErrorNote } from "./ui";
 
 
@@ -51,6 +53,17 @@ type Props = {
   crown?: BattleWinner;
   /** v2.8: yesterday's date (Asia/Kolkata) — what the crown card refers to; today's board reads live. */
   yesterday?: string;
+  /** v2.11: every member's last_read_at (group_read_status); null before schema_v35 → no ticks. */
+  reads?: ReadRow[] | null;
+  /** v2.11: unread Chat posts in this squad when the page loaded (badge on the Chat tab). */
+  chatUnread?: number;
+};
+
+/** v2.11: what a post/message needs to react: its current state, a setter and the reactors sheet. */
+type Reacting = {
+  stateOf: (p: SquadPost) => ReactionState;
+  react: (p: SquadPost, emoji: string, via?: "bar" | "double_tap" | "sheet") => void;
+  openReactors: (id: string) => void;
 };
 
 const rememberedTabKey = (squadId: string) => `squad-tab:${squadId}`;
@@ -61,7 +74,7 @@ const rememberedTabKey = (squadId: string) => `squad-tab:${squadId}`;
  * Chat and Feed poll every 5 s / 15 s while visible; meals, workouts and PRs arrive in the Feed by
  * themselves (see actions.ts → post_to_my_groups).
  */
-export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, challenges: challenges0, proteinGoal, sentNudges, shareStats, pendingRequests, initialTab, hasDeepLinkTab = false, crown = null }: Props) {
+export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, leaderboard: board0, challenges: challenges0, proteinGoal, sentNudges, shareStats, pendingRequests, initialTab, hasDeepLinkTab = false, crown = null, reads: reads0 = null, chatUnread: unread0 = 0 }: Props) {
   const router = useRouter();
   const [tab, setTabState] = useState<Tab>(initialTab);
   const [chat, setChat] = useState(chat0);
@@ -75,6 +88,60 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
   const photoRef = useRef<HTMLInputElement>(null);
   const isOwner = squad.owner_id === me;
   useEffect(() => track("squad_opened", { squad_id: squad.id, owner: isOwner }), [squad.id, isOwner]);
+  const [reads, setReads] = useState<ReadRow[] | null>(reads0);
+  const [chatUnread, setChatUnread] = useState(unread0);
+
+  // v2.11 reactions, optimistic: an override shows the tap at once; on success the posts take the
+  // new state, on failure the override goes and the old state shows again (with the error).
+  const [overrides, setOverrides] = useState<Record<string, ReactionState>>({});
+  const [reactorsFor, setReactorsFor] = useState<string | null>(null);
+  const stateOf = useCallback((p: SquadPost): ReactionState => overrides[p.id] ?? { counts: p.reactions ?? {}, mine: p.my_reaction ?? null }, [overrides]);
+  const react = useCallback(
+    (p: SquadPost, emoji: string, via: "bar" | "double_tap" | "sheet" = "bar") => {
+      if (p.id.startsWith("temp-")) return;
+      const cur = stateOf(p);
+      const next = via === "double_tap" ? quickHeart(cur) : toggleReaction(cur, emoji);
+      if (!next) return;
+      setError(null);
+      setOverrides((o) => ({ ...o, [p.id]: next.state }));
+      const drop = (o: Record<string, ReactionState>) => {
+        if (o[p.id] !== next.state) return o;
+        const rest = { ...o };
+        delete rest[p.id];
+        return rest;
+      };
+      void reactToPost(p.id, next.save, { kind: p.kind, replaced: !!cur.mine && !!next.save, via }).then(
+        (res) => {
+          if (res.ok) {
+            const patch = (list: SquadPost[]) => list.map((x) => (x.id === p.id ? { ...x, reactions: next.state.counts, my_reaction: next.state.mine } : x));
+            setChat(patch);
+            setFeed(patch);
+          } else setError(res.error);
+          setOverrides(drop);
+        },
+        () => {
+          setError("Couldn't save that reaction");
+          setOverrides(drop);
+        },
+      );
+    },
+    [stateOf],
+  );
+  const reacting: Reacting = { stateOf, react, openReactors: setReactorsFor };
+  const reactorsPost = reactorsFor ? (chat.find((p) => p.id === reactorsFor) ?? feed.find((p) => p.id === reactorsFor) ?? null) : null;
+
+  // v2.11 read receipts: with Chat open and visible, mark it read (debounced) whenever the newest
+  // message changes, and clear the tab's unread badge.
+  const newestChat = chat[0]?.id;
+  useEffect(() => {
+    if (tab !== "chat") return;
+    const t = setTimeout(() => {
+      if (document.visibilityState !== "visible") return;
+      setChatUnread(0);
+      void markSquadRead(squad.id).catch(() => {});
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [tab, newestChat, squad.id]);
 
   // v2.9: delete your own post (or any post, as the owner) with the v2.7 undo: it hides at once,
   // "Post deleted · Undo" shows for 5 s, then the real delete runs (still runs if you leave first).
@@ -128,7 +195,11 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
   const refresh = useCallback(
     async (which: Exclude<Tab, "battle">) => {
       try {
-        if (which === "chat") setChat(await loadSquadPosts(squad.id, CHAT_KINDS));
+        if (which === "chat") {
+          const res = await loadChat(squad.id, CHAT_KINDS);
+          setChat(res.posts);
+          if (res.reads) setReads(res.reads);
+        }
         else if (which === "feed") setFeed(await loadSquadPosts(squad.id, FEED_KINDS));
         else if (which === "challenges") {
           const res = await loadChallenges(squad.id);
@@ -213,6 +284,11 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
               onClick={() => setTab(t)}
             >
               {label}
+              {t === "chat" && tab !== "chat" && unreadLabel(chatUnread) ? (
+                <span className="num ml-1 inline-grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 align-[1px] text-[10px] font-extrabold" style={{ background: "var(--btn)", color: "var(--btn-ink)" }} aria-label={`${chatUnread} unread`}>
+                  {unreadLabel(chatUnread)}
+                </span>
+              ) : null}
               {t === "battle" ? <Crown size={13} className="ml-1 inline-block align-[-2px]" /> : null}
               {tab === t ? <motion.span layoutId="squad-tab" className="absolute inset-x-3 bottom-0 h-[3px] rounded-full" style={{ background: "var(--ink)" }} /> : null}
             </button>
@@ -228,7 +304,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
       ) : null}
 
       {tab === "chat" ? (
-        <ChatTab me={me} today={today} posts={chat.filter((p) => !dels.isPending(p.id))} isOwner={isOwner} onDelete={deletePost} onPhoto={() => photoRef.current?.click()} onSent={() => void refresh("chat")} squadId={squad.id} setPosts={setChat} onError={setError} />
+        <ChatTab me={me} today={today} posts={chat.filter((p) => !dels.isPending(p.id))} reads={reads} reacting={reacting} isOwner={isOwner} onDelete={deletePost} onPhoto={() => photoRef.current?.click()} onSent={() => void refresh("chat")} squadId={squad.id} setPosts={setChat} onError={setError} />
       ) : tab === "challenges" ? (
         <ChallengesTab
           me={me}
@@ -243,7 +319,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           }}
         />
       ) : tab === "feed" ? (
-        <FeedTab me={me} today={today} squadId={squad.id} posts={feed.filter((p) => !dels.isPending(p.id))} shareStats={shareStats} isOwner={isOwner} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDelete={deletePost} />
+        <FeedTab me={me} today={today} squadId={squad.id} posts={feed.filter((p) => !dels.isPending(p.id))} reacting={reacting} shareStats={shareStats} isOwner={isOwner} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDelete={deletePost} />
       ) : tab === "leaderboard" ? (
         <LeaderboardTab me={me} squadId={squad.id} rows={board} sentNudges={sentNudges} onError={setError} onOpenProfile={setProfileSheet} />
       ) : (
@@ -274,6 +350,17 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
         }}
       />
       <MemberProfileSheet squadId={squad.id} row={profileSheet} onClose={() => setProfileSheet(null)} />
+      <ReactorsSheet
+        postId={reactorsFor}
+        me={me}
+        today={today}
+        onClose={() => setReactorsFor(null)}
+        onRemoveMine={() => {
+          const p = reactorsPost;
+          const mine = p ? stateOf(p).mine : null;
+          if (p && mine) react(p, mine, "sheet");
+        }}
+      />
       <UndoSnackbar
         text={deletedSnack ? "Post deleted" : null}
         onUndo={() => {
@@ -336,6 +423,8 @@ function ChatTab({
   me,
   today,
   posts,
+  reads,
+  reacting,
   isOwner,
   onDelete,
   squadId,
@@ -347,6 +436,8 @@ function ChatTab({
   me: string;
   today: string;
   posts: SquadPost[];
+  reads: ReadRow[] | null;
+  reacting: Reacting;
   isOwner: boolean;
   onDelete: (id: string) => void;
   squadId: string;
@@ -357,9 +448,15 @@ function ChatTab({
 }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [barFor, setBarFor] = useState<string | null>(null);
+  const [seenOpen, setSeenOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const ordered = [...posts].reverse();
+  const runs = chatRuns(ordered);
   const newest = posts[0]?.id;
+  // v2.11: the receipt sits under my latest (sent) message.
+  const myLatest = posts.find((p) => p.user_id === me && !p.id.startsWith("temp-"));
+  const seen = myLatest && reads ? seenBy(reads, me, myLatest.created_at) : null;
 
   useLayoutEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -396,37 +493,25 @@ function ChatTab({
             <p className="text-[13px] muted">Be the first to start the conversation!</p>
           </div>
         ) : (
-          ordered.map((p, i) => {
-            const mine = p.user_id === me;
-            const prev = ordered[i - 1];
-            const grouped = prev && prev.user_id === p.user_id && new Date(p.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60_000;
-            return (
-              <div key={p.id} className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`} style={{ marginTop: grouped ? -4 : 4 }}>
-                {!mine ? <span className="w-8 shrink-0">{!grouped ? <Avatar path={p.author_avatar_path} name={p.author_name} size={32} /> : null}</span> : null}
-                {mine && canDeletePost(p, me, isOwner) ? <PostMenu up align="left" onDelete={() => onDelete(p.id)} /> : null}
-                <div className={`flex max-w-[78%] flex-col ${mine ? "items-end" : "items-start"}`}>
-                  {!mine && !grouped ? <span className="mb-0.5 px-1 text-[11px] font-bold muted">{p.author_name}</span> : null}
-                  {p.kind === "photo" && p.photo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
-                    <img src={p.photo_url} alt={p.body || "Photo"} className="max-h-72 rounded-2xl object-cover" loading="lazy" />
-                  ) : null}
-                  {p.body ? (
-                    <span
-                      className="whitespace-pre-wrap break-words rounded-[20px] px-3.5 py-2 text-[15px] leading-snug"
-                      style={{ background: mine ? "var(--btn)" : "var(--card)", color: mine ? "var(--btn-ink)" : "var(--ink)", boxShadow: mine ? "none" : "var(--shadow-sm)", marginTop: p.kind === "photo" ? 4 : 0 }}
-                    >
-                      {p.body}
-                    </span>
-                  ) : null}
-                  {!grouped || i === ordered.length - 1 ? <span className="mt-0.5 px-1 text-[10px] muted">{p.id.startsWith("temp-") ? "Sending…" : postStamp(p.created_at, today)}</span> : null}
-                </div>
-                {!mine && canDeletePost(p, me, isOwner) ? <PostMenu up align="right" onDelete={() => onDelete(p.id)} /> : null}
-              </div>
-            );
-          })
+          ordered.map((p, i) => (
+            <ChatMessage
+              key={p.id}
+              p={p}
+              me={me}
+              today={today}
+              run={runs[i]}
+              isLast={i === ordered.length - 1}
+              reacting={reacting}
+              barOpen={barFor === p.id}
+              setBar={(open) => setBarFor(open ? p.id : null)}
+              onDelete={canDeletePost(p, me, isOwner) ? () => onDelete(p.id) : null}
+              receipt={seen && myLatest?.id === p.id ? { state: seen.state, label: seen.label, onOpen: () => setSeenOpen(true) } : null}
+            />
+          ))
         )}
         <div ref={endRef} />
       </div>
+      <SeenSheet open={seenOpen && !!seen} seen={seen?.seen ?? []} unseen={seen?.unseen ?? []} today={today} onClose={() => setSeenOpen(false)} />
       <form
         className="fixed inset-x-0 bottom-0 z-20 mx-auto flex w-full max-w-[480px] items-center gap-2 px-3 pt-2"
         style={{ background: "var(--bg)", paddingBottom: "calc(10px + env(safe-area-inset-bottom, 0px))" }}
@@ -444,6 +529,93 @@ function ChatTab({
         </button>
       </form>
     </>
+  );
+}
+
+/** Hover-only "+😊" beside a chat bubble (touch uses long-press instead). */
+const HOVER_ONLY = "self-center opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:hidden";
+
+/**
+ * One chat message, WhatsApp-style (v2.11): someone else's shows their name on the first message
+ * of a run and their avatar (plus the time) on the last; mine sit on the right with no name.
+ * Hover shows "+😊", a long-press opens the reaction bar; Delete stays in the ⋯ menu.
+ */
+function ChatMessage({
+  p,
+  me,
+  today,
+  run,
+  isLast,
+  reacting,
+  barOpen,
+  setBar,
+  onDelete,
+  receipt,
+}: {
+  p: SquadPost;
+  me: string;
+  today: string;
+  run: { first: boolean; last: boolean };
+  isLast: boolean;
+  reacting: Reacting;
+  barOpen: boolean;
+  setBar: (open: boolean) => void;
+  onDelete: (() => void) | null;
+  receipt: { state: "sent" | "some" | "all"; label: string; onOpen: () => void } | null;
+}) {
+  const mine = p.user_id === me;
+  const temp = p.id.startsWith("temp-");
+  const state = reacting.stateOf(p);
+  const press = useLongPress(() => setBar(true), !temp);
+  const showStamp = run.last || isLast || !!receipt;
+  return (
+    <div className={`group flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`} style={{ marginTop: run.first ? 4 : -4 }}>
+      {!mine ? <span className="w-8 shrink-0">{run.last ? <Avatar path={p.author_avatar_path} name={p.author_name} size={32} /> : null}</span> : null}
+      {mine && onDelete ? <PostMenu up align="left" onDelete={onDelete} /> : null}
+      {mine && !temp ? <AddReactionButton className={HOVER_ONLY} onClick={() => setBar(true)} /> : null}
+      <div className={`flex max-w-[78%] flex-col ${mine ? "items-end" : "items-start"}`}>
+        {!mine && run.first ? <span className="mb-0.5 px-1 text-[11px] font-bold muted">{p.author_name}</span> : null}
+        <div className={`relative flex flex-col [@media(hover:none)]:select-none ${mine ? "items-end" : "items-start"}`} {...press}>
+          <ReactionBar open={barOpen} mine={state.mine} align={mine ? "right" : "left"} onPick={(e) => reacting.react(p, e)} onClose={() => setBar(false)} />
+          {p.kind === "photo" && p.photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
+            <img src={p.photo_url} alt={p.body || "Photo"} className="max-h-72 rounded-2xl object-cover" loading="lazy" draggable={false} />
+          ) : null}
+          {p.body ? (
+            <span
+              className="whitespace-pre-wrap break-words rounded-[20px] px-3.5 py-2 text-[15px] leading-snug"
+              style={{ background: mine ? "var(--btn)" : "var(--card)", color: mine ? "var(--btn-ink)" : "var(--ink)", boxShadow: mine ? "none" : "var(--shadow-sm)", marginTop: p.kind === "photo" ? 4 : 0 }}
+            >
+              {p.body}
+            </span>
+          ) : null}
+        </div>
+        {Object.keys(state.counts).length ? (
+          <div className="mt-1">
+            <ReactionChips state={state} align={mine ? "right" : "left"} onOpen={() => reacting.openReactors(p.id)} />
+          </div>
+        ) : null}
+        {showStamp ? (
+          <span className="mt-0.5 flex items-center gap-1 px-1 text-[10px] muted">
+            {temp ? "Sending…" : postStamp(p.created_at, today)}
+            {receipt ? (
+              <button
+                type="button"
+                className="hit press inline-flex items-center gap-1 font-bold"
+                style={{ background: "none", border: 0, padding: 0, color: receipt.state === "sent" ? "var(--muted)" : "var(--blue)" }}
+                aria-label={`${receipt.label}. Message info`}
+                onClick={receipt.onOpen}
+              >
+                · <Ticks state={receipt.state} size={12} />
+                {receipt.state === "sent" ? null : receipt.label}
+              </button>
+            ) : null}
+          </span>
+        ) : null}
+      </div>
+      {!mine && !temp ? <AddReactionButton className={HOVER_ONLY} onClick={() => setBar(true)} /> : null}
+      {!mine && onDelete ? <PostMenu up align="right" onDelete={onDelete} /> : null}
+    </div>
   );
 }
 
@@ -466,6 +638,7 @@ function FeedTab({
   today,
   squadId,
   posts,
+  reacting,
   shareStats,
   isOwner,
   onPhoto,
@@ -476,12 +649,14 @@ function FeedTab({
   today: string;
   squadId: string;
   posts: SquadPost[];
+  reacting: Reacting;
   shareStats: boolean;
   isOwner: boolean;
   onPhoto: () => void;
   onChallenges: () => void;
   onDelete: (id: string) => void;
 }) {
+  const [barFor, setBarFor] = useState<string | null>(null);
   return (
     <div className="flex flex-col gap-3 px-4 pb-10 pt-3">
       <button type="button" className="card press flex items-center gap-3 text-left" style={{ padding: "12px 14px", color: "var(--ink)" }} onClick={onPhoto}>
@@ -511,54 +686,140 @@ function FeedTab({
         </div>
       ) : (
         <AnimatePresence initial={false}>
-          {posts.map((p) => {
-            const meta = KIND_META[p.kind] ?? KIND_META.photo;
-            const verb = isCompletion(p) ? "crushed a challenge" : meta.verb;
-            const canDelete = canDeletePost(p, me, isOwner);
-            return (
-              <motion.article key={p.id} layout className="card" style={{ padding: 14 }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0, padding: 0 }}>
-                <div className="flex items-center gap-2.5">
-                  <Avatar path={p.author_avatar_path} name={p.author_name} size={40} />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-[14px]">
-                      <span className="font-bold">{p.user_id === me ? "You" : p.author_name}</span> <span className="muted">{verb}</span>
-                    </span>
-                    <span className="truncate text-[11px] muted">
-                      {p.author_username ? `@${p.author_username} · ` : ""}
-                      {postStamp(p.created_at, today)}
-                    </span>
-                  </span>
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)", color: meta.tint }}>
-                    <meta.Icon size={16} />
-                  </span>
-                  {canDelete ? <PostMenu align="right" onDelete={() => onDelete(p.id)} /> : null}
-                </div>
-                {p.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
-                  <img src={p.photo_url} alt="" className="mt-3 max-h-80 w-full rounded-2xl object-cover" loading="lazy" />
-                ) : null}
-                {p.body ? (
-                  <p className={`mt-2.5 whitespace-pre-wrap break-words ${p.kind === "photo" ? "text-[14px]" : "text-[16px] font-bold"}`} style={{ letterSpacing: p.kind === "photo" ? undefined : "-0.01em" }}>
-                    {p.body}
-                  </p>
-                ) : null}
-                {p.kind === "challenge" ? (
-                  p.ref_id ? (
-                    <Link href={`/squad/${squadId}/challenge/${p.ref_id}`} className="press mt-2 inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: "var(--ink)" }}>
-                      See the board <ChevronRight size={13} />
-                    </Link>
-                  ) : (
-                    <button type="button" className="press mt-2 inline-flex items-center gap-1 text-[12px] font-bold" style={{ background: "none", border: 0, padding: 0, color: "var(--ink)" }} onClick={onChallenges}>
-                      Open challenges <ChevronRight size={13} />
-                    </button>
-                  )
-                ) : null}
-              </motion.article>
-            );
-          })}
+          {posts.map((p) => (
+            <FeedCard
+              key={p.id}
+              p={p}
+              me={me}
+              today={today}
+              squadId={squadId}
+              reacting={reacting}
+              barOpen={barFor === p.id}
+              setBar={(open) => setBarFor(open ? p.id : null)}
+              onChallenges={onChallenges}
+              onDelete={canDeletePost(p, me, isOwner) ? () => onDelete(p.id) : null}
+            />
+          ))}
         </AnimatePresence>
       )}
     </div>
+  );
+}
+
+const DOUBLE_TAP_MS = 300;
+
+/**
+ * One Feed post. v2.11: reaction chips + "+😊" under it, double-tap for a quick ❤️, long-press
+ * (touch) for the reaction bar; Delete stays in the ⋯ menu.
+ */
+function FeedCard({
+  p,
+  me,
+  today,
+  squadId,
+  reacting,
+  barOpen,
+  setBar,
+  onChallenges,
+  onDelete,
+}: {
+  p: SquadPost;
+  me: string;
+  today: string;
+  squadId: string;
+  reacting: Reacting;
+  barOpen: boolean;
+  setBar: (open: boolean) => void;
+  onChallenges: () => void;
+  onDelete: (() => void) | null;
+}) {
+  const meta = KIND_META[p.kind] ?? KIND_META.photo;
+  const verb = isCompletion(p) ? "crushed a challenge" : meta.verb;
+  const state = reacting.stateOf(p);
+  const press = useLongPress(() => setBar(true));
+  const lastTap = useRef(0);
+  const [heart, setHeart] = useState(0);
+  function onTap(e: React.PointerEvent) {
+    if ((e.target as HTMLElement).closest("button, a, [role=menu]")) return;
+    const now = e.timeStamp;
+    if (now - lastTap.current < DOUBLE_TAP_MS) {
+      lastTap.current = 0;
+      setHeart((h) => h + 1);
+      reacting.react(p, "❤️", "double_tap");
+    } else lastTap.current = now;
+  }
+  return (
+    <motion.article
+      layout
+      className="card relative [@media(hover:none)]:select-none"
+      style={{ padding: 14, touchAction: "manipulation" }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0, padding: 0 }}
+      {...press}
+      onPointerUp={(e) => {
+        press.onPointerUp?.();
+        onTap(e);
+      }}
+    >
+      <div className="flex items-center gap-2.5">
+        <Avatar path={p.author_avatar_path} name={p.author_name} size={40} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[14px]">
+            <span className="font-bold">{p.user_id === me ? "You" : p.author_name}</span> <span className="muted">{verb}</span>
+          </span>
+          <span className="truncate text-[11px] muted">
+            {p.author_username ? `@${p.author_username} · ` : ""}
+            {postStamp(p.created_at, today)}
+          </span>
+        </span>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ background: "var(--card2)", color: meta.tint }}>
+          <meta.Icon size={16} />
+        </span>
+        {onDelete ? <PostMenu align="right" onDelete={onDelete} /> : null}
+      </div>
+      {p.photo_url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
+        <img src={p.photo_url} alt="" className="mt-3 max-h-80 w-full rounded-2xl object-cover" loading="lazy" draggable={false} />
+      ) : null}
+      {p.body ? (
+        <p className={`mt-2.5 whitespace-pre-wrap break-words ${p.kind === "photo" ? "text-[14px]" : "text-[16px] font-bold"}`} style={{ letterSpacing: p.kind === "photo" ? undefined : "-0.01em" }}>
+          {p.body}
+        </p>
+      ) : null}
+      {p.kind === "challenge" ? (
+        p.ref_id ? (
+          <Link href={`/squad/${squadId}/challenge/${p.ref_id}`} className="press mt-2 inline-flex items-center gap-1 text-[12px] font-bold" style={{ color: "var(--ink)" }}>
+            See the board <ChevronRight size={13} />
+          </Link>
+        ) : (
+          <button type="button" className="press mt-2 inline-flex items-center gap-1 text-[12px] font-bold" style={{ background: "none", border: 0, padding: 0, color: "var(--ink)" }} onClick={onChallenges}>
+            Open challenges <ChevronRight size={13} />
+          </button>
+        )
+      ) : null}
+      <div className="relative mt-2.5">
+        <ReactionBar open={barOpen} mine={state.mine} align="left" onPick={(e) => reacting.react(p, e)} onClose={() => setBar(false)} />
+        <ReactionChips state={state} onOpen={() => reacting.openReactors(p.id)}>
+          <AddReactionButton onClick={() => setBar(!barOpen)} />
+        </ReactionChips>
+      </div>
+      <AnimatePresence>
+        {heart ? (
+          <motion.span
+            key={heart}
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-1/2 text-[72px] leading-none"
+            initial={{ opacity: 0, scale: 0.4, x: "-50%", y: "-50%" }}
+            animate={{ opacity: [0, 1, 1, 0], scale: [0.4, 1.15, 1, 1.1] }}
+            transition={{ duration: 0.8, times: [0, 0.25, 0.7, 1] }}
+            onAnimationComplete={() => setHeart(0)}
+          >
+            ❤️
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
+    </motion.article>
   );
 }
 

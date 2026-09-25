@@ -7,6 +7,7 @@ import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 import { scanName } from "./scanNames";
 import { isMealType, missingMealTypeColumn } from "./mealType";
 import { parseAutoPost, parseAutoShare } from "./squadSharing";
+import { normalizeReaction, parseCounts, type ReadRow } from "./reactions";
 
 const PROFILE_COLS =
   "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml, units, username, water_glass_ml, water_reminder_from, water_reminder_to, water_reminder_every_min";
@@ -452,6 +453,11 @@ export async function fetchSquadPosts(supabase: Client, groupId: string, kinds: 
   const { data, error } = await supabase.rpc("group_feed", { g: groupId, before, n, kinds });
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as SquadPost[];
+  // v2.11: reactions / my_reaction are appended by schema_v35; missing (older server) = none.
+  for (const r of rows) {
+    r.reactions = parseCounts(r.reactions);
+    r.my_reaction = normalizeReaction(r.my_reaction);
+  }
   const paths = [...new Set(rows.filter((r) => r.photo_path).map((r) => r.photo_path as string))];
   if (paths.length) {
     const { data: signed } = await supabase.storage.from("group-photos").createSignedUrls(paths, 3600);
@@ -460,6 +466,27 @@ export async function fetchSquadPosts(supabase: Client, groupId: string, kinds: 
     for (const r of rows) if (r.photo_path) r.photo_url = byPath.get(r.photo_path) ?? null;
   }
   return rows;
+}
+
+/** v2.11: `group_read_status(g)` — every member's last_read_at; null when schema_v35 isn't applied (receipts hidden). */
+export async function fetchReadStatus(supabase: Client, groupId: string): Promise<ReadRow[] | null> {
+  const { data, error } = await supabase.rpc("group_read_status", { g: groupId });
+  if (error) return null;
+  return ((data ?? []) as ReadRow[]).map((r) => ({ user_id: r.user_id, name: r.name || "Member", username: r.username ?? null, avatar_path: r.avatar_path ?? null, last_read_at: r.last_read_at ?? null }));
+}
+
+export async function getReadStatus(groupId: string): Promise<ReadRow[] | null> {
+  return fetchReadStatus(await createClient(), groupId);
+}
+
+/** v2.11: unread Chat posts per squad (`my_unread_counts()`); {} when schema_v35 isn't applied. */
+export async function getUnreadCounts(): Promise<Record<string, number>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("my_unread_counts");
+  if (error) return {};
+  const out: Record<string, number> = {};
+  for (const r of (data ?? []) as { group_id: string; unread: number }[]) out[r.group_id] = Number(r.unread) || 0;
+  return out;
 }
 
 export async function getSquadPosts(groupId: string, kinds: string[] | null): Promise<SquadPost[]> {

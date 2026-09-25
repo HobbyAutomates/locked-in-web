@@ -33,6 +33,7 @@ Pages:
 | `squad_opened` | `squad_id` (web also sends `owner`) |
 | `challenge_created` | `kind`, `days` |
 | `post_deleted` | none |
+| `reaction_added` | `emoji`, `kind` (the post's kind), `replaced` (swapped another emoji), `via` (bar / double_tap) |
 | `error_shown` | `message` (the error text shown, up to 160 characters), `screen` |
 
 Each row also records the platform (`web` / `android`) and the app version. Web sends from the browser (`src/lib/track.ts`) and from Server Actions (`src/lib/trackServer.ts`). Android sends from `data/Analytics.kt`. Both queue events, send them in the background, and silently stop if the table is missing.

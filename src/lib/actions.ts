@@ -10,9 +10,11 @@ import { rollupQuietly } from "./rollup";
 import { trackServer } from "./trackServer";
 import { adminClient } from "./apiAuth";
 import { today as todayIso } from "./dates";
+import type { PostReactor } from "./types";
 import type { Activity, BattleBoardRow, BattleWinner, Challenge, ChallengeBoardRow, ChallengeKind, DescribedExercise, FoodSearchHit, GraffitiEntry, LeaderRow, MealItem, Profile, SavedMeal, SquadMember, SquadPost, WaterEntry, WaterVessel, WorkoutExercise, WorkoutKind } from "./types";
 import { mealPostBody, prPostBody, workoutPostBody } from "./squadPosts";
-import { fetchChallengeBoard, fetchChallenges, fetchSquadPosts } from "./data";
+import { fetchChallengeBoard, fetchChallenges, fetchReadStatus, fetchSquadPosts } from "./data";
+import { missingV35, normalizeReaction, type ReadRow } from "./reactions";
 import { checkChallengeCompletions } from "./challenges";
 import { battleLine } from "./battleLines";
 import { battleTarget, type BattleGoal } from "./battle";
@@ -965,6 +967,51 @@ export async function declineJoin(requestId: string) {
 export async function loadSquadPosts(groupId: string, kinds: string[] | null, before: string | null = null): Promise<SquadPost[]> {
   const { supabase } = await userOrThrow();
   return fetchSquadPosts(supabase, groupId, kinds, before);
+}
+
+/**
+ * v2.11: the Chat poll — posts plus every member's last_read_at for "Seen by" (null when
+ * schema_v35 isn't applied, so the ticks stay hidden). One browser round trip.
+ */
+export async function loadChat(groupId: string, kinds: string[]): Promise<{ posts: SquadPost[]; reads: ReadRow[] | null }> {
+  const { supabase } = await userOrThrow();
+  const [posts, reads] = await Promise.all([fetchSquadPosts(supabase, groupId, kinds), fetchReadStatus(supabase, groupId)]);
+  return { posts, reads };
+}
+
+/** v2.11: I've read this squad's Chat up to now (`mark_read(g)`). Silent when schema_v35 isn't applied. */
+export async function markSquadRead(groupId: string): Promise<void> {
+  const { supabase } = await userOrThrow();
+  await supabase.rpc("mark_read", { g: groupId });
+}
+
+const REACTIONS_NOT_LIVE = "Reactions are coming with the next server update. Try again soon.";
+
+/**
+ * v2.11: set my reaction on a post (one per person: upsert replaces it) or remove it (emoji null).
+ * RLS (schema_v35) only lets me touch my own row on posts in my squads.
+ */
+export async function reactToPost(postId: string, emoji: string | null, meta?: { kind?: string; replaced?: boolean; via?: string }): Promise<ActionResult> {
+  const { supabase, user } = await userOrThrow();
+  if (emoji == null) {
+    const { error } = await supabase.from("post_reactions").delete().eq("post_id", postId).eq("user_id", user.id);
+    if (error) return { ok: false, error: missingV35(error) ? REACTIONS_NOT_LIVE : describe(error) };
+    return { ok: true };
+  }
+  const e = normalizeReaction(emoji);
+  if (!e) return { ok: false, error: "That reaction isn't available" };
+  const { error } = await supabase.from("post_reactions").upsert({ post_id: postId, user_id: user.id, emoji: e, created_at: new Date().toISOString() }, { onConflict: "post_id,user_id" });
+  if (error) return { ok: false, error: missingV35(error) ? REACTIONS_NOT_LIVE : describe(error) };
+  trackServer(supabase, user.id, "reaction_added", { emoji: e, kind: meta?.kind, replaced: meta?.replaced, via: meta?.via });
+  return { ok: true };
+}
+
+/** v2.11: who reacted to a post, with what (`post_reactors(p)`, members only). */
+export async function loadPostReactors(postId: string): Promise<PostReactor[]> {
+  const { supabase } = await userOrThrow();
+  const { data, error } = await supabase.rpc("post_reactors", { p: postId });
+  if (error) throw new Error(missingV35(error) ? REACTIONS_NOT_LIVE : error.message);
+  return ((data ?? []) as PostReactor[]).map((r) => ({ ...r, name: r.name || "Member", emoji: normalizeReaction(r.emoji) ?? r.emoji }));
 }
 
 export async function sendSquadMessage(groupId: string, body: string): Promise<ActionResult> {

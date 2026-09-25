@@ -450,7 +450,14 @@ export type SquadPost = {
   author_name: string;
   author_username: string | null;
   author_avatar_path: string | null;
+  /** v2.11 (schema_v35, appended to group_feed): counts per emoji, {} or missing when none / v35 not applied. */
+  reactions?: Record<string, number>;
+  /** v2.11: my own emoji on this post, or null. */
+  my_reaction?: string | null;
 };
+
+/** v2.11: one row of `bandlog.post_reactors(p)` — who reacted with what. */
+export type PostReactor = { user_id: string; name: string; username: string | null; avatar_path: string | null; emoji: string; created_at: string };
 
 /** One row of `bandlog.group_leaderboard(g)`. */
 export type LeaderRow = { rank: number; user_id: string; name: string; username: string | null; avatar_path: string | null; flames: number; week_points: number; is_owner: boolean };

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { requestJoin } from "@/lib/actions";
+import { unreadLabel } from "@/lib/reactions";
 import type { PublicSquad, Squad } from "@/lib/types";
 import { Check, ChevronRight, Close, Globe, Help, Key, Padlock, Plus, Spinner } from "./icons";
 import ProfileSetupSheet from "./ProfileSetupSheet";
@@ -14,6 +15,8 @@ type Props = {
   me: string;
   squads: Squad[];
   publicSquads: PublicSquad[];
+  /** v2.11: unread Chat posts per squad id (empty until schema_v35 is applied). */
+  unread?: Record<string, number>;
   profile: { name: string; username: string | null; avatar_path: string | null };
 };
 
@@ -22,7 +25,7 @@ type Props = {
  * menu (Create a squad → the 3-step flow, Join with code, How squads work). A squad opens its own
  * page with Chat · Feed · Leaderboard. No username yet → the one-time profile sheet first.
  */
-export default function SquadScreen({ me, squads, publicSquads, profile }: Props) {
+export default function SquadScreen({ me, squads, publicSquads, unread = {}, profile }: Props) {
   const router = useRouter();
   const [menu, setMenu] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -125,6 +128,11 @@ export default function SquadScreen({ me, squads, publicSquads, profile }: Props
                       </span>
                       {g.description || g.tagline ? <span className="truncate text-xs muted">{g.description || g.tagline}</span> : null}
                     </span>
+                    {unreadLabel(unread[g.id]) ? (
+                      <span className="num grid h-[22px] min-w-[22px] shrink-0 place-items-center rounded-full px-1.5 text-[11px] font-extrabold" style={{ background: "var(--btn)", color: "var(--btn-ink)" }} aria-label={`${unread[g.id]} unread`}>
+                        {unreadLabel(unread[g.id])}
+                      </span>
+                    ) : null}
                     <span className="muted">
                       <ChevronRight size={18} />
                     </span>

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getChallenges, getJoinRequests, getLeaderboard, getProfile, getSentNudges, getSquad, getSquadPosts } from "@/lib/data";
+import { getChallenges, getJoinRequests, getLeaderboard, getProfile, getReadStatus, getSentNudges, getSquad, getSquadPosts, getUnreadCounts } from "@/lib/data";
 import { addDays, today } from "@/lib/dates";
 import { requireUser } from "@/lib/supabase/server";
 import SquadRoom from "@/components/SquadRoom";
@@ -16,7 +16,7 @@ export default async function SquadRoomPage({ params, searchParams }: { params: 
   if (!squad || !user) redirect("/squad");
   const todayIso = today();
   const yesterdayIso = addDays(todayIso, -1);
-  const [chat, feed, leaderboard, challenges, sent, profile, requests, crown] = await Promise.all([
+  const [chat, feed, leaderboard, challenges, sent, profile, requests, crown, reads, unread] = await Promise.all([
     getSquadPosts(id, CHAT_KINDS),
     getSquadPosts(id, FEED_KINDS),
     getLeaderboard(id),
@@ -27,6 +27,9 @@ export default async function SquadRoomPage({ params, searchParams }: { params: 
     // Closing yesterday's battle (idempotent) on every load is the spec's "no cron" design: the
     // first read after a day closes inserts the win + crown post; every later read is a no-op.
     squad.battle_enabled ? closeBattleDay(id, yesterdayIso) : Promise.resolve(null),
+    // v2.11 (schema_v35): read receipts + the Chat tab's unread badge; null / {} before v35.
+    getReadStatus(id),
+    getUnreadCounts(),
   ]);
   const deepLinkTab =
     sp.tab === "feed" || sp.tab === "leaderboard" || sp.tab === "challenges" || sp.tab === "chat" || (sp.tab === "battle" && squad.battle_enabled) ? sp.tab : null;
@@ -49,6 +52,8 @@ export default async function SquadRoomPage({ params, searchParams }: { params: 
       initialTab={deepLinkTab ?? defaultTab}
       hasDeepLinkTab={deepLinkTab != null}
       crown={crown}
+      reads={reads}
+      chatUnread={unread[id] ?? 0}
       yesterday={yesterdayIso}
     />
   );
