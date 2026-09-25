@@ -223,7 +223,9 @@ export function applyRestaurant(item: MealItem, oily: boolean): MealItem {
     carbs_g: Math.round(item.carbs_g * k * 10) / 10,
     fat_g: Math.round((item.fat_g * k + fatAdd) * 10) / 10,
     micros,
-    servings: item.servings != null ? Math.round(item.servings * k * 100) / 100 : item.servings,
+    // v2.8 (B4): a restaurant portion is stored by grams ("180 g"), never as "1.4 servings".
+    unit: "g",
+    servings: null,
     cooked_in: "restaurant",
   };
 }
@@ -250,4 +252,170 @@ export function mealItemFromPlate(i: { food_id: string | null; name: string; gra
     servings: null,
     cooked_in: i.cooked_in ?? null,
   };
+}
+
+// ---- v2.8: single-piece counting (B2) — a port of Android's Counting.unitFor ----
+
+/**
+ * How the Quantity sheet counts a food: "1 roti = 40 g" in whole steps, "1 katori = 150 g" in ½
+ * steps. `label` is set when the serving could not be split into single pieces ("5-6 pieces"), in
+ * which case the stepper counts that serving as a whole. Mirrors Android's util/Quantity.kt CountUnit.
+ */
+export type CountUnit = { noun: string; grams: number; step: 1 | 0.5; defaultCount: number; label: string | null };
+
+/** "2 roti", "1-egg omelette", "½ katori", "1 katori (2 pcs)" → count + noun. The noun must start with a letter ("5-6 pieces" doesn't parse). */
+const LEAD = /^\s*(\d+(?:\.\d+)?|½|¼|¾)\s*-?\s*(\p{L}.*?)\s*$/u;
+const WEIGHT_WORDS = new Set(["g", "gm", "gms", "gram", "grams", "kg", "ml", "l", "litre", "liter", "oz", "mg"]);
+/** Household measures you'd eat half of — everything else (roti, egg, idli, scoop, piece, slice …) counts in whole numbers. */
+const HALVES = new Set(["katori", "katoris", "bowl", "bowls", "glass", "glasses", "cup", "cups", "plate", "plates", "tumbler", "ladle", "handful", "handfuls", "tub", "tbsp", "tsp", "serving", "servings", "pack", "packs", "bar", "coconut"]);
+
+function leadNum(s: string): number | null {
+  if (s === "½") return 0.5;
+  if (s === "¼") return 0.25;
+  if (s === "¾") return 0.75;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** "slices" → "slice", "egg whites" → "egg white", "sandwiches" → "sandwich". Only the last word. */
+export function singularNoun(noun: string): string {
+  const words = noun.split(" ");
+  const w = words[words.length - 1];
+  let out = w;
+  if (w.length > 4 && (w.endsWith("ches") || w.endsWith("shes") || w.endsWith("sses"))) out = w.slice(0, -2);
+  else if (w.length > 4 && w.endsWith("ies")) out = w.slice(0, -3) + "y";
+  else if (w.length > 3 && w.endsWith("s") && !w.endsWith("ss")) out = w.slice(0, -1);
+  words[words.length - 1] = out;
+  return words.join(" ");
+}
+
+type ParsedServing = { count: number; noun: string; grams: number; label: string };
+
+function parseServing(s: PresetServing): ParsedServing | null {
+  const m = LEAD.exec(s.label);
+  if (!m) return null;
+  const n = leadNum(m[1]);
+  if (n == null) return null;
+  // "1 katori (2 pcs)" → "katori"; "1 pack (50 g)" → "pack".
+  const noun = m[2].replace(/\s*\(.*?\)/g, "").trim().toLowerCase();
+  if (!noun || n <= 0) return null;
+  if (WEIGHT_WORDS.has(noun.split(" ")[0])) return null;
+  return { count: n, noun: n > 1 ? singularNoun(noun) : noun, grams: s.grams, label: s.label };
+}
+
+const stepFor = (noun: string): 1 | 0.5 => (noun.split(" ").some((w) => HALVES.has(w)) ? 0.5 : 1);
+
+/**
+ * The count unit for a food's servings, or null for a loose food (no servings, or only gram weights
+ * like "100 g" / "200 g pack"). Prefers a single piece of the default serving's noun ("1 roti" over
+ * "2 roti"), then the default split per piece ("2 idli = 80 g" → 40 g), then any single piece. The
+ * default count is 1 — the preset's "2 roti" never decides it — except for small things you count
+ * in handfuls ("10 almonds", "6 momos").
+ */
+export function unitFor(servings: PresetServing[], defaultLabel?: string | null): CountUnit | null {
+  const list = servings.filter((s) => s && s.label);
+  if (!list.length) return null;
+  const def = list.find((s) => s.label === defaultLabel) ?? list[0];
+  const parsed = list.map(parseServing).filter((x): x is ParsedServing => x !== null);
+  const pd = parseServing(def);
+  const one = parsed.find((x) => x.count === 1 && (pd === null || x.noun === pd.noun));
+  let base: CountUnit | null = null;
+  if (one) base = { noun: one.noun, grams: one.grams, step: stepFor(one.noun), defaultCount: 1, label: null };
+  else if (pd && pd.count >= 1) base = { noun: pd.noun, grams: pd.grams / pd.count, step: stepFor(pd.noun), defaultCount: 1, label: null };
+  else {
+    const any1 = parsed.find((x) => x.count === 1);
+    if (any1) base = { noun: any1.noun, grams: any1.grams, step: stepFor(any1.noun), defaultCount: 1, label: null };
+  }
+  if (!base) {
+    // Nothing splits into pieces: "5-6 pieces" counts as a whole serving, unless every label is a weight.
+    if (!parsed.length && list.every((s) => WEIGHT_WORDS.has((s.label.trim().split(/\s+/)[1] ?? "").toLowerCase()))) return null;
+    return { noun: def.label.toLowerCase(), grams: def.grams, step: 0.5, defaultCount: 1, label: def.label };
+  }
+  const dc = pd && pd.noun === base.noun && pd.count >= 5 ? pd.count : 1;
+  return { ...base, grams: Math.round(base.grams * 10) / 10, defaultCount: dc };
+}
+
+export function unitForFood(f: QuantityFood): CountUnit | null {
+  return unitFor(f.servings, f.defaultServing);
+}
+
+/** The one-piece serving a count unit prices through ("1 roti" = 40 g), so rows store unit=serving, servings=count. */
+export function unitServing(cu: CountUnit): PresetServing {
+  return { label: cu.label ?? `1 ${cu.noun}`, grams: cu.grams };
+}
+
+/** Rounds `n` to the unit's step, never below one step. */
+export function snapCount(cu: CountUnit, n: number): number {
+  return Math.max(cu.step, Math.round(n / cu.step) * cu.step);
+}
+
+/** "2 roti", "1½ katori", "1 × 5-6 pieces" — how a count reads with its unit. */
+export function countLabel(cu: CountUnit, n: number): string {
+  return cu.label ? `${countText(n)} × ${cu.label}` : `${countText(n)} ${nounFor(cu.noun, n)}`;
+}
+
+/** What one tap on a food adds: its count unit at the default count (Android's sheet opens there too), else 100 g. */
+export function oneTap(f: QuantityFood): { food: QuantityFood; q: Quantity; label: string | null; unit: CountUnit | null } {
+  const cu = unitForFood(f);
+  if (!cu) return { food: f, q: { unit: "g", value: 100 }, label: null, unit: null };
+  const s = unitServing(cu);
+  return { food: { ...f, servings: [s], defaultServing: s.label }, q: { unit: "serving", value: cu.defaultCount }, label: s.label, unit: cu };
+}
+
+// ---- v2.8: the meal editor ----
+
+/**
+ * An item re-priced at `grams` from its own per-gram values (macros and micros linear). `servings`
+ * scales with it when the row is counted; pass `servings` to set it exactly (the stepper's count).
+ */
+export function rescaleItem(item: MealItem, grams: number, servings?: number | null): MealItem {
+  const g = Math.max(0, Math.round(grams * 10) / 10);
+  if (!(item.grams > 0)) return { ...item, grams: g };
+  const k = g / item.grams;
+  const micros: ItemMicros = {};
+  for (const [key, v] of Object.entries(item.micros ?? {})) if (v != null && Number.isFinite(v)) micros[key as keyof ItemMicros] = Math.round(v * k * 10) / 10;
+  const counted = item.unit === "serving" && item.servings != null && item.servings > 0;
+  return {
+    ...item,
+    grams: g,
+    calories: Math.round(Number(item.calories) * k),
+    protein_g: Math.round(Number(item.protein_g) * k * 10) / 10,
+    carbs_g: Math.round(Number(item.carbs_g) * k * 10) / 10,
+    fat_g: Math.round(Number(item.fat_g) * k * 10) / 10,
+    micros,
+    servings: servings !== undefined ? servings : counted ? Math.round(Number(item.servings) * k * 100) / 100 : (item.servings ?? null),
+  };
+}
+
+/** Words a food's own name counts in ("Roti", "Boiled egg", "Idli") — how a saved row with no serving label still reads "2 roti". */
+const NAME_NOUNS = new Set([...WHOLE_NOUNS, ...HALF_NOUNS]);
+
+/**
+ * The one-piece serving a saved row was counted in, when it was counted (unit = serving): its grams
+ * per piece and the noun its name suggests ("Roti" → roti), else "serving".
+ */
+export function savedUnitOf(item: MealItem): PresetServing | null {
+  const n = Number(item.servings);
+  if (item.unit !== "serving" || !(n > 0) || !(item.grams > 0) || item.cooked_in === "restaurant") return null;
+  const words = item.name.toLowerCase().replace(/\(.*?\)/g, " ").split(/[\s,]+/).filter(Boolean);
+  const noun = [...words].reverse().find((w) => NAME_NOUNS.has(w));
+  return { label: `1 ${noun ? singularNoun(noun) : "serving"}`, grams: Math.round((item.grams / n) * 10) / 10 };
+}
+
+/**
+ * A logged row's amount as it reads: "2 roti", "1½ katori", "180 g". Restaurant portions and
+ * anything not counted read in grams (B4: never "1.4 servings").
+ */
+export function itemQtyLabel(item: MealItem, servingLabel?: string | null): string {
+  const grams = `${Math.round(Number(item.grams) || 0)} g`;
+  const n = Number(item.servings);
+  if (item.unit !== "serving" || !(n > 0) || item.cooked_in === "restaurant") return grams;
+  const label = servingLabel ?? savedUnitOf(item)?.label ?? null;
+  if (!label) return grams;
+  const cu = unitFor([{ label, grams: item.grams / n }], label);
+  if (!cu) return grams;
+  // A count that isn't whole or half (older rows) reads in grams rather than "1.37 roti".
+  const count = Math.round(n * 100) / 100;
+  if (Math.abs(count * 2 - Math.round(count * 2)) > 0.02) return grams;
+  return countLabel(cu, Math.round(count * 2) / 2);
 }

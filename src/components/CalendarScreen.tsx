@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { iso, longDate, today as todayIso } from "@/lib/dates";
 import type { Meal, Workout } from "@/lib/types";
 import { ChevronLeft, ChevronRight } from "./icons";
-import { MealRow, WorkoutRow } from "./Rows";
+import { WorkoutRow } from "./Rows";
+import MealSections from "./MealSections";
 import { Card, PillButton, Rise } from "./ui";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -140,11 +141,8 @@ export default function CalendarScreen({ workouts, meals, weekStreak }: { workou
           <WorkoutRow workout={w} onOpen={() => router.push(`/log?workout=${w.id}`)} />
         </Rise>
       ))}
-      {dayMeals.map((m) => (
-        <Rise key={m.id} index={4}>
-          <MealRow meal={m} feedback={false} />
-        </Rise>
-      ))}
+      {/* v2.8: the day's meals grouped like Home (Breakfast · Lunch · Dinner · Snacks); tap one to edit it. */}
+      {dayMeals.length ? <MealSections meals={dayMeals} date={selected} back="/calendar" rise={4} /> : null}
     </div>
   );
 }

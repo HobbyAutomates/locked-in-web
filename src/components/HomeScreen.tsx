@@ -11,7 +11,8 @@ import { logWater } from "@/lib/actions";
 import { litres, WaterBottle } from "./WaterBottle";
 import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Nudge, type Profile, type WaterEntry, type Workout, type Wrap } from "@/lib/types";
 import { CalendarIcon, Check, ChevronRight, Close, Fist, Flame, Lock, MoonStar, Plus, Run, Share, Spinner } from "./icons";
-import { ExerciseRow, MealRow, WorkoutRow } from "./Rows";
+import { ExerciseRow, WorkoutRow } from "./Rows";
+import MealSections from "./MealSections";
 import { usePendingMeals, type Pending } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
 
@@ -91,25 +92,15 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
             <Lock size={26} />
             Locked In
           </h1>
-          <span className="flex items-center gap-2">
-            <span
-              className="flex items-center gap-1.5 rounded-full py-1.5 pl-2.5 pr-3 text-sm font-bold"
-              style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)" }}
-              title={`${weekStreak} week streak`}
-            >
-              <BreathingFlame size={16} />
-              {weekStreak}
-            </span>
-            {/* v2.4: Calendar left the tab bar; it lives here, as on Android. */}
-            <Link
-              href="/calendar"
-              aria-label="Calendar"
-              className="press grid h-9 w-9 place-items-center rounded-full"
-              style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)", color: "var(--ink)" }}
-            >
-              <CalendarIcon size={19} />
-            </Link>
-          </span>
+          {/* v2.8 declutter: the header keeps only Calendar (the week streak lives on Calendar and Progress). */}
+          <Link
+            href="/calendar"
+            aria-label="Calendar"
+            className="press grid h-9 w-9 place-items-center rounded-full"
+            style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)", color: "var(--ink)" }}
+          >
+            <CalendarIcon size={19} />
+          </Link>
         </div>
         {error ? <div className="mt-2"><ErrorNote text={error} /></div> : null}
       </Rise>
@@ -202,21 +193,11 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
 
       <Rise index={4}>
         <h2 className="text-xl font-extrabold" style={{ letterSpacing: "-0.025em" }}>
-          {isToday ? "Recently logged" : longDate(selected)}
+          {isToday ? "Today" : longDate(selected)}
         </h2>
       </Rise>
 
-      {dayWorkouts.length === 0 && dayMeals.length === 0 && dayExercises.length === 0 && !(isToday && pending.length) ? (
-        <Rise index={5}>
-          <div className="card flex flex-col items-start gap-3">
-            <p className="text-[15px]">{isToday ? "Nothing logged yet today." : `Nothing logged on ${longDate(selected)}.`}</p>
-            <PillButton soft height={44} onClick={() => router.push(`/log?date=${selected}`)}>
-              {isToday ? "Log something" : "Log for this day"}
-            </PillButton>
-          </div>
-        </Rise>
-      ) : null}
-
+      {/* v2.8: no "Log something" button here — the + button logs; each meal section has its own "+ Add". */}
       {dayWorkouts.map((w) => (
         <Rise key={w.id} index={5}>
           <WorkoutRowLink workout={w} burnKcal={workoutBurn.get(w.id) ?? null} />
@@ -227,11 +208,8 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
           <ExerciseRow entry={e} />
         </Rise>
       ))}
-      {dayMeals.map((m) => (
-        <Rise key={m.id} index={6}>
-          <MealRow meal={m} />
-        </Rise>
-      ))}
+      {/* v2.8: Breakfast · Lunch · Dinner · Snacks, each with its totals and "+ Add"; tap a meal to edit it. */}
+      <MealSections meals={dayMeals} date={selected} />
 
       <AnimatePresence>
         {celebrate ? <Celebration thisWeek={thisWeek} target={profile.weekly_workout_target} streakWeeks={weekStreak} /> : null}
@@ -319,38 +297,27 @@ function DayStreakPill({ days, loggedToday }: { days: number; loggedToday: boole
 }
 
 /**
- * One banner slot above the hero: at most one of the squad nudge, the 9 pm wrap and a meal still
- * being saved, in that priority. With more than one, a dot row underneath steps to the next.
+ * v2.8: one card above the hero, never a carousel — the most relevant of: a meal still being saved,
+ * then a squad nudge, then the 9 pm wrap. Dismissing one lets the next show.
  */
 function BannerSlot({ nudges, wrap, pending }: { nudges: Nudge[]; wrap: Wrap | null; pending: Pending[] }) {
   const nudgeHidden = useDismissed(`nudge:${nudges[0]?.id ?? "none"}`);
   const wrapHidden = useDismissed(`wrap:${wrap?.date ?? "none"}`);
-  const [idx, setIdx] = useState(0);
-  const slots: { key: string; node: React.ReactNode }[] = [];
-  if (nudges.length && !nudgeHidden) slots.push({ key: "nudge", node: <NudgeBanner nudges={nudges} /> });
-  if (wrap && !wrapHidden) slots.push({ key: "wrap", node: <WrapCard wrap={wrap} /> });
-  if (pending.length) slots.push({ key: "pending", node: <PendingBanner pending={pending} /> });
-  if (!slots.length) return null;
-  const i = idx % slots.length;
+  const slot = pending.length
+    ? { key: "pending", node: <PendingBanner pending={pending} /> }
+    : nudges.length && !nudgeHidden
+      ? { key: "nudge", node: <NudgeBanner nudges={nudges} /> }
+      : wrap && !wrapHidden
+        ? { key: "wrap", node: <WrapCard wrap={wrap} /> }
+        : null;
+  if (!slot) return null;
   return (
     <Rise index={1}>
       <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={slots[i].key} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.16 }}>
-          {slots[i].node}
+        <motion.div key={slot.key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
+          {slot.node}
         </motion.div>
       </AnimatePresence>
-      {slots.length > 1 ? (
-        <button
-          type="button"
-          className="hit press mx-auto mt-1 flex h-6 items-center gap-1.5 px-3"
-          aria-label={`Banner ${i + 1} of ${slots.length}. Show the next one`}
-          onClick={() => setIdx(i + 1)}
-        >
-          {slots.map((s, j) => (
-            <span key={s.key} className="rounded-full" style={{ width: j === i ? 16 : 6, height: 6, background: j === i ? "var(--ink)" : "var(--hair)", transition: "width 0.2s" }} />
-          ))}
-        </button>
-      ) : null}
     </Rise>
   );
 }
@@ -364,7 +331,7 @@ function PendingBanner({ pending }: { pending: Pending[] }) {
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[15px] font-bold">Saving {pending.length === 1 ? `"${pending[0].text}"` : `${pending.length} meals`}</span>
-        <span className="text-xs muted">Working out the calories. It lands in Recently logged.</span>
+        <span className="text-xs muted">Working out the calories. It lands under its meal.</span>
       </span>
     </div>
   );

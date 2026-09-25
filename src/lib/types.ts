@@ -52,6 +52,8 @@ export type Meal = {
   created_at: string;
   photo_path?: string | null;
   items: MealItem[];
+  /** v2.8: breakfast | lunch | dinner | snack (schema_v30). Null / missing → the hour rule (lib/mealType.ts). */
+  meal_type?: "breakfast" | "lunch" | "dinner" | "snack" | null;
 };
 
 export type Gender = "male" | "female" | "other";

@@ -5,6 +5,7 @@ import { normalizeBoard, normalizeChallenge } from "./challenges";
 import { parse as parseReminders } from "./reminders";
 import { calorieGoalDays, longestDayRun, type BadgeProgress } from "./badges";
 import { scanName } from "./scanNames";
+import { isMealType, missingMealTypeColumn } from "./mealType";
 
 const PROFILE_COLS =
   "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml, units, username, water_glass_ml, water_reminder_from, water_reminder_to, water_reminder_every_min";
@@ -165,23 +166,40 @@ export async function getFoodUsage(days = 60): Promise<Record<string, number>> {
 }
 
 /** Meals with items; `photo_path` becomes a 1-hour signed URL in `photo_url` when a photo exists. */
-export async function getMeals(from: string, to: string): Promise<(Meal & { photo_url?: string | null })[]> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("meals")
-    .select("id, date, raw_text, created_at, photo_path, meal_items(id, food_id, name, grams, calories, protein_g, carbs_g, fat_g, source, confidence, micros, unit, servings, cooked_in)")
-    .gte("date", from)
-    .lte("date", to)
-    .order("created_at", { ascending: false });
-  const meals = (data ?? []).map((m) => ({
+const MEAL_ITEM_COLS = "id, food_id, name, grams, calories, protein_g, carbs_g, fat_g, source, confidence, micros, unit, servings, cooked_in";
+
+type MealRowData = { id: unknown; date: unknown; raw_text: unknown; created_at: unknown; photo_path: unknown; meal_type?: unknown; meal_items: unknown };
+
+function mealFromRow(m: MealRowData): Meal & { photo_url: string | null } {
+  return {
     id: m.id as string,
     date: m.date as string,
     raw_text: m.raw_text as string,
     created_at: m.created_at as string,
     photo_path: (m.photo_path as string | null) ?? null,
-    items: (m.meal_items ?? []) as MealItem[],
-    photo_url: null as string | null,
-  }));
+    items: ((m.meal_items ?? []) as MealItem[]).map((i) => ({ ...i, grams: Number(i.grams), servings: i.servings == null ? null : Number(i.servings) })),
+    // v2.8: null (or no column before schema_v30) → the hour rule, in lib/mealType.ts.
+    meal_type: isMealType(m.meal_type) ? m.meal_type : null,
+    photo_url: null,
+  };
+}
+
+/**
+ * Meals with items; `photo_path` becomes a 1-hour signed URL in `photo_url` when a photo exists.
+ * v2.8: selects `meal_type`, and again without it while schema_v30 isn't applied.
+ */
+export async function getMeals(from: string, to: string): Promise<(Meal & { photo_url?: string | null })[]> {
+  const supabase = await createClient();
+  const query = (withType: boolean) =>
+    supabase
+      .from("meals")
+      .select(`id, date, raw_text, created_at, photo_path${withType ? ", meal_type" : ""}, meal_items(${MEAL_ITEM_COLS})`)
+      .gte("date", from)
+      .lte("date", to)
+      .order("created_at", { ascending: false });
+  let res = await query(true);
+  if (res.error && missingMealTypeColumn(res.error)) res = await query(false);
+  const meals = ((res.data ?? []) as unknown as MealRowData[]).map(mealFromRow);
   const paths = meals.filter((m) => m.photo_path).map((m) => m.photo_path as string);
   if (paths.length) {
     const { data: signed } = await supabase.storage.from("meal-photos").createSignedUrls(paths, 3600);
@@ -189,6 +207,24 @@ export async function getMeals(from: string, to: string): Promise<(Meal & { phot
     for (const m of meals) if (m.photo_path) m.photo_url = byPath.get(m.photo_path) ?? null;
   }
   return meals;
+}
+
+/** v2.8: one meal with its items, for the meal editor (null when it's gone or not mine). */
+export async function getMeal(id: string): Promise<Meal | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const supabase = await createClient();
+  const query = (withType: boolean) =>
+    supabase
+      .from("meals")
+      .select(`id, date, raw_text, created_at, photo_path${withType ? ", meal_type" : ""}, meal_items(${MEAL_ITEM_COLS})`)
+      .eq("id", id)
+      .maybeSingle();
+  let res = await query(true);
+  if (res.error && missingMealTypeColumn(res.error)) res = await query(false);
+  if (res.error || !res.data) return null;
+  const { photo_url, ...meal } = mealFromRow(res.data as unknown as MealRowData);
+  void photo_url;
+  return meal;
 }
 
 /** v2.3: glasses / bottles logged between `from` and `to`, newest first. */
