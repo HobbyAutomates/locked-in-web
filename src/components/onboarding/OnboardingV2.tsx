@@ -614,7 +614,7 @@ function ResultScreen({ top, log, onMealType, onNext }: { top: React.ReactNode; 
         <span className="display num" style={{ fontSize: 26, fontWeight: 800 }}>
           {Math.round(t.calories)} kcal
         </span>
-        <span className="mono" style={{ fontSize: 11, opacity: 0.75 }}>
+        <span className="mono" style={{ fontSize: 11, opacity: 0.75, textTransform: "none" }}>
           P {Math.round(t.protein)} g · C {Math.round(t.carbs)} g · F {Math.round(t.fat)} g
         </span>
       </div>
@@ -977,8 +977,11 @@ function CoachStyleScreen({ top, teen, value, onPick, onNext, busy, err, tune }:
         </div>
       </div>
       <div className="flex flex-col gap-3" style={{ padding: "20px 20px 0" }}>
-        <div className="m-fade" style={{ opacity: 0.45 }}>
-          <CoachBubble label={STYLES.find((s) => s.key === other)!.label}>{SAMPLE[other]}</CoachBubble>
+        <div className="m-fade">
+          {/* The dimmed voice on its own wrapper: an animation's final opacity would override it. */}
+          <div style={{ opacity: 0.45 }}>
+            <CoachBubble label={STYLES.find((s) => s.key === other)!.label}>{SAMPLE[other]}</CoachBubble>
+          </div>
         </div>
         <div key={v} className="m-rise">
           <CoachBubble label={label}>{SAMPLE[v]}</CoachBubble>
@@ -1229,8 +1232,8 @@ function RevealScreen({ st, plan, onNext, onBack }: { st: OnbState; plan: OnbPla
           </div>
         </div>
       ) : null}
-      <div className="m-rise" style={md(500, { margin: "12px 20px 0", padding: 16, borderRadius: 22, background: "#0B0B0C", color: "#F4F1EA" })}>
-        <div className="mono" style={{ fontSize: 11, color: "#8F8A82", marginBottom: 8 }}>
+      <div className="m-rise" style={md(500, { margin: "12px 20px 0", padding: 16, borderRadius: 22, background: "var(--btn)", color: "var(--btn-ink)" })}>
+        <div className="mono" style={{ fontSize: 11, color: "var(--mute)", marginBottom: 8 }}>
           Daily target
         </div>
         <div className="flex justify-between">
@@ -1239,7 +1242,7 @@ function RevealScreen({ st, plan, onNext, onBack }: { st: OnbState; plan: OnbPla
               <div className="display num" style={{ fontSize: 20, fontWeight: 800 }}>
                 {v}
               </div>
-              <div className="mono" style={{ fontSize: 10, color: "#8F8A82" }}>
+              <div className="mono" style={{ fontSize: 10, color: "var(--mute)" }}>
                 {l}
               </div>
             </div>

@@ -56,8 +56,8 @@ export default function CoachStyleSettings({ initial }: { initial: CoachSettings
               role="radio"
               aria-checked={on}
               disabled={locked}
-              className="m-rise press flex flex-col gap-2.5 text-left"
-              style={{ animationDelay: `${i * 120}ms`, padding: 16, borderRadius: 22, border: 0, background: "var(--surf)", color: "var(--ink)", boxShadow: on ? "inset 0 0 0 2px var(--ember)" : "none", opacity: locked ? 0.45 : 1 }}
+              className="press flex flex-col gap-2.5 text-left"
+              style={{ padding: 16, borderRadius: 22, border: 0, background: "var(--surf)", color: "var(--ink)", boxShadow: on ? "inset 0 0 0 2px var(--ember)" : "none", opacity: locked ? 0.45 : 1 }}
               onClick={() => void save({ style: st.key as CoachStyle })}
             >
               <span className="flex items-center gap-3">
