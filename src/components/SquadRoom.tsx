@@ -253,7 +253,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
             className="press flex min-w-0 flex-1 items-center gap-2.5"
             style={{ color: "var(--ink)" }}
           >
-            <SquadIcon icon={squad.icon} cover={squad.cover_url} size={36} />
+            <SquadIcon icon={squad.icon} cover={squad.cover_url} size={36} squadId={squad.id} />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-[17px] font-extrabold leading-tight" style={{ letterSpacing: "-0.02em" }}>
                 {squad.name}
@@ -902,6 +902,7 @@ function LeaderboardTab({ me, squadId, rows, sentNudges, onError, onOpenProfile 
             isMe={isMe}
             meta={`${r.week_points} pts this week`}
             onClick={() => onOpenProfile(r)}
+            squadId={squadId}
             right={
               <>
                 <span className="flex items-center gap-1 text-[17px] font-extrabold" title={`${r.flames}-day streak`}>

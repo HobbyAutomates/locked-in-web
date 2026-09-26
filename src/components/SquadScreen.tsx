@@ -118,7 +118,7 @@ export default function SquadScreen({ me, squads, publicSquads, unread = {}, pro
               <div className="px-3.5">
                 {squads.map((g, i) => (
                   <Link key={g.id} href={`/squad/${g.id}`} className="press flex items-center gap-3 py-3" style={{ borderTop: i > 0 ? "1px solid var(--hair)" : "none", color: "var(--ink)" }}>
-                    <SquadIcon icon={g.icon} cover={g.cover_url} size={52} />
+                    <SquadIcon icon={g.icon} cover={g.cover_url} size={52} squadId={g.id} />
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-[15px] font-bold">{g.name}</span>
                       <span className="flex items-center gap-1 text-xs font-semibold muted">
@@ -251,7 +251,7 @@ function Discover({ squads }: { squads: PublicSquad[] }) {
           <div className="px-3.5">
             {squads.map((g, i) => (
               <div key={g.id} className="flex items-center gap-3 py-3" style={{ borderTop: i > 0 ? "1px solid var(--hair)" : "none" }}>
-                <SquadIcon icon={g.icon} cover={g.cover_url} size={56} rounded="2xl" />
+                <SquadIcon icon={g.icon} cover={g.cover_url} size={56} rounded="2xl" squadId={g.id} />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[15px] font-bold">{g.name}</span>
                   <span className="text-xs font-semibold muted">

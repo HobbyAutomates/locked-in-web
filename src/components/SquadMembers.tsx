@@ -98,7 +98,7 @@ export default function SquadMembers({ me, squad, members, requests: requests0, 
       <div className="flex flex-col gap-3.5 px-4">
         <Rise index={0}>
           <div className="flex flex-col items-center text-center">
-            <SquadIcon icon={squad.icon} cover={squad.cover_url} size={112} />
+            <SquadIcon icon={squad.icon} cover={squad.cover_url} size={112} squadId={squad.id} />
             <h1 className="mt-3 text-[24px] font-extrabold" style={{ letterSpacing: "-0.03em" }}>
               {squad.name}
             </h1>

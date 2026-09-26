@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { People } from "./icons";
+import { SquadTextureTile } from "./SquadTexture";
 
 /**
  * v2.6: the 12 pre-made squad icons (Cal AI's "Choose a group photo"): a gradient disc with a
@@ -169,9 +170,26 @@ export function SquadIconArt({ k, size = 48 }: { k: SquadIconKey; size?: number 
   );
 }
 
-/** A squad's picture: preset icon, else its cover / uploaded photo, else a people glyph. */
-export function SquadIcon({ icon, cover, size = 48, rounded = "full" }: { icon?: string | null; cover?: string | null; size?: number; rounded?: "full" | "2xl" }) {
+/**
+ * A squad's picture: preset icon, else its cover / uploaded photo, else a people glyph.
+ * v2.14 squad textures: with `squadId`, the preset icon sits in mono on the squad's own pattern
+ * (brand v1: squads get a texture, not a colour). An uploaded photo stays a photo.
+ */
+export function SquadIcon({ icon, cover, size = 48, rounded = "full", squadId }: { icon?: string | null; cover?: string | null; size?: number; rounded?: "full" | "2xl"; squadId?: string }) {
   const [broken, setBroken] = useState(false);
+  if (squadId && (isSquadIcon(icon) || !cover || broken)) {
+    return (
+      <SquadTextureTile squadId={squadId} size={size} rounded={rounded}>
+        {isSquadIcon(icon) ? (
+          <span style={{ filter: "grayscale(1) contrast(1.15)", display: "grid" }}>
+            <SquadIconArt k={icon} size={Math.round(size * 0.62)} />
+          </span>
+        ) : (
+          <People size={Math.round(size * 0.3)} />
+        )}
+      </SquadTextureTile>
+    );
+  }
   if (isSquadIcon(icon)) return <SquadIconArt k={icon} size={size} />;
   const radius = rounded === "full" ? 999 : Math.round(size * 0.28);
   if (cover && !broken) {
