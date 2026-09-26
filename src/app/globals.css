@@ -1,88 +1,127 @@
 @import url("https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Permanent+Marker&display=swap");
 @import "tailwindcss";
 
-/* ───────── Cal AI-style palette, mirroring the Android app's Color.kt ───────── */
+/* ───────── Brand v1 palette, mirroring the Android app's Color.kt ───────── */
 :root {
-  --bg: #f4f4f6;
-  --card: #ffffff;
-  --card2: #f2f2f4;
-  --ink: #111111;
-  --muted: #7c7c82;
-  --hair: #e9e9ec;
-  --track: #ececef;
-  --btn: #111111;
-  --btn-ink: #ffffff;
-  --red: #e9573f;
-  --red-bg: #fde9e5;
-  --orange: #f09a2a;
-  --orange-bg: #fdf0dc;
-  --blue: #3e86e4;
-  --blue-bg: #e3eefb;
-  --green: #2fb35e;
-  --green-bg: #e2f5e8;
-  --purple: #7a5af8;
-  --purple-bg: #ece7fe;
-  --flame: #ff6a00;
-  /* v2.12: one warm accent (Profile, Login), used sparingly, and the premium card surface */
-  --accent: #e8701f;
-  --accent2: #f4a061;
+  /* Brand v1 (locked 2026-09-26): ink · bone · ember · iris · mint. Monochrome body, ember heartbeat.
+     --ink stays "the foreground" and --bone "the page", so the light theme (ink on bone) and the dark
+     theme (bone on ink) swap them, as the brand system says. */
+  --bone: #f4f1ea;
+  --surf: #ffffff;
+  --surf2: #eae6dd;
+  --mute: #6e6962;
+  --line: rgba(11, 11, 12, 0.1);
+  --ember: #ff5b1f;
+  --ember-2: #ff8b5e;
+  --ember-bg: #fbe3d8;
+  --ember-ink: #ffffff;
+  /* Iris is the coach's voice and nothing else; mint only means "on track". */
+  --iris: #6b5ce6;
+  --iris-bg: rgba(107, 92, 230, 0.07);
+  --iris-line: rgba(107, 92, 230, 0.33);
+  --mint: #1f9d6b;
+  --mint-bg: rgba(89, 227, 167, 0.18);
+  --danger: #d23a26;
+  --danger-bg: rgba(210, 58, 38, 0.1);
+  --hatch: rgba(11, 11, 12, 0.34);
+  --bg: var(--bone);
+  --card: var(--surf);
+  --card2: var(--surf2);
+  --ink: #0b0b0c;
+  --muted: var(--mute);
+  --hair: var(--line);
+  --track: #e3ded4;
+  --btn: #0b0b0c;
+  --btn-ink: #f4f1ea;
+  /* The old macro hues are mono now (charts, bars and rings are monochrome): protein = full ink,
+     carbs = mid grey, fat = light grey. Errors and deletes use --danger. */
+  --red: #0b0b0c;
+  --red-bg: rgba(11, 11, 12, 0.07);
+  --orange: #6e6962;
+  --orange-bg: rgba(110, 105, 98, 0.12);
+  --blue: #a39d93;
+  --blue-bg: rgba(163, 157, 147, 0.16);
+  --green: var(--mint);
+  --green-bg: var(--mint-bg);
+  --purple: var(--iris);
+  --purple-bg: var(--iris-bg);
+  --flame: var(--ember);
+  --accent: var(--ember);
+  --accent2: var(--ember-2);
   --accent-ink: #ffffff;
   --pcard: #ffffff;
   --pcard-ring: 0 1px 2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.03);
-  --cover-a: #1d1d1f;
-  --cover-b: #050505;
+  --cover-a: #1d1d20;
+  --cover-b: #0b0b0c;
   --float: #ffffff;
   --medal-drop: rgba(0, 0, 0, 0.18);
-  --green-ink: #1f8443;
-  --orange-ink: #b86e0c;
-  --blue-ink: #2f74d0;
-  --red-ink: #d9482f;
-  --medal-well: #f1f0ed;
+  --green-ink: #1a7f57;
+  --orange-ink: #57534d;
+  --blue-ink: #57534d;
+  --red-ink: #0b0b0c;
+  --medal-well: #efebe3;
   --tier-gold: #8a5a12;
   --tier-silver: #6c6c75;
   --tier-bronze: #7a3d17;
-  --shadow: 0 6px 18px rgba(17, 17, 17, 0.08), 0 1px 3px rgba(17, 17, 17, 0.05);
-  --shadow-sm: 0 3px 10px rgba(17, 17, 17, 0.07);
-  --shadow-lg: 0 10px 30px rgba(17, 17, 17, 0.14);
+  --shadow: 0 6px 18px rgba(11, 11, 12, 0.07), 0 1px 3px rgba(11, 11, 12, 0.05);
+  --shadow-sm: 0 3px 10px rgba(11, 11, 12, 0.06);
+  --shadow-lg: 0 10px 30px rgba(11, 11, 12, 0.13);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #000000;
-    --card: #1c1c1e;
-    --card2: #2c2c2e;
-    --ink: #f5f5f7;
-    --muted: #9a9aa0;
-    --hair: #2c2c2e;
-    --track: #2c2c2e;
-    --btn: #f5f5f7;
-    --btn-ink: #000000;
-    --red: #ff6b6b;
-    --red-bg: rgba(255, 107, 107, 0.16);
-    --orange: #f5a623;
-    --orange-bg: rgba(245, 166, 35, 0.16);
-    --blue: #5b9bf0;
-    --blue-bg: rgba(91, 155, 240, 0.16);
-    --green: #4cd964;
-    --green-bg: rgba(76, 217, 100, 0.16);
-    --purple: #a78bfa;
-    --purple-bg: rgba(167, 139, 250, 0.16);
-    --flame: #ff7a1a;
-    --accent: #ff8a3d;
-    --accent2: #ffb27a;
+    --bone: #0b0b0c;
+    --surf: #141416;
+    --surf2: #1d1d20;
+    --mute: #8f8a82;
+    --line: rgba(244, 241, 234, 0.09);
+    --ember: #ff5b1f;
+    --ember-2: #ff8b5e;
+    --ember-bg: rgba(255, 91, 31, 0.16);
+    --ember-ink: #ffffff;
+    --iris: #8b7bff;
+    --iris-bg: rgba(139, 123, 255, 0.12);
+    --iris-line: rgba(139, 123, 255, 0.33);
+    --mint: #59e3a7;
+    --mint-bg: rgba(89, 227, 167, 0.14);
+    --danger: #ff6b5b;
+    --danger-bg: rgba(255, 107, 91, 0.14);
+    --hatch: rgba(244, 241, 234, 0.3);
+    --bg: var(--bone);
+    --card: var(--surf);
+    --card2: var(--surf2);
+    --ink: #f4f1ea;
+    --muted: var(--mute);
+    --hair: var(--line);
+    --track: #26262a;
+    --btn: #f4f1ea;
+    --btn-ink: #0b0b0c;
+    --red: #f4f1ea;
+    --red-bg: rgba(244, 241, 234, 0.1);
+    --orange: #b5b0a8;
+    --orange-bg: rgba(181, 176, 168, 0.14);
+    --blue: #6e6962;
+    --blue-bg: rgba(110, 105, 98, 0.2);
+    --green: var(--mint);
+    --green-bg: var(--mint-bg);
+    --purple: var(--iris);
+    --purple-bg: var(--iris-bg);
+    --flame: var(--ember);
+    --accent: var(--ember);
+    --accent2: var(--ember-2);
     --accent-ink: #ffffff;
-    --pcard: #141415;
-    --pcard-ring: 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --cover-a: #e9e9eb;
-    --cover-b: #bdbdc1;
-    --float: #1a1a1b;
+    --pcard: #141416;
+    --pcard-ring: 0 0 0 1px rgba(244, 241, 234, 0.05);
+    --cover-a: #f4f1ea;
+    --cover-b: #c9c4ba;
+    --float: #1d1d20;
     --medal-drop: rgba(0, 0, 0, 0.55);
-    --green-ink: #5fe07a;
-    --orange-ink: #f5b041;
-    --blue-ink: #7fb0f5;
-    --red-ink: #ff7b6b;
-    --medal-well: #141415;
+    --green-ink: #59e3a7;
+    --orange-ink: #c9c4ba;
+    --blue-ink: #c9c4ba;
+    --red-ink: #f4f1ea;
+    --medal-well: #141416;
     --tier-gold: #e2b04a;
     --tier-silver: #c9c9d1;
     --tier-bronze: #c97a42;
@@ -94,40 +133,57 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #000000;
-  --card: #1c1c1e;
-  --card2: #2c2c2e;
-  --ink: #f5f5f7;
-  --muted: #9a9aa0;
-  --hair: #2c2c2e;
-  --track: #2c2c2e;
-  --btn: #f5f5f7;
-  --btn-ink: #000000;
-  --red: #ff6b6b;
-  --red-bg: rgba(255, 107, 107, 0.16);
-  --orange: #f5a623;
-  --orange-bg: rgba(245, 166, 35, 0.16);
-  --blue: #5b9bf0;
-  --blue-bg: rgba(91, 155, 240, 0.16);
-  --green: #4cd964;
-  --green-bg: rgba(76, 217, 100, 0.16);
-  --purple: #a78bfa;
-  --purple-bg: rgba(167, 139, 250, 0.16);
-  --flame: #ff7a1a;
-  --accent: #ff8a3d;
-  --accent2: #ffb27a;
+  --bone: #0b0b0c;
+  --surf: #141416;
+  --surf2: #1d1d20;
+  --mute: #8f8a82;
+  --line: rgba(244, 241, 234, 0.09);
+  --ember: #ff5b1f;
+  --ember-2: #ff8b5e;
+  --ember-bg: rgba(255, 91, 31, 0.16);
+  --ember-ink: #ffffff;
+  --iris: #8b7bff;
+  --iris-bg: rgba(139, 123, 255, 0.12);
+  --iris-line: rgba(139, 123, 255, 0.33);
+  --mint: #59e3a7;
+  --mint-bg: rgba(89, 227, 167, 0.14);
+  --danger: #ff6b5b;
+  --danger-bg: rgba(255, 107, 91, 0.14);
+  --hatch: rgba(244, 241, 234, 0.3);
+  --bg: var(--bone);
+  --card: var(--surf);
+  --card2: var(--surf2);
+  --ink: #f4f1ea;
+  --muted: var(--mute);
+  --hair: var(--line);
+  --track: #26262a;
+  --btn: #f4f1ea;
+  --btn-ink: #0b0b0c;
+  --red: #f4f1ea;
+  --red-bg: rgba(244, 241, 234, 0.1);
+  --orange: #b5b0a8;
+  --orange-bg: rgba(181, 176, 168, 0.14);
+  --blue: #6e6962;
+  --blue-bg: rgba(110, 105, 98, 0.2);
+  --green: var(--mint);
+  --green-bg: var(--mint-bg);
+  --purple: var(--iris);
+  --purple-bg: var(--iris-bg);
+  --flame: var(--ember);
+  --accent: var(--ember);
+  --accent2: var(--ember-2);
   --accent-ink: #ffffff;
-  --pcard: #141415;
-  --pcard-ring: 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --cover-a: #e9e9eb;
-  --cover-b: #bdbdc1;
-  --float: #1a1a1b;
+  --pcard: #141416;
+  --pcard-ring: 0 0 0 1px rgba(244, 241, 234, 0.05);
+  --cover-a: #f4f1ea;
+  --cover-b: #c9c4ba;
+  --float: #1d1d20;
   --medal-drop: rgba(0, 0, 0, 0.55);
-  --green-ink: #5fe07a;
-  --orange-ink: #f5b041;
-  --blue-ink: #7fb0f5;
-  --red-ink: #ff7b6b;
-  --medal-well: #141415;
+  --green-ink: #59e3a7;
+  --orange-ink: #c9c4ba;
+  --blue-ink: #c9c4ba;
+  --red-ink: #f4f1ea;
+  --medal-well: #141416;
   --tier-gold: #e2b04a;
   --tier-silver: #c9c9d1;
   --tier-bronze: #c97a42;
@@ -135,6 +191,15 @@
   --shadow-sm: 0 3px 10px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6);
   color-scheme: dark;
+}
+
+/* /admin compares many series at once, so it keeps distinct category hues. */
+.admin-palette {
+  --red: #e9573f;
+  --orange: #f09a2a;
+  --blue: #3e86e4;
+  --green: #2fb35e;
+  --purple: #7a5af8;
 }
 
 @theme inline {
@@ -154,7 +219,17 @@
   --color-purple: var(--purple);
   --color-flame: var(--flame);
   --color-accent: var(--accent);
+  --color-ember: var(--ember);
+  --color-iris: var(--iris);
+  --color-mint: var(--mint);
+  --color-surf: var(--surf);
+  --color-surf2: var(--surf2);
+  --color-mute: var(--mute);
+  --color-danger: var(--danger);
   --font-sans: var(--font-geist), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-bricolage), var(--font-geist), system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 * {
@@ -184,6 +259,28 @@ h3 {
   margin: 0;
   letter-spacing: -0.03em;
   text-wrap: balance;
+}
+
+/* Brand type: Bricolage for headlines and big numbers, one Fraunces italic phrase per screen at
+   most, Geist Mono for eyebrows / units / timestamps. */
+h1,
+.screen-title,
+.display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.035em;
+}
+.serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
 }
 
 input,
@@ -460,10 +557,10 @@ button {
 @keyframes fab-glow {
   0%,
   100% {
-    box-shadow: 0 6px 18px rgba(17, 17, 17, 0.28);
+    box-shadow: 0 6px 18px rgba(255, 91, 31, 0.3);
   }
   50% {
-    box-shadow: 0 10px 28px rgba(17, 17, 17, 0.42);
+    box-shadow: 0 10px 28px rgba(255, 91, 31, 0.45);
   }
 }
 .fab {
@@ -648,6 +745,7 @@ button {
 
 /* Big height / weight boxes on onboarding. */
 .bignum {
+  font-family: var(--font-display);
   width: 100%;
   min-width: 0;
   border: 0;

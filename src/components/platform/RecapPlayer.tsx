@@ -108,7 +108,7 @@ export default function RecapPlayer({ recap, units }: { recap: Recap; units: "me
                   <Big>{b.kg != null ? `${b.kg} kg × ${b.reps}` : `${b.reps} reps`}</Big>
                   {b.kg != null ? <Sub>Estimated 1RM {b.e1rm} kg</Sub> : null}
                   {b.pr ? (
-                    <span className="m-pop mt-3 rounded-full px-3 py-1 text-[13px] font-extrabold" style={md(900, { background: "var(--orange)", color: "#fff" })}>
+                    <span className="m-pop mt-3 rounded-full px-3 py-1 text-[13px] font-extrabold" style={md(900, { background: "var(--btn)", color: "var(--btn-ink)" })}>
                       PERSONAL RECORD
                     </span>
                   ) : null}

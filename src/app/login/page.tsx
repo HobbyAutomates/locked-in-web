@@ -103,10 +103,10 @@ export default function LoginPage() {
 function Logo({ size = 44 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 56 56" aria-hidden="true" style={{ flex: "none" }}>
-      <rect width="56" height="56" rx="16" fill="var(--green)" />
+      <rect width="56" height="56" rx="16" fill="var(--ember)" />
       <path d="M19 26v-5a9 9 0 0 1 18 0v5" fill="none" stroke="var(--card)" strokeWidth="4" strokeLinecap="round" />
       <rect x="14" y="25" width="28" height="20" rx="6" fill="var(--card)" />
-      <path d="M28 29c3 3 4 5 4 7a4 4 0 0 1-8 0c0-1.5.7-2.5 1.5-3.2.2 1.2 1 1.9 1.7 1.9-.7-2-.2-4 .8-5.7z" fill="var(--green)" />
+      <path d="M28 29c3 3 4 5 4 7a4 4 0 0 1-8 0c0-1.5.7-2.5 1.5-3.2.2 1.2 1 1.9 1.7 1.9-.7-2-.2-4 .8-5.7z" fill="var(--ember)" />
     </svg>
   );
 }
@@ -160,7 +160,7 @@ function Start({ onEmail }: { onEmail: () => void }) {
         style={{
           minHeight: 362,
           paddingTop: "env(safe-area-inset-top, 0px)",
-          background: "radial-gradient(120% 90% at 20% 0%, var(--green-bg), transparent 60%), radial-gradient(90% 80% at 100% 30%, var(--blue-bg), transparent 60%)",
+          background: "radial-gradient(120% 90% at 20% 0%, var(--ember-bg), transparent 60%), radial-gradient(90% 80% at 100% 30%, var(--surf2), transparent 60%)",
         }}
       >
         <div className="relative w-[390px] max-w-full" style={{ height: 320 }}>
@@ -190,14 +190,14 @@ function Start({ onEmail }: { onEmail: () => void }) {
               {av("A", "var(--blue)")}
               {av("R", "var(--orange)")}
               {av("K", "var(--purple)")}
-              {av("S", "var(--green)")}
+              {av("S", "var(--ember)")}
             </div>
             <p className="mt-2 text-[14px] font-bold" style={{ color: "var(--ink)" }}>
               Ayaan logged lunch
             </p>
             <p className="text-[12px] muted">+32 g protein · 2 min ago</p>
           </Float>
-          <Float x={228} y={198} rot={-6} delay={500} bg="var(--green)">
+          <Float x={228} y={198} rot={-6} delay={500} bg="var(--ember)">
             <p className="text-[12px] font-semibold" style={{ color: "var(--card)", opacity: 0.8 }}>
               Today
             </p>
@@ -261,7 +261,7 @@ function Btn({ kind, icon, children, onClick, type = "button", disabled }: { kin
     kind === "primary"
       ? { background: "var(--btn)", color: "var(--btn-ink)", border: 0 }
       : kind === "accent"
-        ? { background: "var(--green)", color: "var(--card)", border: 0 }
+        ? { background: "var(--ember)", color: "var(--ember-ink)", border: 0 }
         : { background: "transparent", color: "var(--ink)", border: "1.5px solid var(--hair)" };
   return (
     <button type={type} disabled={disabled} onClick={onClick} className="press flex h-[54px] w-full items-center justify-center gap-2.5 rounded-full text-[16px] font-bold" style={style}>
@@ -296,7 +296,7 @@ function EyeButton({ shown, onToggle }: { shown: boolean; onToggle: () => void }
   );
 }
 
-/** The wrapper shows focus (ring / green frame), so the bare input doesn't draw the global outline too. */
+/** The wrapper shows focus (ring / ember frame), so the bare input doesn't draw the global outline too. */
 const NO_OUTLINE: React.CSSProperties = { outline: "none" };
 const inputCls = "min-w-0 flex-1 bg-transparent text-[16px] outline-none";
 
@@ -430,7 +430,7 @@ function CreateAccount({
         <div className="flex flex-1 gap-1.5" role="progressbar" aria-label="Create account" aria-valuemin={1} aria-valuemax={4} aria-valuenow={step + 1}>
           {[0, 1, 2, 3].map((i) => (
             <span key={i} className="h-[5px] flex-1 overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
-              <span className="block h-full rounded-full" style={{ background: "var(--green)", width: i <= step ? "100%" : "0%", transition: "width 600ms cubic-bezier(.16,1,.3,1)" }} />
+              <span className="block h-full rounded-full" style={{ background: "var(--ember)", width: i <= step ? "100%" : "0%", transition: "width 600ms cubic-bezier(.16,1,.3,1)" }} />
             </span>
           ))}
         </div>
@@ -446,7 +446,7 @@ function CreateAccount({
       >
         <div key={step} className="m-step flex flex-col">
           <div className="flex flex-col gap-2.5 pt-[30px]">
-            <span className="text-[14px] font-bold" style={{ color: "var(--green-ink)" }}>
+            <span className="text-[14px] font-bold" style={{ color: "var(--ember)" }}>
               Create account
             </span>
             <h1 className="text-[34px] font-extrabold" style={{ letterSpacing: "-1px", lineHeight: 1.1 }}>
@@ -471,7 +471,7 @@ function CreateAccount({
                 </BigInput>
                 {fallback && !name.trim() ? (
                   <div className="mt-3.5 flex flex-wrap gap-2">
-                    <button type="button" className="press rounded-full px-3.5 py-2.5 text-[14px] font-bold" style={{ background: "var(--green)", color: "var(--card)", border: 0 }} onClick={() => setName(fallback)}>
+                    <button type="button" className="press rounded-full px-3.5 py-2.5 text-[14px] font-bold" style={{ background: "var(--ember)", color: "var(--ember-ink)", border: 0 }} onClick={() => setName(fallback)}>
                       {fallback}
                     </button>
                   </div>
@@ -532,7 +532,7 @@ const bigCls = "min-w-0 flex-1 bg-transparent text-[22px] font-bold outline-none
 
 function BigInput({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="flex h-16 items-center rounded-[18px] pl-[18px] pr-2" style={{ background: "var(--card2)", boxShadow: "inset 0 0 0 2px var(--green)" }}>
+    <div className="flex h-16 items-center rounded-[18px] pl-[18px] pr-2" style={{ background: "var(--card2)", boxShadow: "inset 0 0 0 2px var(--ember)" }}>
       {children}
       {right}
     </div>

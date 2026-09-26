@@ -245,7 +245,7 @@ export default function SquadMembers({ me, squad, members, requests: requests0, 
                 <PillButton
                   height={44}
                   disabled={busy === "leave"}
-                  style={{ background: "var(--red)", color: "#fff" }}
+                  style={{ background: "var(--danger)", color: "#fff" }}
                   onClick={async () => {
                     setBusy("leave");
                     try {
@@ -262,7 +262,7 @@ export default function SquadMembers({ me, squad, members, requests: requests0, 
               </div>
             </Card>
           ) : (
-            <button type="button" className="hit press mx-auto block py-2 text-[13px] font-semibold" style={{ color: "var(--red)" }} onClick={() => setConfirmLeave(true)}>
+            <button type="button" className="hit press mx-auto block py-2 text-[13px] font-semibold" style={{ color: "var(--danger)" }} onClick={() => setConfirmLeave(true)}>
               Leave squad
             </button>
           )}

@@ -571,7 +571,7 @@ export default function MealForm({
               aria-pressed={dictation.listening}
               onClick={dictation.toggle}
               className="press grid h-10 w-10 shrink-0 place-items-center rounded-full"
-              style={{ background: dictation.listening ? "var(--red)" : "var(--card2)", color: dictation.listening ? "#fff" : "var(--ink)" }}
+              style={{ background: dictation.listening ? "var(--danger)" : "var(--card2)", color: dictation.listening ? "#fff" : "var(--ink)" }}
             >
               <Mic size={18} className={dictation.listening ? "flame-breathe" : undefined} />
             </button>
@@ -722,7 +722,7 @@ export default function MealForm({
                 ) : (
                   <span />
                 )}
-                <button type="button" className="press inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold" style={{ background: "var(--red-bg)", color: "var(--red)" }} disabled={saving} onClick={startDelete}>
+                <button type="button" className="press inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold" style={{ background: "var(--danger-bg)", color: "var(--danger)" }} disabled={saving} onClick={startDelete}>
                   <Trash size={15} />
                   Delete
                 </button>
@@ -1048,7 +1048,7 @@ function SearchResults({
   return (
     <div className="card" style={{ padding: 0 }}>
       <div className="px-4">
-        {err ? <p className="py-3 text-[13px]" style={{ color: "var(--red)" }}>{err}</p> : null}
+        {err ? <p className="py-3 text-[13px]" style={{ color: "var(--danger)" }}>{err}</p> : null}
         {busy && hits.length === 0 ? (
           <p className="flex items-center gap-2 py-3.5 text-[13px] muted">
             <Spinner size={14} /> Searching 3,000+ foods…

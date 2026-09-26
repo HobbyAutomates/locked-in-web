@@ -93,7 +93,7 @@ export default function ExerciseStats({ name, lifts, pro }: { name: string; lift
                   <span className="flex items-center gap-2">
                     {dm(p.date)}
                     {p.pr ? (
-                      <span className="rounded-full px-1.5 py-0.5 text-[10px] font-extrabold" style={{ background: "var(--orange)", color: "#fff" }}>
+                      <span className="rounded-full px-1.5 py-0.5 text-[10px] font-extrabold" style={{ background: "var(--btn)", color: "var(--btn-ink)" }}>
                         PR
                       </span>
                     ) : null}

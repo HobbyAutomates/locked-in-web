@@ -265,7 +265,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
             <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: "var(--card)", boxShadow: "var(--shadow-sm)", color: "var(--ink)" }}>
               <People size={19} />
               {pendingRequests ? (
-                <span className="num absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-extrabold" style={{ background: "var(--red)", color: "#fff" }}>
+                <span className="num absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-extrabold" style={{ background: "var(--ember)", color: "var(--ember-ink)" }}>
                   {pendingRequests}
                 </span>
               ) : null}
@@ -854,7 +854,7 @@ function PostMenu({ onDelete, align, up = false }: { onDelete: () => void; align
             type="button"
             role="menuitem"
             className="press flex min-h-[44px] w-full items-center gap-2 px-3.5 text-[14px] font-semibold"
-            style={{ background: "none", border: 0, color: "var(--red)" }}
+            style={{ background: "none", border: 0, color: "var(--danger)" }}
             onClick={() => {
               setOpen(false);
               onDelete();

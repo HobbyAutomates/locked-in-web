@@ -202,7 +202,7 @@ function LogWeightDialog({ initialKg, onClose, entry = null, onDelete }: { initi
             Cancel
           </PillButton>
           {entry && onDelete ? (
-            <button type="button" onClick={onDelete} disabled={busy} className="press min-h-[44px] py-2 text-[15px] font-semibold" style={{ color: "var(--red)", background: "none", border: 0 }}>
+            <button type="button" onClick={onDelete} disabled={busy} className="press min-h-[44px] py-2 text-[15px] font-semibold" style={{ color: "var(--danger)", background: "none", border: 0 }}>
               Delete
             </button>
           ) : null}

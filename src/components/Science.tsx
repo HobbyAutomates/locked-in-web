@@ -224,7 +224,7 @@ export function BmiCard({ profile, weightKg, waist = false }: { profile: Profile
   } else {
     const india = bmiCategoryIndia(b);
     const who = bmiCategoryWHO(b);
-    chip = { text: india, color: india === "Normal" ? "var(--green)" : india === "Underweight" ? "var(--blue)" : india === "Overweight" ? "var(--orange)" : "var(--red)" };
+    chip = { text: india, color: india === "Normal" ? "var(--green)" : india === "Underweight" ? "var(--blue)" : india === "Overweight" ? "var(--orange)" : "var(--danger)" };
     lines = [`${india} by Indian/Asian cut-offs · ${who} by WHO global ones.`, "BMI can't tell muscle from fat, so it's one signal, not a verdict."];
   }
 
@@ -325,7 +325,7 @@ export function WaistRow({ profile }: { profile: Profile }) {
         </p>
       ) : null}
       {error ? (
-        <p className="mt-1 text-[12px]" style={{ color: "var(--red)" }}>
+        <p className="mt-1 text-[12px]" style={{ color: "var(--danger)" }}>
           {error}
         </p>
       ) : null}

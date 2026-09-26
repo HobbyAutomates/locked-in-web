@@ -255,7 +255,7 @@ export default function RecipeEditor({ available, recipe }: { available: boolean
       </div>
       {recipe && dirty ? <p className="-mt-2 text-center text-[11px] muted">Save your changes to log a serving.</p> : null}
       {recipe ? (
-        <button type="button" className="press self-center py-2 text-[13px] font-semibold" style={{ background: "none", border: 0, color: "var(--red)" }} onClick={() => setConfirmDelete(true)}>
+        <button type="button" className="press self-center py-2 text-[13px] font-semibold" style={{ background: "none", border: 0, color: "var(--danger)" }} onClick={() => setConfirmDelete(true)}>
           Delete recipe
         </button>
       ) : null}
@@ -263,7 +263,7 @@ export default function RecipeEditor({ available, recipe }: { available: boolean
       <BottomSheet open={confirmDelete} title="Delete this recipe?" subtitle="Meals you already logged from it stay as they are." onClose={() => setConfirmDelete(false)}>
         <div className="grid grid-cols-2 gap-2 pb-1">
           <GhostButton onClick={() => setConfirmDelete(false)}>Keep</GhostButton>
-          <button type="button" className="press h-[46px] rounded-2xl text-[15px] font-semibold" style={{ background: "var(--red)", color: "#fff", border: 0 }} disabled={busy} onClick={() => void remove()}>
+          <button type="button" className="press h-[46px] rounded-2xl text-[15px] font-semibold" style={{ background: "var(--danger)", color: "#fff", border: 0 }} disabled={busy} onClick={() => void remove()}>
             {busy ? "Deleting…" : "Delete"}
           </button>
         </div>

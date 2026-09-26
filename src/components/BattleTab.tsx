@@ -176,10 +176,10 @@ function BoardRow({ row, me, isLeader, gap }: { row: ScoredBattleRow; me: string
       {!row.private ? (
         <div className="relative mt-2.5 h-2 rounded-full" style={{ background: "var(--card2)" }}>
           <div className="absolute inset-y-0 rounded-full" style={{ left: `${bandLo * 100}%`, width: `${Math.max(0, bandHi - bandLo) * 100}%`, background: "var(--green-bg)" }} />
-          <div className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full" style={{ left: `calc(${Math.min(99, pct * 100)}% - 6px)`, background: row.underFuelled ? "var(--red)" : "var(--ink)" }} />
+          <div className="absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full" style={{ left: `calc(${Math.min(99, pct * 100)}% - 6px)`, background: row.underFuelled ? "var(--danger)" : "var(--ink)" }} />
         </div>
       ) : null}
-      {row.underFuelled ? <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "var(--red)" }}>Under-fuelled — eat more, not less</p> : !row.eligible ? <p className="mt-1.5 text-[11px] muted">Log one more meal to be eligible today</p> : gap ? <p className="mt-1.5 text-[11px] muted">{gap} pts to lead</p> : null}
+      {row.underFuelled ? <p className="mt-1.5 text-[11px] font-semibold" style={{ color: "var(--danger)" }}>Under-fuelled — eat more, not less</p> : !row.eligible ? <p className="mt-1.5 text-[11px] muted">Log one more meal to be eligible today</p> : gap ? <p className="mt-1.5 text-[11px] muted">{gap} pts to lead</p> : null}
     </Card>
   );
 }

@@ -221,7 +221,7 @@ export default function PhotosScreen({ photos, extended, weights, units, pro }: 
                         {p.pose ? <span style={{ opacity: 0.85 }}>{POSE_LABEL[p.pose]}</span> : null}
                       </span>
                       {sel ? (
-                        <span className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full" style={{ background: "var(--accent)", color: "#fff" }}>
+                        <span className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full" style={{ background: "var(--accent)", color: "var(--accent-ink)" }}>
                           <LineIcon name="check" size={14} stroke={2.4} />
                         </span>
                       ) : null}
@@ -304,7 +304,7 @@ export default function PhotosScreen({ photos, extended, weights, units, pro }: 
 
 function SheetAction({ icon, label, onClick, danger = false }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
-    <button type="button" className="press flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-2xl text-[12px] font-semibold" style={{ background: danger ? "var(--red-bg)" : "var(--card2)", color: danger ? "var(--red)" : "var(--ink)", border: 0 }} onClick={onClick}>
+    <button type="button" className="press flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-2xl text-[12px] font-semibold" style={{ background: danger ? "var(--danger-bg)" : "var(--card2)", color: danger ? "var(--danger)" : "var(--ink)", border: 0 }} onClick={onClick}>
       {icon}
       {label}
     </button>

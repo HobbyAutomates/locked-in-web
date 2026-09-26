@@ -31,7 +31,7 @@ export type SourceItem = {
 };
 
 const RECIPE_INFO: SourceInfo = { kind: "custom", label: "Your recipe", detail: "Worked out from the ingredients and servings you set in Recipes.", links: [] };
-const LEVEL_TONE = { High: { bg: "var(--green-bg)", ink: "var(--green-ink)" }, Medium: { bg: "var(--orange-bg)", ink: "var(--orange-ink)" }, Low: { bg: "var(--red-bg)", ink: "var(--red-ink)" } } as const;
+const LEVEL_TONE = { High: { bg: "var(--green-bg)", ink: "var(--green-ink)" }, Medium: { bg: "var(--orange-bg)", ink: "var(--orange-ink)" }, Low: { bg: "var(--danger-bg)", ink: "var(--danger)" } } as const;
 
 type Looked = { source_info: SourceInfo | null; variants?: FoodVariant[] };
 
@@ -229,7 +229,7 @@ export function SourceSheet({
               Not right? Pick another
             </button>
           ) : null}
-          <button type="button" className="hit press self-start px-1 text-[13px] font-semibold" style={{ color: reported === key ? "var(--muted)" : "var(--red)" }} disabled={reported === key} onClick={report}>
+          <button type="button" className="hit press self-start px-1 text-[13px] font-semibold" style={{ color: reported === key ? "var(--muted)" : "var(--danger)" }} disabled={reported === key} onClick={report}>
             {reported === key ? "Reported — thanks, we'll check it" : "Report a wrong number"}
           </button>
         </div>

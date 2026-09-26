@@ -197,7 +197,7 @@ export default function LiveWorkout({ routineId, routineName, dayIndex, day, his
                 <p className="flex min-w-0 items-center gap-2 text-[17px] font-semibold">
                   <span className="truncate">{x.name}</span>
                   {pr ? (
-                    <span className="m-pop shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={md(0, { background: "var(--orange)", color: "#fff" })}>
+                    <span className="m-pop shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={md(0, { background: "var(--btn)", color: "var(--btn-ink)" })}>
                       PR
                     </span>
                   ) : null}
@@ -215,7 +215,7 @@ export default function LiveWorkout({ routineId, routineName, dayIndex, day, his
                   <span className="num text-[14px] font-bold">{j + 1}</span>
                   <input inputMode="decimal" value={s.kg} placeholder={x.bw ? "BW" : "kg"} aria-label={`Set ${j + 1} weight`} className="num h-11 w-full rounded-xl px-3 text-[16px] outline-none" style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }} onChange={(e) => setVal(i, j, { kg: e.target.value.replace(/[^\d.]/g, "") })} />
                   <input inputMode="numeric" value={s.reps} aria-label={`Set ${j + 1} reps`} className="num h-11 w-full rounded-xl px-3 text-[16px] outline-none" style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }} onChange={(e) => setVal(i, j, { reps: e.target.value.replace(/\D/g, "") })} />
-                  <button type="button" role="checkbox" aria-checked={s.done} aria-label={`Set ${j + 1} done`} className="press grid h-11 w-12 place-items-center rounded-xl" style={{ border: 0, background: s.done ? "var(--green)" : "var(--card2)", color: s.done ? "#fff" : "var(--muted)" }} onClick={() => tick(i, j)}>
+                  <button type="button" role="checkbox" aria-checked={s.done} aria-label={`Set ${j + 1} done`} className="press grid h-11 w-12 place-items-center rounded-xl" style={{ border: 0, background: s.done ? "var(--green)" : "var(--card2)", color: s.done ? "#0b0b0c" : "var(--muted)" }} onClick={() => tick(i, j)}>
                     <LineIcon name="check" size={18} stroke={2.4} />
                   </button>
                 </div>

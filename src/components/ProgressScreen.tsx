@@ -1089,7 +1089,7 @@ function PhotosStrip({ photos }: { photos: ProgressPhoto[] }) {
                 <Close size={16} />
                 Close
               </button>
-              <button type="button" className="press flex h-11 items-center gap-2 rounded-full px-4 text-sm font-bold" style={{ background: "var(--red)", color: "#fff", border: 0 }} disabled={deleting} onClick={() => void remove(open)}>
+              <button type="button" className="press flex h-11 items-center gap-2 rounded-full px-4 text-sm font-bold" style={{ background: "var(--danger)", color: "#fff", border: 0 }} disabled={deleting} onClick={() => void remove(open)}>
                 {deleting ? <Spinner size={14} /> : <Trash size={16} />}
                 Delete
               </button>

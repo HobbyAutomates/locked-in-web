@@ -129,7 +129,7 @@ export function EditorDelete({ label, del, disabled }: { label: string; del: Ret
       </button>
     </div>
   ) : (
-    <button type="button" onClick={del.start} disabled={disabled} className="press min-h-[44px] py-2 text-[15px] font-semibold" style={{ color: "var(--red)", background: "none", border: 0 }}>
+    <button type="button" onClick={del.start} disabled={disabled} className="press min-h-[44px] py-2 text-[15px] font-semibold" style={{ color: "var(--danger)", background: "none", border: 0 }}>
       {label}
     </button>
   );

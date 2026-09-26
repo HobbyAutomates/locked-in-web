@@ -398,7 +398,7 @@ function Account({ profile, email }: { profile: Profile; email: string }) {
               <Chevron />
             </SettingRow>
             <Hair />
-            <SettingRow icon={<Trash size={20} />} tint="var(--red)" label="Delete my data" subtitle="Emails Sohum a request to erase your account" href={`${DELETE_MAIL}${encodeURIComponent(email)}`}>
+            <SettingRow icon={<Trash size={20} />} tint="var(--danger)" label="Delete my data" subtitle="Emails Sohum a request to erase your account" href={`${DELETE_MAIL}${encodeURIComponent(email)}`}>
               <Chevron />
             </SettingRow>
           </div>

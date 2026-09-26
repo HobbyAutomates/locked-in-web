@@ -557,7 +557,7 @@ function BuildingScreen({ progress, onDone }: { progress: number; onDone: () => 
             const ok = pct >= (i + 1) / PLAN_CHECKS.length;
             return (
               <li key={label} className="flex items-center gap-3">
-                <span className="grid place-items-center rounded-full" style={{ width: 24, height: 24, background: ok ? "var(--green)" : "var(--card2)", color: "#fff", transition: "background-color 0.2s ease" }}>
+                <span className="grid place-items-center rounded-full" style={{ width: 24, height: 24, background: ok ? "var(--green)" : "var(--card2)", color: ok ? "#0b0b0c" : "var(--muted)", transition: "background-color 0.2s ease" }}>
                   {ok ? <Check size={14} /> : null}
                 </span>
                 <span className="text-[15px] font-semibold" style={{ color: ok ? "var(--ink)" : "var(--muted)" }}>

@@ -63,7 +63,7 @@ function Expand({ open, children }: { open: boolean; children: React.ReactNode }
 
 function DeleteButton({ label, busy, onClick }: { label: string; busy: boolean; onClick: () => void }) {
   return (
-    <button type="button" className="press inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold" style={{ background: "var(--red-bg)", color: "var(--red)" }} aria-label={label} disabled={busy} onClick={onClick}>
+    <button type="button" className="press inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold" style={{ background: "var(--danger-bg)", color: "var(--danger)" }} aria-label={label} disabled={busy} onClick={onClick}>
       {busy ? <Spinner size={14} /> : <Trash size={15} />}
       Delete
     </button>

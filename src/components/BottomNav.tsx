@@ -23,9 +23,9 @@ type DialKey = "food" | "activity" | "water" | "weight";
 
 /** v2.8 speed-dial under the +, bottom-most first so Food sits closest to the thumb. */
 const DIAL: { key: DialKey; label: string; Icon: (p: { size?: number }) => React.ReactNode; tint: string }[] = [
-  { key: "food", label: "Food", Icon: Bowl, tint: "var(--orange)" },
-  { key: "activity", label: "Activity", Icon: Run, tint: "var(--green)" },
-  { key: "water", label: "Water +1 glass", Icon: Glass, tint: "var(--blue)" },
+  { key: "food", label: "Food", Icon: Bowl, tint: "var(--ink)" },
+  { key: "activity", label: "Activity", Icon: Run, tint: "var(--ink)" },
+  { key: "water", label: "Water +1 glass", Icon: Glass, tint: "var(--ink)" },
   { key: "weight", label: "Weight", Icon: Scale, tint: "var(--ink)" },
 ];
 
@@ -188,7 +188,7 @@ export default function BottomNav() {
             aria-expanded={open}
             aria-haspopup="menu"
             className="fab press absolute right-5 z-50 grid place-items-center rounded-full"
-            style={{ width: 60, height: 60, top: -30, background: "var(--btn)", color: "var(--btn-ink)", border: 0 }}
+            style={{ width: 60, height: 60, top: -30, background: "var(--ember)", color: "var(--ember-ink)", border: 0 }}
             onClick={() => setOpen((v) => !v)}
           >
             <motion.span className="grid place-items-center" animate={{ rotate: open ? 45 : 0 }} transition={{ type: "spring", stiffness: 380, damping: 24 }}>

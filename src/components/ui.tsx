@@ -297,7 +297,7 @@ export function ErrorNote({ text }: { text?: string | null }) {
   useEffect(() => void (text && track("error_shown", { message: text })), [text]);
   if (!text) return null;
   return (
-    <p role="alert" className="rounded-xl px-3 py-3 text-[13px]" style={{ background: "var(--red-bg)", color: "var(--red)" }}>
+    <p role="alert" className="rounded-xl px-3 py-3 text-[13px]" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>
       {text}
     </p>
   );

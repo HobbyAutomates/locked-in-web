@@ -363,9 +363,9 @@ function LensChips({ value, onChange, fits }: { value: Lens; onChange: (l: Lens)
 const TRUST: Record<string, { color: string; bg: string; label: string; short: string }> = {
   safe: { color: "var(--green)", bg: "var(--green-bg)", label: "Safe", short: "Trust" },
   caution: { color: "var(--orange)", bg: "var(--orange-bg)", label: "Caution", short: "Caution" },
-  unsafe: { color: "var(--red)", bg: "var(--red-bg)", label: "Unsafe", short: "Avoid" },
+  unsafe: { color: "var(--danger)", bg: "var(--danger-bg)", label: "Unsafe", short: "Avoid" },
   misleading: { color: "var(--purple)", bg: "var(--purple-bg)", label: "Misleading", short: "Misleading" },
-  fake: { color: "var(--red)", bg: "var(--red-bg)", label: "Likely fake", short: "Fake" },
+  fake: { color: "var(--danger)", bg: "var(--danger-bg)", label: "Likely fake", short: "Fake" },
 };
 
 const PER_100 = [
@@ -450,8 +450,8 @@ const EAT: Record<string, { label: string; color: string }> = {
   yes: { label: "Yes", color: "var(--green)" },
   ok: { label: "Sometimes", color: "var(--orange)" },
   sometimes: { label: "Sometimes", color: "var(--orange)" },
-  weak: { label: "Skip", color: "var(--red)" },
-  skip: { label: "Skip", color: "var(--red)" },
+  weak: { label: "Skip", color: "var(--danger)" },
+  skip: { label: "Skip", color: "var(--danger)" },
 };
 /** How far along the Trust meter each verdict sits (of 4). */
 const TRUST_LEVEL: Record<string, number> = { safe: 4, caution: 2, misleading: 2, unsafe: 1, fake: 1 };
@@ -485,7 +485,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
   const info = r.infographic;
   const eat = EAT[fit?.verdict ?? info?.eat_it ?? ""] ?? null;
   const score = info?.score_out_of_10 ?? null;
-  const scoreColor = score == null ? "var(--muted)" : score >= 7 ? "var(--green)" : score >= 4 ? "var(--orange)" : "var(--red)";
+  const scoreColor = score == null ? "var(--muted)" : score >= 7 ? "var(--green)" : score >= 4 ? "var(--orange)" : "var(--danger)";
 
   async function logServing(item: MealItem) {
     setLogFood(null);
@@ -569,7 +569,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
               {logged} — on Home
             </p>
           ) : null}
-          {logErr ? <p className="mt-2 text-center text-xs" style={{ color: "var(--red)" }}>{logErr}</p> : null}
+          {logErr ? <p className="mt-2 text-center text-xs" style={{ color: "var(--danger)" }}>{logErr}</p> : null}
         </Rise>
       ) : null}
 
@@ -748,7 +748,7 @@ function TrafficLights({ r }: { r: LabelReport }) {
   const p = r.per_100g ?? {};
   const G = "var(--green)";
   const A = "var(--orange)";
-  const R = "var(--red)";
+  const R = "var(--danger)";
   const N = "var(--muted)";
   const rows: { name: string; v: number | undefined; unit: string; color: (v: number) => string }[] = [
     { name: "Sugar", v: p.sugar_g, unit: "g", color: (v) => (v <= 5 ? G : v <= 22.5 ? A : R) },
@@ -788,7 +788,7 @@ function ClaimsCheck({ claims }: { claims?: LabelReport["claims"] }) {
       <Card padding={16}>
         <p className="text-[14px] font-bold">Claims check</p>
         {claims.map((c, i) => {
-          const color = c.status === "supported" ? "var(--green)" : c.status === "unclear" ? "var(--orange)" : "var(--red)";
+          const color = c.status === "supported" ? "var(--green)" : c.status === "unclear" ? "var(--orange)" : "var(--danger)";
           return (
             <div key={i} className="mt-2.5 flex items-start gap-2.5">
               <span className="mt-px grid h-5 w-5 shrink-0 place-items-center" style={{ color }} aria-label={c.status}>
@@ -924,7 +924,7 @@ function Details({ r }: { r: LabelReport }) {
         <div className="mt-2.5 flex items-center gap-2.5">
           <span className="w-[62px] shrink-0 text-xs font-semibold muted">Salt</span>
           <span className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
-            <span className="block h-full rounded-full" style={{ width: `${salt}%`, background: salt >= 30 ? "var(--red)" : salt >= 15 ? "var(--orange)" : "var(--green)" }} />
+            <span className="block h-full rounded-full" style={{ width: `${salt}%`, background: salt >= 30 ? "var(--danger)" : salt >= 15 ? "var(--orange)" : "var(--green)" }} />
           </span>
           <span className="num w-[76px] shrink-0 text-right text-[12px] font-bold">{salt}% of a day</span>
         </div>
@@ -953,7 +953,7 @@ function Details({ r }: { r: LabelReport }) {
       <Section key="ingredients" title="Ingredients to know about">
         <ul className="flex list-none flex-col gap-2.5 p-0">
           {r.concerns.map((c, i) => {
-            const color = c.severity === "high" ? "var(--red)" : c.severity === "medium" ? "var(--orange)" : "var(--muted)";
+            const color = c.severity === "high" ? "var(--danger)" : c.severity === "medium" ? "var(--orange)" : "var(--muted)";
             return (
               <li key={i} className="flex items-start gap-2.5">
                 <span className="mt-px grid h-5 w-5 shrink-0 place-items-center" style={{ color }} aria-label={`${c.severity} concern`}>
@@ -1171,7 +1171,7 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
                   {it.name}
                   {it.source === "estimated" ? " ~" : ""}
                 </span>
-                <span className={sc.confDot} style={{ background: low ? "var(--red)" : c.color }} aria-hidden="true" />
+                <span className={sc.confDot} style={{ background: low ? "var(--danger)" : c.color }} aria-hidden="true" />
                 <span className="shrink-0 text-[11px] muted">{it.confidence}</span>
                 <span className="num ml-auto shrink-0 text-[15px] font-extrabold">
                   {it.calories} <span className="text-[11px] font-semibold muted">kcal</span>
