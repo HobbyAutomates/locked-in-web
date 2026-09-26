@@ -11,6 +11,7 @@ import { cachedFoodImages, resolveFoodImage } from "@/lib/foodImage";
 import { extractWater } from "@/lib/waterParse";
 import { enrichItems } from "@/lib/itemSources";
 import type { ParseResult, ParsedItem } from "@/lib/types";
+import { allow, clientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -204,9 +205,19 @@ function localHit(name: string): FoodHit | null {
 
 export async function POST(req: Request) {
   const { user, admin } = await apiUser(req);
-  if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  const { text, correction, previous, preview } = (await req.json().catch(() => ({}))) as { text?: string; correction?: string; previous?: unknown; preview?: boolean };
+  // v2.14: the onboarding's first log happens before the account exists. A signed-out caller may ask
+  // for a preview: same parse, no DB writes, rate-limited per device and per IP.
+  const isPreview = !user && preview === true;
+  if (!user && !isPreview) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  if (isPreview) {
+    const device = (req.headers.get("x-device-id") ?? "").replace(/[^a-zA-Z0-9-]/g, "").slice(0, 64) || "none";
+    const hour = 60 * 60 * 1000;
+    if (!allow(`parse:d:${device}`, 12, hour) || !allow(`parse:ip:${clientIp(req)}`, 30, hour)) {
+      return NextResponse.json({ error: "That's a lot of tries. Save your plan to keep logging." }, { status: 429 });
+    }
+  }
 
-  const { text, correction, previous } = (await req.json()) as { text?: string; correction?: string; previous?: unknown };
   if (!text || !text.trim()) return NextResponse.json({ error: "Nothing to parse" }, { status: 400 });
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set" }, { status: 500 });
 
@@ -217,7 +228,9 @@ export async function POST(req: Request) {
   let water: ParseResult["water"] = null;
   let workingText = text;
   if (!correction) {
-    const glassMl = await Promise.resolve(admin.from("profiles").select("water_glass_ml").eq("id", user.id).maybeSingle())
+    const glassMl = !user
+      ? 250
+      : await Promise.resolve(admin.from("profiles").select("water_glass_ml").eq("id", user.id).maybeSingle())
       .then((r) => (r.data?.water_glass_ml && r.data.water_glass_ml > 0 ? r.data.water_glass_ml : 250))
       .catch(() => 250);
     const extracted = extractWater(text, glassMl);
@@ -310,7 +323,7 @@ export async function POST(req: Request) {
     if (u) it.image_url = u;
     else if (!unpictured.includes(it.name)) unpictured.push(it.name);
   }
-  if (unpictured.length) after(() => Promise.all(unpictured.slice(0, 4).map((n) => resolveFoodImage(n, { admin }).catch(() => null))).then(() => undefined));
+  if (unpictured.length && !isPreview) after(() => Promise.all(unpictured.slice(0, 4).map((n) => resolveFoodImage(n, { admin }).catch(() => null))).then(() => undefined));
 
   const result: ParseResult = { items, assumptions: raw.assumptions ?? [], unparsed: raw.unparsed ?? [], water };
   return NextResponse.json(result);
