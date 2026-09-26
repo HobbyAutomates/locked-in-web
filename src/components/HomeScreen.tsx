@@ -12,7 +12,7 @@ import { logWater } from "@/lib/actions";
 import { toggleMacroMode, useMacroMode, type MacroMode } from "@/lib/macroMode";
 import { litres, WaterBottle } from "./WaterBottle";
 import { carbTargetG, fatTargetG, type ExerciseEntry, type Meal, type Nudge, type Profile, type WaterEntry, type Workout, type Wrap } from "@/lib/types";
-import { CalendarIcon, Check, ChevronRight, Close, Fist, Flame, Lock, MoonStar, Plus, Run, Share, Spinner } from "./icons";
+import { CalendarIcon, Check, ChevronRight, Close, Fist, Flame, MoonStar, Plus, Run, Share, Spinner } from "./icons";
 import { ExerciseRow, WorkoutRow } from "./Rows";
 import MealSections from "./MealSections";
 import { usePendingMeals, type Pending } from "./PendingMeals";
@@ -21,6 +21,12 @@ import { HomeBanner, InboxBell, TodaySessionCard } from "./platform/HomeEntries"
 import { FastingHomeCard, HomeNutritionLinks } from "./nutrition/HomeNutrition";
 import { CheckinCard, checkinKey } from "./nutrition/CheckinCard";
 import type { CheckinRow, FastSession } from "@/lib/nutritionTypes";
+import { Padlock, Wordmark } from "./BrandMark";
+import TodayNote from "./coach/TodayNote";
+import TuneCard from "./home/TuneCard";
+import BuddyCard from "./home/BuddyCard";
+import DayGlow, { warmth } from "./home/DayGlow";
+import MilestoneFlood from "./home/MilestoneFlood";
 
 /** Background saves already pulled in by a refresh (see PendingMeals); survives remounts of Home. */
 let handledSaves = 0;
@@ -46,9 +52,13 @@ type Props = {
   checkin?: CheckinRow | null;
   /** v2.13: the fast that's running (null under 18 or when none). */
   fast?: FastSession | null;
+  /** v2.14 (schema_v37): false = an existing user who hasn't seen the new questions; null = unknown / not applied. */
+  onboardedV2?: boolean | null;
+  /** v2.14 milestone flood keys already shown (null = schema_v37 not applied, local storage only). */
+  milestonesSeen?: string[] | null;
 };
 
-export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [], checkin = null, fast = null }: Props) {
+export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [], checkin = null, fast = null, onboardedV2 = null, milestonesSeen = null }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(today);
   const { pending, savedCount, error } = usePendingMeals();
@@ -112,14 +122,30 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   const hideNumbers = profile.hide_numbers === true;
   const kcalWords = calorieWords(totals.calories, budget.budget);
   const kcalLabel = mode === "eaten" ? "Calories eaten" : "Calories left";
+  // v2.14 "The day warms up": today's glow from calories, protein, a workout and the log streak.
+  const todayTotals = totalsFor(meals, today);
+  const loggedToday = meals.some((m) => m.date === today) || workouts.some((w) => w.date === today) || exercises.some((e) => e.date === today);
+  const glow = warmth({
+    calories: todayTotals.calories,
+    calorieTarget: calorieBudget(profile, meals, exercises, today).budget,
+    protein: todayTotals.protein,
+    proteinTarget: profile.protein_target_g,
+    trainedToday: workouts.some((w) => w.date === today) || exercises.some((e) => e.date === today && (Number(e.minutes) || 0) >= 15),
+    loggedToday,
+  });
 
   return (
     <div className="flex flex-col gap-3.5">
+      <DayGlow level={glow} />
+      <MilestoneFlood
+        serverSeen={milestonesSeen}
+        input={{ today, dayStreak, weightKg: profile.weight_kg, goalWeightKg: profile.goal_weight_kg, goalType: profile.goal_type, workouts }}
+      />
       <Rise index={0}>
         <div className="flex items-center justify-between">
-          <h1 className="flex items-center gap-2 text-[22px] font-extrabold" style={{ letterSpacing: "-0.027em" }}>
-            <Lock size={26} />
-            Locked In
+          <h1 className="flex items-center gap-2 text-[22px]" aria-label="Locked In">
+            <Padlock size={28} />
+            <Wordmark size={22} />
           </h1>
           {/* v2.8 declutter: the header keeps only Calendar (the week streak lives on Calendar and Progress). */}
           <InboxBell /> {/* v2.13 platform */}
@@ -136,8 +162,13 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       </Rise>
 
       <Rise index={1}>
-        <DayStreakPill days={dayStreak} loggedToday={meals.some((m) => m.date === today) || workouts.some((w) => w.date === today) || exercises.some((e) => e.date === today)} />
+        <DayStreakPill days={dayStreak} loggedToday={loggedToday} />
       </Rise>
+
+      {/* v2.14: the coach's note, buddy streaks, and "Tune your plan" for existing users. */}
+      {onboardedV2 === false ? <TuneCard /> : null}
+      <TodayNote />
+      <BuddyCard />
 
       <HomeBanner /> {/* v2.13 platform */}
 
@@ -188,9 +219,9 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
 
       <Rise index={3}>
         <div className="grid grid-cols-3 gap-2.5">
-          <MacroCard macro="Protein" consumed={totals.protein} target={profile.protein_target_g} color="var(--red)" mode={mode} animate={flipped} onFlip={flip} draw={420} />
-          <MacroCard macro="Carbs" consumed={totals.carbs} target={carbTarget} color="var(--orange)" mode={mode} animate={flipped} onFlip={flip} draw={590} />
-          <MacroCard macro="Fat" consumed={totals.fat} target={fatTarget} color="var(--blue)" mode={mode} animate={flipped} onFlip={flip} draw={760} />
+          <MacroCard macro="Protein" consumed={totals.protein} target={profile.protein_target_g} color="var(--ink)" mode={mode} animate={flipped} onFlip={flip} draw={420} />
+          <MacroCard macro="Carbs" consumed={totals.carbs} target={carbTarget} color="var(--ink)" mode={mode} animate={flipped} onFlip={flip} draw={590} />
+          <MacroCard macro="Fat" consumed={totals.fat} target={fatTarget} color="var(--ink)" mode={mode} animate={flipped} onFlip={flip} draw={760} />
         </div>
         {showHint ? <p className="mt-1.5 text-center text-[12px] muted">Tap a card to switch between left and eaten</p> : null}
       </Rise>
@@ -218,8 +249,8 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         >
           <span className="grid flex-1 grid-cols-2">
             <span className="flex min-w-0 items-center gap-2.5 pr-3">
-              <Ring fraction={burned / 400} color="var(--orange)" size={44} stroke={5} draw={900}>
-                <span style={{ color: "var(--orange)" }}>
+              <Ring fraction={burned / 400} color="var(--ink)" size={44} stroke={5} draw={900}>
+                <span style={{ color: "var(--ink)" }}>
                   <Flame size={16} />
                 </span>
               </Ring>
@@ -229,8 +260,8 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
               </span>
             </span>
             <span className="flex min-w-0 items-center gap-2.5 pl-3" style={{ borderLeft: "1px solid var(--hair)" }}>
-              <Ring fraction={activeMin / 60} color="var(--green)" size={44} stroke={5} draw={1060}>
-                <span style={{ color: "var(--green)" }}>
+              <Ring fraction={activeMin / 60} color="var(--ink)" size={44} stroke={5} draw={1060}>
+                <span style={{ color: "var(--ink)" }}>
                   <Run size={16} />
                 </span>
               </Ring>
@@ -622,7 +653,8 @@ function MacroCard({ macro, consumed, target, color, mode, animate, onFlip, draw
       </FlipFace>
       <div className="mt-2.5 flex justify-center">
         <Ring fraction={consumed / safeTarget} color={color} size={56} stroke={6} draw={draw}>
-          <span className="rounded-full" style={{ width: 8, height: 8, background: color }} />
+          {/* Mint only means "on track": 90 to 110 % of the target. */}
+          <span className="rounded-full" style={{ width: 8, height: 8, background: consumed >= target * 0.9 && consumed <= target * 1.1 ? "var(--mint)" : color }} />
         </Ring>
       </div>
     </button>

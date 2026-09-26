@@ -12,7 +12,9 @@ export type ShareCard =
   | { kind: "pr"; exercise: string; value: string; sub: string; date: string }
   | { kind: "streak"; days: number; best: number }
   | { kind: "today"; date: string; stats: CardStat[] }
-  | { kind: "recap"; title: string; period: string; stats: CardStat[] };
+  | { kind: "recap"; title: string; period: string; stats: CardStat[] }
+  /** v2.14 milestone flood: the whole card is ember, a big Bricolage number and one Fraunces line. */
+  | { kind: "milestone"; eyebrow: string; big: string; line: string };
 
 const WIDTH = 1080;
 const HEIGHT = 1920;
@@ -38,6 +40,52 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, 
   return s;
 }
 
+/** The font family a class resolves to (next/font hashes the names), for canvas text. */
+function familyOf(className: string, fallback: string): string {
+  try {
+    const el = document.createElement("span");
+    el.className = className;
+    el.style.position = "absolute";
+    el.style.visibility = "hidden";
+    document.body.appendChild(el);
+    const f = getComputedStyle(el).fontFamily;
+    el.remove();
+    return f || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** v2.14: the ember milestone card (brand v1: ink type on ember, Fraunces italic line). */
+function drawMilestone(ctx: CanvasRenderingContext2D, card: Extract<ShareCard, { kind: "milestone" }>, fam: string) {
+  const display = familyOf("display", fam);
+  const serif = familyOf("serif", "Georgia, serif");
+  const mono = familyOf("mono", "ui-monospace, monospace");
+  ctx.fillStyle = "#FF5B1F";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  const glow = ctx.createRadialGradient(WIDTH * 0.5, HEIGHT * 0.42, 40, WIDTH * 0.5, HEIGHT * 0.42, 1100);
+  glow.addColorStop(0, "rgba(255,139,94,0.9)");
+  glow.addColorStop(1, "rgba(255,91,31,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#0B0B0C";
+  ctx.font = `800 64px ${display}`;
+  ctx.fillText("locked in", 96, 200);
+  ctx.font = `500 40px ${mono}`;
+  ctx.fillText(card.eyebrow.toUpperCase(), 96, 620);
+  const size = fitText(ctx, card.big, WIDTH - 192, 520, 800, display);
+  ctx.font = `800 ${size}px ${display}`;
+  ctx.fillText(card.big, 84, 620 + size * 0.95);
+  ctx.fillStyle = "#F4F1EA";
+  fitText(ctx, card.line, WIDTH - 192, 96, 300, `italic ${serif}`.replace("italic ", ""));
+  ctx.font = `italic 300 96px ${serif}`;
+  ctx.fillText(card.line, 96, 620 + size * 0.95 + 150);
+  ctx.fillStyle = "rgba(11,11,12,0.6)";
+  ctx.font = `600 36px ${fam}`;
+  ctx.fillText("Tracked with Locked In", 96, HEIGHT - 120);
+}
+
 /** Draws a card and returns it as a PNG blob. */
 export async function renderCard(card: ShareCard): Promise<Blob> {
   const canvas = document.createElement("canvas");
@@ -51,6 +99,10 @@ export async function renderCard(card: ShareCard): Promise<Blob> {
     // Fonts API missing: the fallback family is fine.
   }
   const fam = fontFamily();
+  if (card.kind === "milestone") {
+    drawMilestone(ctx, card, fam);
+    return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't make the image"))), "image/png"));
+  }
 
   // Background: near-black with a warm glow and three soft plates, like the Profile cover.
   const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);

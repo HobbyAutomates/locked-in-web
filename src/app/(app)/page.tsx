@@ -5,12 +5,22 @@ import { ageYears, isTeen } from "@/lib/goals";
 import { activityDayStreak, thisWeekCount, trainingDates, workoutWeekStreak } from "@/lib/streaks";
 import { computeWrap, wrapWindow } from "@/lib/wrap";
 import HomeScreen from "@/components/HomeScreen";
+import { createClient } from "@/lib/supabase/server";
+
+/** v2.14 (schema_v37) Home extras in their own query, so a database without v37 still renders Home. */
+async function getV214Home(): Promise<{ onboardedV2: boolean | null; milestonesSeen: string[] | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("profiles").select("onboarded_v2, milestones_seen").maybeSingle();
+  if (error || !data) return { onboardedV2: null, milestonesSeen: null };
+  const d = data as { onboarded_v2?: boolean | null; milestones_seen?: string[] | null };
+  return { onboardedV2: d.onboarded_v2 ?? null, milestonesSeen: d.milestones_seen ?? [] };
+}
 
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage({ searchParams }: { searchParams: Promise<{ celebrate?: string }> }) {
   const t = todayIso();
-  const [{ today, profile, workouts, meals, exercises }, nudges, sp, water, settings] = await Promise.all([getDashboard(), getMyNudges(), searchParams, getWater(addDays(t, -7), t), getNutritionSettings()]);
+  const [{ today, profile, workouts, meals, exercises }, nudges, sp, water, settings, v214] = await Promise.all([getDashboard(), getMyNudges(), searchParams, getWater(addDays(t, -7), t), getNutritionSettings(), getV214Home()]);
   // v2.13: the Monday check-in (computed once a week when adaptive targets are on) and a running fast.
   const teen = isTeen(ageYears(profile.dob));
   const [checkin, fasting] = await Promise.all([getWeeklyCheckin(profile, settings, meals), teen || !settings.available ? Promise.resolve(null) : getFasting()]);
@@ -35,6 +45,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       water={water}
       checkin={checkin.row}
       fast={fasting?.active ?? null}
+      onboardedV2={v214.onboardedV2}
+      milestonesSeen={v214.milestonesSeen}
     />
   );
 }
