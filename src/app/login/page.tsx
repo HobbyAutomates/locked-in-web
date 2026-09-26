@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { nameFromEmail } from "@/lib/display";
 import { LineIcon, type LineName } from "@/components/lineIcons";
-import { drawLen, md } from "@/components/motion";
+import { md } from "@/components/motion";
 import { BottomSheet, ErrorNote } from "@/components/ui";
 import { Padlock, Wordmark } from "@/components/BrandMark";
 import { HatchRing } from "@/components/Hatch";
