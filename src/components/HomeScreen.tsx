@@ -17,6 +17,7 @@ import { ExerciseRow, WorkoutRow } from "./Rows";
 import MealSections from "./MealSections";
 import { usePendingMeals, type Pending } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
+import { HomeBanner, InboxBell, TodaySessionCard } from "./platform/HomeEntries"; // v2.13 platform
 
 /** Background saves already pulled in by a refresh (see PendingMeals); survives remounts of Home. */
 let handledSaves = 0;
@@ -114,6 +115,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
             Locked In
           </h1>
           {/* v2.8 declutter: the header keeps only Calendar (the week streak lives on Calendar and Progress). */}
+          <InboxBell /> {/* v2.13 platform */}
           <Link
             href="/calendar"
             aria-label="Calendar"
@@ -129,6 +131,8 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       <Rise index={1}>
         <DayStreakPill days={dayStreak} loggedToday={meals.some((m) => m.date === today) || workouts.some((w) => w.date === today) || exercises.some((e) => e.date === today)} />
       </Rise>
+
+      <HomeBanner /> {/* v2.13 platform */}
 
       <BannerCarousel nudges={nudges} wrap={wrap} pending={pending} hideNumbers={profile?.hide_numbers === true} />
 
@@ -225,6 +229,8 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       <Rise index={4}>
         <WaterCard date={selected} isToday={isToday} ml={water.filter((w) => w.date === selected).reduce((a, w) => a + w.ml, 0)} goal={profile.water_goal_ml} glassMl={profile.water_glass_ml} />
       </Rise>
+
+      <TodaySessionCard /> {/* v2.13 platform */}
 
       <Rise index={4}>
         <h2 className="text-xl font-extrabold" style={{ letterSpacing: "-0.025em" }}>

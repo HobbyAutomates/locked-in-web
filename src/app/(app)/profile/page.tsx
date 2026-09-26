@@ -5,12 +5,14 @@ import { activityDayStreak } from "@/lib/streaks";
 import { bestDayRun } from "@/lib/progressStats";
 import { totalsFor } from "@/lib/totals";
 import ProfileScreen from "@/components/ProfileScreen";
+import { getPro } from "@/lib/platform-data";
+import { priceText } from "@/lib/pro";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
   const [{ today, profile, workouts, meals, exercises }, { user }] = await Promise.all([getDashboard(), requireUser()]);
-  const [weights, badges, squads] = await Promise.all([getWeights(), getBadgeProgress(profile, workouts, meals), getMySquads().catch(() => [])]);
+  const [weights, badges, squads, pro] = await Promise.all([getWeights(), getBadgeProgress(profile, workouts, meals), getMySquads().catch(() => []), getPro()]);
   const activity = [workouts.map((w) => w.date), exercises.map((e) => e.date), meals.map((m) => m.date)];
   const streak = activityDayStreak(...activity);
   return (
@@ -26,6 +28,7 @@ export default async function ProfilePage() {
       weights={weights}
       badges={badges}
       isAdmin={isAdminEmail(user?.email)}
+      proLabel={pro.plan === "beta" && pro.pro ? "Beta" : pro.pro ? "Pro" : priceText(pro.config)}
     />
   );
 }

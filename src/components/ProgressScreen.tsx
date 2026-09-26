@@ -23,6 +23,8 @@ import { LockedMedal, MetalMedal, TROPHY_ICON, medalShelf } from "./Medal";
 import { CountUp, MRise, STAGGER, drawLen, md } from "./motion";
 import { LineIcon } from "./lineIcons";
 import { Camera, ChevronDown, Close, Plus, Spinner, Trash } from "./icons";
+import { BodyCard, RecapsCard, ShareRow, TrainingCard } from "./platform/ProgressExtras";
+import type { Measurement } from "@/lib/body";
 import { BreathingFlame, Card, Chevron, ErrorNote, Hair, MacroDot, Rise, SPRING, Segmented, fmt } from "./ui";
 
 const PROTEIN = "#E9636B";
@@ -69,6 +71,7 @@ export default function ProgressScreen({
   weekStreak,
   dayStreak,
   thisWeek,
+  measurements = null,
 }: {
   profile: Profile;
   workouts: Workout[];
@@ -83,6 +86,8 @@ export default function ProgressScreen({
   /** Consecutive days with anything logged, ending today or yesterday. */
   dayStreak: number;
   thisWeek: number;
+  /** v2.13 body measurements, newest first; null = schema_v36 not applied yet. */
+  measurements?: Measurement[] | null;
 }) {
   const t = todayIso();
   const target = Math.max(1, profile.weekly_workout_target);
@@ -127,7 +132,9 @@ export default function ProgressScreen({
       ) : null}
 
       <MRise delay={card(1)}>
-        <StreakCard dayStreak={dayStreak} best={best} flames={weekFlames(t, ...activity)} b={card(1)} />
+        <StreakCard dayStreak={dayStreak} best={best} flames={weekFlames(t, ...activity)} b={card(1)}>
+          <ShareRow streak={dayStreak} best={best} meals={meals} today={t} proteinTarget={profile.protein_target_g} calorieTarget={profile.calorie_target} hide={profile.hide_numbers === true} workoutsToday={workouts.filter((w) => w.date === t).length} />
+        </StreakCard>
       </MRise>
 
       <MRise delay={card(2)}>
@@ -146,7 +153,20 @@ export default function ProgressScreen({
         <MealTimesCard meals={meals} today={t} days={range === 2 ? 90 : 30} b={card(5)} />
       </MRise>
 
+      {/* v2.13: training, body (measurements + photos) and recaps. */}
       <MRise delay={card(6)}>
+        <TrainingCard workouts={workouts} today={t} b={card(6)} />
+      </MRise>
+
+      <MRise delay={card(7)}>
+        <BodyCard measurements={measurements} photos={photos} b={card(7)} />
+      </MRise>
+
+      <MRise delay={card(8)}>
+        <RecapsCard />
+      </MRise>
+
+      <MRise delay={card(9)}>
         <button
           type="button"
           aria-expanded={showMore}
@@ -369,7 +389,7 @@ function WeightCard({ profile, weights, today, days, tag, b }: { profile: Profil
 
 // ---------------------------------------------------------------- 2 · streak
 
-function StreakCard({ dayStreak, best, flames, b }: { dayStreak: number; best: number; flames: FlameDay[]; b: number }) {
+function StreakCard({ dayStreak, best, flames, b, children }: { dayStreak: number; best: number; flames: FlameDay[]; b: number; children?: React.ReactNode }) {
   const toBeat = best - dayStreak + 1;
   const done = flames.filter((f) => f.state === "done").length;
   return (
@@ -414,6 +434,11 @@ function StreakCard({ dayStreak, best, flames, b }: { dayStreak: number; best: n
           </div>
         ))}
       </div>
+      {children ? (
+        <div className="border-t pt-3" style={{ borderColor: "var(--hair)" }}>
+          {children}
+        </div>
+      ) : null}
     </PCard>
   );
 }
@@ -1017,7 +1042,9 @@ function PhotosStrip({ photos }: { photos: ProgressPhoto[] }) {
     <Card>
       <div className="flex items-center justify-between">
         <p className="text-[17px] font-bold">Progress photos</p>
-        <span className="text-xs muted">{photos.length ? `${photos.length} photo${photos.length === 1 ? "" : "s"} · private` : "Only you can see these"}</span>
+        <Link href="/progress/photos" className="press text-xs font-semibold" style={{ color: "var(--accent)" }}>
+          {photos.length ? `${photos.length} · Manage` : "Manage"}
+        </Link>
       </div>
       <div className="-mx-4 mt-3 overflow-x-auto px-4" style={{ scrollbarWidth: "none" }}>
         <div className="flex w-max gap-2.5">

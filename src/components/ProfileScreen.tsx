@@ -45,6 +45,7 @@ export default function ProfileScreen({
   weights = [],
   badges = { streakDays: 0, meals: 0, goalDays: 0 },
   isAdmin = false,
+  proLabel = "Beta",
 }: {
   profile: Profile;
   email: string;
@@ -57,6 +58,8 @@ export default function ProfileScreen({
   weights?: WeightEntry[];
   badges?: BadgeProgress;
   isAdmin?: boolean;
+  /** v2.13: what the Locked In Pro row says ("Beta", "Pro" or the price). */
+  proLabel?: string;
 }) {
   const router = useRouter();
   const [sheet, setSheet] = useState<null | "news" | "home" | "edit">(null);
@@ -268,6 +271,8 @@ export default function ProfileScreen({
         {/* ---- you ---- */}
         <MRise delay={1190}>
           <ListCard>
+            <ListRow icon="trophy" label="Locked In Pro" value={proLabel} href="/profile/pro" />
+            <ListRow icon="flame" label="Training" sub="Routines, muscle map, PR charts" value="" href="/train" />
             <ListRow icon="user" label="Personal details" value={[age != null ? `${age}` : null, profile.height_cm ? `${Math.round(profile.height_cm)} cm` : null].filter(Boolean).join(" · ")} href="/profile/details" />
             <ListRow icon="target" label="Nutrition goals" value={profile.hide_numbers ? "Set" : `${profile.calorie_target.toLocaleString("en-IN")} kcal`} href="/profile/goals" />
             <ListRow icon="flame" label="Goal weight" value={goal != null ? weightText(goal, profile.units) : profile.goal_type.charAt(0).toUpperCase() + profile.goal_type.slice(1)} href="/profile/goal" />
