@@ -1,29 +1,23 @@
 import { createClient } from "./supabase/server";
 import { addDays, today as todayIso } from "./dates";
 import { getMeals, getProfile, getWeights } from "./data";
-import { isDietMode, type DietMode } from "./dietModes";
-import { adaptiveFloor, checkinWeek, goalRateFor, weeklyCheckin, type CheckinResult } from "./adaptive";
+import { isDietMode } from "./dietModes";
+import { adaptiveFloor, checkinWeek, goalRateFor, weeklyCheckin } from "./adaptive";
 import { clampHours } from "./fasting";
 import { recipeFromRow, type Recipe } from "./recipes";
 import { missingV36 } from "./v36";
 import { totalsFor } from "./totals";
 import type { Meal, Profile } from "./types";
+import { DEFAULT_SETTINGS, type CheckinRow, type CheckinState, type FastSession, type NutritionSettings } from "./nutritionTypes";
+
+export type { CheckinRow, CheckinState, FastSession, NutritionSettings };
+export { DEFAULT_SETTINGS };
 
 /**
  * v2.13 nutrition reads (server only). Everything here tolerates schema_v36 not being applied:
  * `available: false` means the table or column isn't there yet and the screen says "Coming with the
  * next update". Writes are in nutrition-actions.ts.
  */
-
-export type NutritionSettings = {
-  /** False while schema_v36 isn't applied (the settings can't be saved yet). */
-  available: boolean;
-  diet_mode: DietMode;
-  adaptive_targets: boolean;
-  fasting_hours: number | null;
-};
-
-export const DEFAULT_SETTINGS: NutritionSettings = { available: false, diet_mode: "balanced", adaptive_targets: false, fasting_hours: null };
 
 /** diet_mode / adaptive_targets / fasting_hours in their own query, so a pre-v36 database still loads everything else. */
 export async function getNutritionSettings(): Promise<NutritionSettings> {
@@ -58,8 +52,6 @@ export async function getRecipe(id: string): Promise<{ available: boolean; recip
 
 // ---------------------------------------------------------------- fasting
 
-export type FastSession = { id: string; started_at: string; ended_at: string | null; target_hours: number; note: string | null };
-
 export async function getFasting(): Promise<{ available: boolean; active: FastSession | null; history: FastSession[] }> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("fasting_sessions").select("id, started_at, ended_at, target_hours, note").order("started_at", { ascending: false }).limit(15);
@@ -70,26 +62,6 @@ export async function getFasting(): Promise<{ available: boolean; active: FastSe
 }
 
 // ---------------------------------------------------------------- weekly check-in
-
-export type CheckinRow = {
-  id: string;
-  week_start: string;
-  avg_weight_kg: number | null;
-  trend_kg_per_week: number | null;
-  avg_kcal: number | null;
-  old_target: number | null;
-  new_target: number | null;
-  reason: string;
-  applied: boolean;
-};
-
-export type CheckinState = {
-  available: boolean;
-  /** This week's stored check-in (created on the first open on / after Monday). */
-  row: CheckinRow | null;
-  /** When there isn't enough data: what's missing (nothing is stored then). */
-  pending: Extract<CheckinResult, { ok: false }> | null;
-};
 
 const rowOf = (r: Record<string, unknown>): CheckinRow => ({
   id: String(r.id),

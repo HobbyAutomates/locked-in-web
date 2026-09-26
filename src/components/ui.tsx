@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ChevronRight as ChevronRightIcon, Flame as FlameIcon } from "./icons";
@@ -132,8 +133,19 @@ export function BottomSheet({
   children?: React.ReactNode;
   primary?: { label: React.ReactNode; onClick: () => void; disabled?: boolean };
 }) {
-  return <AnimatePresence>{open ? <SheetFrame title={title} subtitle={subtitle} onClose={onClose} primary={primary}>{children}</SheetFrame> : null}</AnimatePresence>;
+  const mounted = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
+  const sheet = <AnimatePresence>{open ? <SheetFrame title={title} subtitle={subtitle} onClose={onClose} primary={primary}>{children}</SheetFrame> : null}</AnimatePresence>;
+  // v2.13 scroll fix: the sheet renders into <body>. Inside a card with a transform / filter (the
+  // v2.12 entrance animations, the scan result sheet) `position: fixed` pinned it to that card, so a
+  // tall sheet ran off-screen and couldn't scroll ("What's new" was the worst case).
+  return mounted ? createPortal(sheet, document.body) : null;
 }
+
+const noopSubscribe = () => () => undefined;
 
 function SheetFrame({ title, subtitle, onClose, children, primary }: { title: string; subtitle?: React.ReactNode; onClose: () => void; children?: React.ReactNode; primary?: { label: React.ReactNode; onClick: () => void; disabled?: boolean } }) {
   useEffect(() => {
@@ -159,8 +171,8 @@ function SheetFrame({ title, subtitle, onClose, children, primary }: { title: st
       onClick={onClose}
     >
       <motion.div
-        className="flex w-full max-w-[480px] flex-col"
-        style={{ background: "var(--card)", borderRadius: "28px 28px 0 0", maxHeight: "88vh", padding: "10px 20px calc(18px + env(safe-area-inset-bottom, 0px))" }}
+        className="sheet-frame flex w-full max-w-[480px] flex-col"
+        style={{ background: "var(--card)", borderRadius: "28px 28px 0 0", padding: "10px 20px calc(18px + env(safe-area-inset-bottom, 0px))" }}
         initial={{ y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 80, opacity: 0 }}
@@ -172,7 +184,7 @@ function SheetFrame({ title, subtitle, onClose, children, primary }: { title: st
           {title}
         </p>
         {subtitle ? <div className="mt-0.5 shrink-0 text-[13px] muted">{subtitle}</div> : null}
-        {children ? <div className="-mx-1 mt-3 min-h-0 overflow-y-auto px-1">{children}</div> : null}
+        {children ? <div className="sheet-scroll -mx-1 mt-3 min-h-0 px-1">{children}</div> : null}
         {primary ? (
           <div className="mt-4 shrink-0">
             <PillButton onClick={primary.onClick} disabled={primary.disabled}>

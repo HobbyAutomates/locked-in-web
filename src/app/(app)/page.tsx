@@ -1,5 +1,7 @@
 import { getDashboard, getMyNudges, getWater } from "@/lib/data";
+import { getFasting, getNutritionSettings, getWeeklyCheckin } from "@/lib/nutrition-data";
 import { addDays, today as todayIso } from "@/lib/dates";
+import { ageYears, isTeen } from "@/lib/goals";
 import { activityDayStreak, thisWeekCount, trainingDates, workoutWeekStreak } from "@/lib/streaks";
 import { computeWrap, wrapWindow } from "@/lib/wrap";
 import HomeScreen from "@/components/HomeScreen";
@@ -8,7 +10,10 @@ export const dynamic = "force-dynamic";
 
 export default async function TodayPage({ searchParams }: { searchParams: Promise<{ celebrate?: string }> }) {
   const t = todayIso();
-  const [{ today, profile, workouts, meals, exercises }, nudges, sp, water] = await Promise.all([getDashboard(), getMyNudges(), searchParams, getWater(addDays(t, -7), t)]);
+  const [{ today, profile, workouts, meals, exercises }, nudges, sp, water, settings] = await Promise.all([getDashboard(), getMyNudges(), searchParams, getWater(addDays(t, -7), t), getNutritionSettings()]);
+  // v2.13: the Monday check-in (computed once a week when adaptive targets are on) and a running fast.
+  const teen = isTeen(ageYears(profile.dob));
+  const [checkin, fasting] = await Promise.all([getWeeklyCheckin(profile, settings, meals), teen || !settings.available ? Promise.resolve(null) : getFasting()]);
   const workoutDates = workouts.map((w) => w.date);
   // v2.5: cardio / sport / yoga on the exercise log count toward the week streak too.
   const trainedDates = trainingDates(workouts, exercises);
@@ -28,6 +33,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       wrap={wrap}
       nudges={nudges}
       water={water}
+      checkin={checkin.row}
+      fast={fasting?.active ?? null}
     />
   );
 }
