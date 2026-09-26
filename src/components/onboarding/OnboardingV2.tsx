@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { skipOnboarding } from "@/lib/actions";
+import { BETA_SKIP_ONBOARDING } from "@/lib/onboarding";
 import { md } from "@/components/motion";
 import { BottomSheet, ErrorNote } from "@/components/ui";
 import { Padlock } from "@/components/BrandMark";
@@ -32,7 +33,7 @@ import {
   type OnbPace,
   type OnbPlan,
 } from "@/lib/onboardingV2";
-import { Bolded, CoachBubble, Cta, Eyebrow, Heading, OnbIcon, Option, TopBar, type OnbIconName } from "./kit";
+import { Bolded, CoachBubble, Cta, Eyebrow, Heading, OnbIcon, Option, SkipCorner, TopBar, type OnbIconName } from "./kit";
 import { EMPTY, clearOnb, deviceId, loadOnb, saveOnb, type OnbState } from "./store";
 import { Wheel, nearest } from "./Wheel";
 
@@ -172,9 +173,28 @@ export default function OnboardingV2({ signedIn, tune = false, firstName = "" }:
       </Shell>
     );
 
+  // v2.15 beta: skip from any screen. Signed out → the email sign-in (the skip cookie keeps the
+  // (app) layout from bouncing a new account back here, so it lands on Home with the default
+  // targets). Signed in → Home, saving nothing ("Tune your plan" on Home covers it later).
+  const skip = BETA_SKIP_ONBOARDING
+    ? async () => {
+        if (tune) return router.replace("/");
+        try {
+          await skipOnboarding();
+        } catch {
+          // No cookie: a signed-in skip still reaches Home once; signed out, sign-in still works.
+        }
+        if (signedIn) {
+          router.replace("/");
+          router.refresh();
+        } else router.push("/login?email=1");
+      }
+    : undefined;
+
   const step = st.step;
   const section = SECTION[step] ?? -1;
-  const top = section >= 0 ? <TopBar section={section} onBack={step === 0 ? (signedIn ? () => router.back() : () => router.push("/login")) : back} /> : null;
+  const top = section >= 0 ? <TopBar section={section} onBack={step === 0 ? (signedIn ? () => router.back() : () => router.push("/login")) : back} onSkip={skip} /> : null;
+  const corner = skip && section < 0 ? <SkipCorner onSkip={() => void skip()} color={step === S.pledge ? "#8F8A82" : undefined} /> : null;
 
   switch (step) {
     case S.source:
@@ -426,16 +446,36 @@ export default function OnboardingV2({ signedIn, tune = false, firstName = "" }:
       );
 
     case S.building:
-      return <BuildingScreen key={step} st={st} teen={teen} onDone={() => set({ step: S.reveal })} />;
+      return (
+        <>
+          {corner}
+          <BuildingScreen key={step} st={st} teen={teen} onDone={() => set({ step: S.reveal })} />
+        </>
+      );
 
     case S.reveal:
-      return <RevealScreen key={step} st={st} plan={plan} onNext={go} onBack={back} />;
+      return (
+        <>
+          {corner}
+          <RevealScreen key={step} st={st} plan={plan} onNext={go} onBack={back} />
+        </>
+      );
 
     case S.pledge:
-      return <PledgeScreen key={step} plan={plan} goalWeight={a.goal_weight_kg ?? null} onDone={() => set({ step: S.save, done: true, savedAt: Date.now() })} onBack={back} />;
+      return (
+        <>
+          {corner}
+          <PledgeScreen key={step} plan={plan} goalWeight={a.goal_weight_kg ?? null} onDone={() => set({ step: S.save, done: true, savedAt: Date.now() })} onBack={back} />
+        </>
+      );
 
     case S.save:
-      return <SaveScreen key={step} st={st} plan={plan} signedIn={signedIn} busy={saving} err={err} onSaveSignedIn={() => void finish()} onName={(n) => answer({ name: n })} />;
+      return (
+        <>
+          {corner}
+          <SaveScreen key={step} st={st} plan={plan} signedIn={signedIn} busy={saving} err={err} onSaveSignedIn={() => void finish()} onName={(n) => answer({ name: n })} />
+        </>
+      );
   }
   return null;
 }

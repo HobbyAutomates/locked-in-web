@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { nameFromEmail } from "@/lib/display";
@@ -31,6 +31,11 @@ export default function LoginPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [created, setCreated] = useState(false);
   const [busy, setBusy] = useState(false);
+  // v2.15 beta: onboarding's "Skip" lands here with ?email=1, straight on the email sign-in.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the URL after mount
+    if (new URLSearchParams(window.location.search).get("email") === "1") setScreen("in");
+  }, []);
 
   async function submit(mode: "in" | "up") {
     setBusy(true);

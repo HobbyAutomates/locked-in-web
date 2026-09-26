@@ -58,8 +58,8 @@ export function OnbIcon({ name, size = 19, stroke = 1.5, style }: { name: OnbIco
 /** The six sections of the progress pill: food, streak, you, training, mind, together. */
 export const SECTIONS: OnbIconName[] = ["food", "flame", "user", "dumbbell", "brain", "users"];
 
-/** Back button + the section pill: done = ember on ember tint, current = ink, later = faded. */
-export function TopBar({ section, onBack }: { section: number; onBack?: () => void }) {
+/** Back button + the section pill: done = ember on ember tint, current = ink, later = faded. v2.15 beta: `onSkip` adds a quiet "Skip" beside the pill. */
+export function TopBar({ section, onBack, onSkip }: { section: number; onBack?: () => void; onSkip?: () => void }) {
   return (
     <div className="m-rise flex items-center justify-between" style={{ padding: "calc(14px + env(safe-area-inset-top, 0px)) 20px 0" }}>
       <button
@@ -93,6 +93,27 @@ export function TopBar({ section, onBack }: { section: number; onBack?: () => vo
           );
         })}
       </div>
+      {onSkip ? <SkipButton onSkip={onSkip} /> : null}
+    </div>
+  );
+}
+
+/** v2.15 beta: the quiet "Skip" text button (onboarding can be skipped while BETA_SKIP_ONBOARDING is on). */
+export function SkipButton({ onSkip, color = "var(--mute)" }: { onSkip: () => void; color?: string }) {
+  return (
+    <button type="button" className="press hit shrink-0" style={{ height: 40, padding: "0 2px 0 10px", background: "none", border: 0, fontSize: 14.5, fontWeight: 600, color }} onClick={onSkip}>
+      Skip
+    </button>
+  );
+}
+
+/** The same Skip, pinned top-right on the screens that have no progress rail (building, reveal, pledge, save). */
+export function SkipCorner({ onSkip, color }: { onSkip: () => void; color?: string }) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-0 z-20 mx-auto flex w-full max-w-[480px] justify-end" style={{ padding: "calc(20px + env(safe-area-inset-top, 0px)) 20px 0" }}>
+      <span className="pointer-events-auto">
+        <SkipButton onSkip={onSkip} color={color} />
+      </span>
     </div>
   );
 }
