@@ -12,21 +12,23 @@ import type { PrefSection } from "@/lib/preferences";
 import { Bell, Bowl, Check, Dumbbell, Exit, Flame, Glass, Lock, Mail, Medal, Moon, Person, Refresh, Scale, Scan, Share, Steps, Target, Trash } from "./icons";
 import { NameField } from "./ProfileScreen";
 import SubPage from "./SubPage";
+import NotificationsPrefs from "./platform/NotificationsPrefs";
+import type { NotificationPrefs } from "@/lib/platform-data";
 import { BottomSheet, Card, Chevron, ErrorNote, Hair, PillSwitch, Rise, SettingRow, Toggle } from "./ui";
 
 
-const TITLES: Record<PrefSection, string> = { appearance: "Appearance", tracking: "Tracking", privacy: "Privacy", account: "Account" };
+const TITLES: Record<PrefSection, string> = { appearance: "Appearance", tracking: "Tracking", notifications: "Notifications", privacy: "Privacy", account: "Account" };
 const DELETE_MAIL = "mailto:sohumai.team@gmail.com?subject=Delete%20my%20Locked%20In%20data&body=Please%20delete%20my%20Locked%20In%20account%20and%20all%20my%20data.%20Account%20email%3A%20";
 
 /**
  * v2.4 Preferences: one list of categories (Appearance, Tracking, Reminders, Privacy, Account),
  * each opening its own page — one screen per level, Cal AI style. `section` null is the list.
  */
-export default function PreferencesScreen({ profile, email, section }: { profile: Profile; email: string; section: PrefSection | null }) {
+export default function PreferencesScreen({ profile, email, section, notificationPrefs = null }: { profile: Profile; email: string; section: PrefSection | null; notificationPrefs?: NotificationPrefs | null }) {
   if (!section) return <PreferencesIndex profile={profile} />;
   return (
     <SubPage title={TITLES[section]} back="/profile/preferences">
-      {section === "appearance" ? <Appearance /> : section === "tracking" ? <Tracking profile={profile} /> : section === "privacy" ? <Privacy profile={profile} /> : <Account profile={profile} email={email} />}
+      {section === "appearance" ? <Appearance /> : section === "tracking" ? <Tracking profile={profile} /> : section === "notifications" ? <NotificationsPrefs prefs={notificationPrefs ?? { available: false, protein_nudge: true, protein_nudge_time: "16:00" }} /> : section === "privacy" ? <Privacy profile={profile} /> : <Account profile={profile} email={email} />}
     </SubPage>
   );
 }
@@ -47,6 +49,10 @@ function PreferencesIndex({ profile }: { profile: Profile }) {
             </SettingRow>
             <Hair />
             <SettingRow icon={<Target size={20} />} label="Tracking" subtitle="Water, steps, calorie rules, scans, units" href="/profile/preferences/tracking">
+              <Chevron />
+            </SettingRow>
+            <Hair />
+            <SettingRow icon={<Bell size={20} />} label="Notifications" subtitle="Push on this device, protein nudge, inbox" href="/profile/preferences/notifications">
               <Chevron />
             </SettingRow>
             <Hair />
