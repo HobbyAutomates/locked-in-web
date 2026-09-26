@@ -16,6 +16,7 @@ import { Spinner, Trash } from "../icons";
 import { BottomSheet, ErrorNote } from "../ui";
 import MuscleMap, { MapLegend } from "./MuscleMap";
 import { CardLabel, ComingSoon, PCard, ProLocked } from "./kit";
+import { invalidateHomeEntries } from "./HomeEntries";
 
 const BAND_TEXT = { none: "not trained", low: "below 10", good: "in range", high: "above 20" } as const;
 const BAND_COLOR = { none: "var(--muted)", low: "var(--orange-ink)", good: "var(--green-ink)", high: "var(--blue-ink)" } as const;
@@ -43,7 +44,10 @@ export default function TrainScreen({ pro, available, routines, workouts, lifts,
     try {
       const r = await fn();
       if (!r.ok) setError((r as { error?: string }).error ?? "Something went wrong");
-      else router.refresh();
+      else {
+        invalidateHomeEntries();
+        router.refresh();
+      }
     } finally {
       setBusy(null);
     }

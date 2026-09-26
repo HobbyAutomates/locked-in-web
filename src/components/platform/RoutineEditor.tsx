@@ -12,6 +12,7 @@ import { Trash } from "../icons";
 import { BottomSheet, ErrorNote, Toggle } from "../ui";
 import MuscleMap, { MapLegend } from "./MuscleMap";
 import { CardLabel, ComingSoon, PCard, ProLocked } from "./kit";
+import { invalidateHomeEntries } from "./HomeEntries";
 
 /** v2.13 build / edit a routine: days → exercises from the library with sets, reps and rest. */
 export default function RoutineEditor({ routine, available, pro }: { routine: Routine | null; available: boolean; pro: boolean }) {
@@ -43,7 +44,10 @@ export default function RoutineEditor({ routine, available, pro }: { routine: Ro
     const r = await saveRoutine({ id: routine?.id, name, days, activate });
     setBusy(false);
     if (!r.ok) setError(r.error);
-    else router.push("/train");
+    else {
+      invalidateHomeEntries();
+      router.push("/train");
+    }
   }
 
   if (!pro)

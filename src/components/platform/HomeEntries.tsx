@@ -19,6 +19,11 @@ import { ProChip } from "./kit";
  */
 
 let cache: { at: number; p: Promise<HomeEntries> } | null = null;
+
+/** Drop the cached Home data (after reading the inbox or changing the active routine). */
+export function invalidateHomeEntries() {
+  cache = null;
+}
 function useHome(): HomeEntries | null {
   const [data, setData] = useState<HomeEntries | null>(null);
   useEffect(() => {

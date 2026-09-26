@@ -8,6 +8,7 @@ import SubPage from "../SubPage";
 import { MRise } from "../motion";
 import { LineIcon, type LineName } from "../lineIcons";
 import { ComingSoon, PCard } from "./kit";
+import { invalidateHomeEntries } from "./HomeEntries";
 
 const ICON: Record<NotificationKind, LineName> = { nudge: "users", protein: "drop", fasting: "flame", checkin: "chart", system: "bell" };
 
@@ -31,6 +32,7 @@ export default function InboxScreen({ available, items, now }: { available: bool
   async function open(i: InboxItem) {
     if (!read.has(i.id)) {
       setRead((r) => new Set(r).add(i.id));
+      invalidateHomeEntries();
       void markNotificationsRead([i.id]);
     }
     if (i.url) router.push(i.url);
@@ -38,6 +40,7 @@ export default function InboxScreen({ available, items, now }: { available: bool
 
   async function all() {
     setRead(new Set(items.map((i) => i.id)));
+    invalidateHomeEntries();
     await markNotificationsRead(null);
     router.refresh();
   }
