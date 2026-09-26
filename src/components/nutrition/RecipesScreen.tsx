@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ProNote } from "../platform/kit";
 import type { Recipe } from "@/lib/recipes";
 import SubPage from "../SubPage";
 import { LineIcon } from "../lineIcons";
@@ -12,6 +13,7 @@ import { ComingSoon, PCard } from "./kit";
 export default function RecipesScreen({ available, recipes, hideNumbers = false }: { available: boolean; recipes: Recipe[]; hideNumbers?: boolean }) {
   return (
     <SubPage title="Recipes">
+      <ProNote className="mb-3" />
       {!available ? (
         <MRise>
           <ComingSoon what="Recipe builder" />

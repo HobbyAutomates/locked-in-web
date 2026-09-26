@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { ProNote } from "../platform/kit";
 import { useRouter } from "next/navigation";
 import { deleteFast, endFast, setFastingHours, startFast } from "@/lib/nutrition-actions";
 import { PROTOCOLS, STAGES, clampHours, clock, durationText, hoursBetween, stageAt, type FastingAccess } from "@/lib/fasting";
@@ -69,6 +70,7 @@ export default function FastingScreen({ access, flags, available, active, histor
   if (!access.ok) {
     return (
       <SubPage title="Fasting" back="/profile/goals">
+      <ProNote className="mb-3" />
         <MRise>
           <PCard label="Fasting">
             <div className="flex items-start gap-3">
@@ -122,6 +124,7 @@ export default function FastingScreen({ access, flags, available, active, histor
 
   return (
     <SubPage title="Fasting" back="/profile/goals">
+      <ProNote className="mb-3" />
       {!available ? (
         <MRise>
           <ComingSoon what="Fasting timer" />

@@ -123,3 +123,13 @@ export function PageTitle({ children, pro = false }: { children: React.ReactNode
     </h1>
   );
 }
+
+/** One-line "PRO · free for beta testers" marker for Pro screens owned by other areas (v2.13 merge). */
+export function ProNote({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex items-center gap-2 text-[12.5px] ${className}`} style={{ color: "var(--muted)" }}>
+      <ProChip />
+      <span>Free for beta testers</span>
+    </div>
+  );
+}

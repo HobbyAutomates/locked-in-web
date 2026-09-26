@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ProNote } from "../platform/kit";
 import { useRouter } from "next/navigation";
 import { saveMeal } from "@/lib/actions";
 import { loadWhatToEat, type WhatToEat } from "@/lib/nutrition-actions";
@@ -76,6 +77,7 @@ export function WhatToEatSheet({ open, onClose, date, onPick }: { open: boolean;
 
   return (
     <BottomSheet open={open} title="What should I eat?" subtitle={sub} onClose={onClose}>
+      <ProNote className="mb-3" />
       <div className="flex flex-col gap-3 pb-1">
         {!data && !error ? (
           <p className="flex items-center gap-2 py-6 text-[13px] muted">

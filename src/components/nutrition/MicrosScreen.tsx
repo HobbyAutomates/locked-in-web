@@ -1,6 +1,7 @@
 "use client";
 
 import { dayMicros, microTargets, weekAverage, weekHints, type MicroKey } from "@/lib/micros";
+import { ProNote } from "../platform/kit";
 import { dietModeInfo } from "@/lib/dietModes";
 import type { NutritionSettings } from "@/lib/nutritionTypes";
 import type { Meal, Profile } from "@/lib/types";
@@ -68,6 +69,7 @@ export default function MicrosScreen({ today, profile, settings, meals }: { toda
 
   return (
     <SubPage title="Micronutrients" back="/profile/goals">
+      <ProNote className="mb-3" />
       <MRise>
         <PCard label="Summary">
           <div className="flex items-center justify-between gap-2">
