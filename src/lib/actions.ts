@@ -9,6 +9,7 @@ import { bandCode, bandIntensity, bandKcal, burnKcal } from "./burn";
 import { rollupQuietly } from "./rollup";
 import { trackServer } from "./trackServer";
 import { adminClient } from "./apiAuth";
+import { dispatchQuietly } from "./push";
 import { today as todayIso } from "./dates";
 import type { PostReactor } from "./types";
 import type { Activity, BattleBoardRow, BattleWinner, Challenge, ChallengeBoardRow, ChallengeKind, DescribedExercise, FoodSearchHit, GraffitiEntry, LeaderRow, MealItem, Profile, SavedMeal, SquadMember, SquadPost, WaterEntry, WaterVessel, WorkoutExercise, WorkoutKind } from "./types";
@@ -672,6 +673,8 @@ export async function nudgeMember(groupId: string, toUser: string) {
   if (recent?.length) return { already: true };
   const { error } = await supabase.from("nudges").insert({ group_id: groupId, from_user: user.id, to_user: toUser, kind: "nudge" });
   if (error) throw new Error(error.message);
+  // v2.13: the nudges trigger (schema_v36) wrote them a notification; push it now. No-op without VAPID keys.
+  await dispatchQuietly(adminClient, toUser);
   return { already: false };
 }
 
