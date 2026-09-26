@@ -68,7 +68,7 @@ export type SafetyKind = "not_eating" | "purging" | "self_harm" | "body_hate";
 const SAFETY: [SafetyKind, RegExp][] = [
   ["self_harm", /\b(kill myself|end (it|my life)|suicid\w*|self[- ]?harm|cut(ting)? myself|want to die|don'?t want to live|marna chahta|marna chahti|mar jaana)\b/i],
   ["purging", /\b(purg\w*|throw(ing)? up (after|on purpose)|make myself (throw up|vomit|sick)|vomit\w* (after|on purpose)|laxatives? to lose|ulti kar)/i],
-  ["not_eating", /\b(stop(ped)? eating|not eating (anything|at all|for)|haven'?t eaten (in|for) (\d+|two|three|four|five) days|starv\w*|skip(ping)? all (my )?meals|khana (nahi|nahin) kha(ya|ta|ti|unga|ungi)|bhookh? (reh|rah))/i],
+  ["not_eating", /\b(stop(ped)? eating|not eating (anything|at all|for)|haven'?t eaten (in|for) (\d+|two|three|four|five) days|starv(e|ing) myself|skip(ping)? all (my )?meals|khana (nahi|nahin) kha(ya|ta|ti|unga|ungi)|bhookh? (reh|rah))/i],
   ["body_hate", /\b(hate (my|this) body|i'?m (so )?(fat|ugly|disgusting)|disgusted (with|by) (my ?self|my body)|apne body se nafrat)\b/i],
 ];
 
