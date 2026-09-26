@@ -29,4 +29,7 @@ export const TASKS: Record<TaskId, TaskDef> = {
   meal_text_parse: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 1800, images: false, plannedAlternative: "qwen:qwen-plus or gemini:gemini-flash" },
   exercise_parse: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 1500, images: false, plannedAlternative: "qwen:qwen-plus or gemini:gemini-flash" },
   food_lookup: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 300, images: false, plannedAlternative: "qwen:qwen-plus or openai-compatible (was LIVE_FOOD_PROVIDER)" },
+  // v2.13 restaurant menu scan: Haiku reads the menu first; Sonnet only when Haiku fails or finds nothing.
+  menu_vision: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 4000, images: true, plannedAlternative: "gemini:gemini-flash" },
+  menu_vision_hard: { defaultProvider: "anthropic", defaultModel: DEFAULT_VISION_MODEL, maxTokens: 4000, images: true, plannedAlternative: "gemini:gemini-pro" },
 };
