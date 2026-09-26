@@ -7,6 +7,8 @@ import { nameFromEmail } from "@/lib/display";
 import { LineIcon, type LineName } from "@/components/lineIcons";
 import { drawLen, md } from "@/components/motion";
 import { BottomSheet, ErrorNote } from "@/components/ui";
+import { Padlock, Wordmark } from "@/components/BrandMark";
+import { HatchRing } from "@/components/Hatch";
 
 type Screen = "start" | "in" | "up";
 
@@ -101,14 +103,7 @@ export default function LoginPage() {
 // ---------------------------------------------------------------- start (Login B)
 
 function Logo({ size = 44 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 56 56" aria-hidden="true" style={{ flex: "none" }}>
-      <rect width="56" height="56" rx="16" fill="var(--ember)" />
-      <path d="M19 26v-5a9 9 0 0 1 18 0v5" fill="none" stroke="var(--card)" strokeWidth="4" strokeLinecap="round" />
-      <rect x="14" y="25" width="28" height="20" rx="6" fill="var(--card)" />
-      <path d="M28 29c3 3 4 5 4 7a4 4 0 0 1-8 0c0-1.5.7-2.5 1.5-3.2.2 1.2 1 1.9 1.7 1.9-.7-2-.2-4 .8-5.7z" fill="var(--ember)" />
-    </svg>
-  );
+  return <Padlock size={size} />;
 }
 
 /** A decorative preview card, tilted, rising in and then drifting gently. */
@@ -124,13 +119,9 @@ function Float({ x, y, rot, delay, bg = "var(--card)", children }: { x: number; 
   );
 }
 
-function MiniRing({ fraction, color, delay }: { fraction: number; color: string; delay: number }) {
-  return (
-    <svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true">
-      <circle cx="23" cy="23" r="18" fill="none" stroke="var(--track)" strokeWidth="6" />
-      <circle cx="23" cy="23" r="18" fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" pathLength={1} transform="rotate(-90 23 23)" className="m-draw" style={drawLen(fraction, delay)} />
-    </svg>
-  );
+function MiniRing({ fraction, delay }: { fraction: number; delay: number }) {
+  // Brand v1: mono rings, solid = done, hatched = still to go.
+  return <HatchRing size={46} stroke={6} fraction={fraction} delay={delay} />;
 }
 
 function Start({ onEmail }: { onEmail: () => void }) {
@@ -146,8 +137,8 @@ function Start({ onEmail }: { onEmail: () => void }) {
     router.push(`/join/${m[1].toUpperCase()}`);
   }
 
-  const av = (n: string, c: string) => (
-    <span key={n} className="grid place-items-center rounded-full text-[13px] font-extrabold" style={{ width: 34, height: 34, background: c, color: "var(--card)", border: "2px solid var(--card)", marginLeft: -8 }}>
+  const av = (n: string, c: string, ink = "var(--card)") => (
+    <span key={n} className="grid place-items-center rounded-full text-[13px] font-extrabold" style={{ width: 34, height: 34, background: c, color: ink, border: "2px solid var(--card)", marginLeft: -8 }}>
       {n}
     </span>
   );
@@ -160,13 +151,13 @@ function Start({ onEmail }: { onEmail: () => void }) {
         style={{
           minHeight: 362,
           paddingTop: "env(safe-area-inset-top, 0px)",
-          background: "radial-gradient(120% 90% at 20% 0%, var(--ember-bg), transparent 60%), radial-gradient(90% 80% at 100% 30%, var(--surf2), transparent 60%)",
+          background: "radial-gradient(120% 90% at 20% 0%, var(--surf2), transparent 60%), radial-gradient(90% 80% at 100% 30%, var(--surf2), transparent 60%)",
         }}
       >
         <div className="relative w-[390px] max-w-full" style={{ height: 320 }}>
           <Float x={24} y={54} rot={-4} delay={140}>
             <div className="flex items-center gap-1.5">
-              <LineIcon name="flame" size={26} stroke={2} style={{ color: "var(--orange)" }} />
+              <LineIcon name="flame" size={26} stroke={2} style={{ color: "var(--ember)" }} />
               <span className="num text-[34px] font-extrabold" style={{ letterSpacing: "-1px", color: "var(--ink)" }}>
                 19
               </span>
@@ -179,32 +170,32 @@ function Start({ onEmail }: { onEmail: () => void }) {
           </Float>
           <Float x={196} y={40} rot={5} delay={260}>
             <div className="flex gap-2">
-              <MiniRing fraction={0.84} color="var(--blue)" delay={900} />
-              <MiniRing fraction={0.96} color="var(--orange)" delay={1060} />
-              <MiniRing fraction={1} color="var(--purple)" delay={1220} />
+              <MiniRing fraction={0.84} delay={900} />
+              <MiniRing fraction={0.62} delay={1060} />
+              <MiniRing fraction={0.45} delay={1220} />
             </div>
             <p className="mt-1.5 text-[12px] font-semibold muted">Protein · Carbs · Fat</p>
           </Float>
           <Float x={30} y={180} rot={3} delay={380}>
             <div className="flex items-center pl-2">
-              {av("A", "var(--blue)")}
-              {av("R", "var(--orange)")}
-              {av("K", "var(--purple)")}
-              {av("S", "var(--ember)")}
+              {av("A", "var(--ink)")}
+              {av("R", "var(--mute)")}
+              {av("K", "var(--surf2)", "var(--ink)")}
+              {av("S", "var(--ember)", "var(--ember-ink)")}
             </div>
             <p className="mt-2 text-[14px] font-bold" style={{ color: "var(--ink)" }}>
               Ayaan logged lunch
             </p>
             <p className="text-[12px] muted">+32 g protein · 2 min ago</p>
           </Float>
-          <Float x={228} y={198} rot={-6} delay={500} bg="var(--ember)">
-            <p className="text-[12px] font-semibold" style={{ color: "var(--card)", opacity: 0.8 }}>
+          <Float x={228} y={198} rot={-6} delay={500} bg="var(--btn)">
+            <p className="text-[12px] font-semibold" style={{ color: "var(--btn-ink)", opacity: 0.8 }}>
               Today
             </p>
-            <p className="num text-[30px] font-extrabold" style={{ color: "var(--card)", letterSpacing: "-1px", lineHeight: 1.15 }}>
+            <p className="num text-[30px] font-extrabold" style={{ color: "var(--btn-ink)", letterSpacing: "-1px", lineHeight: 1.15 }}>
               1,892
             </p>
-            <p className="text-[12px] font-semibold" style={{ color: "var(--card)", opacity: 0.8 }}>
+            <p className="text-[12px] font-semibold" style={{ color: "var(--btn-ink)", opacity: 0.8 }}>
               of 2,200 kcal
             </p>
           </Float>
@@ -215,13 +206,17 @@ function Start({ onEmail }: { onEmail: () => void }) {
         <div className="flex items-center gap-3">
           <Logo />
           <div>
-            <h1 className="text-[24px] font-extrabold" style={{ letterSpacing: "-.6px" }}>
-              Locked In
+            <h1 className="text-[26px]">
+              <Wordmark size={26} />
             </h1>
             <p className="text-[14px] muted">Your food, training and squad in one place</p>
           </div>
         </div>
         <div className="h-2" />
+        {/* v2.14: new people start with the onboarding (value first, account at the end). */}
+        <Btn kind="accent" onClick={() => router.push("/start")}>
+          Get started
+        </Btn>
         <Btn kind="primary" icon="mail" onClick={onEmail}>
           Continue with email
         </Btn>
@@ -296,7 +291,7 @@ function EyeButton({ shown, onToggle }: { shown: boolean; onToggle: () => void }
   );
 }
 
-/** The wrapper shows focus (ring / ember frame), so the bare input doesn't draw the global outline too. */
+/** The wrapper shows focus (ring / ink frame), so the bare input doesn't draw the global outline too. */
 const NO_OUTLINE: React.CSSProperties = { outline: "none" };
 const inputCls = "min-w-0 flex-1 bg-transparent text-[16px] outline-none";
 
@@ -351,7 +346,7 @@ function SignIn({
           <ErrorNote text={msg} />
         </div>
         <div className="m-rise mt-auto flex flex-col gap-3 pt-8" style={md(270)}>
-          <Btn kind="primary" type="submit" disabled={busy || !email || password.length < 6}>
+          <Btn kind="accent" type="submit" disabled={busy || !email || password.length < 6}>
             {busy ? "Signing in…" : "Sign in"}
           </Btn>
           <p className="text-center text-[14px] muted">
@@ -430,7 +425,7 @@ function CreateAccount({
         <div className="flex flex-1 gap-1.5" role="progressbar" aria-label="Create account" aria-valuemin={1} aria-valuemax={4} aria-valuenow={step + 1}>
           {[0, 1, 2, 3].map((i) => (
             <span key={i} className="h-[5px] flex-1 overflow-hidden rounded-full" style={{ background: "var(--track)" }}>
-              <span className="block h-full rounded-full" style={{ background: "var(--ember)", width: i <= step ? "100%" : "0%", transition: "width 600ms cubic-bezier(.16,1,.3,1)" }} />
+              <span className="block h-full rounded-full" style={{ background: "var(--ink)", width: i <= step ? "100%" : "0%", transition: "width 600ms cubic-bezier(.16,1,.3,1)" }} />
             </span>
           ))}
         </div>
@@ -446,7 +441,7 @@ function CreateAccount({
       >
         <div key={step} className="m-step flex flex-col">
           <div className="flex flex-col gap-2.5 pt-[30px]">
-            <span className="text-[14px] font-bold" style={{ color: "var(--ember)" }}>
+            <span className="mono text-[12px]" style={{ color: "var(--ember)" }}>
               Create account
             </span>
             <h1 className="text-[34px] font-extrabold" style={{ letterSpacing: "-1px", lineHeight: 1.1 }}>
@@ -471,7 +466,7 @@ function CreateAccount({
                 </BigInput>
                 {fallback && !name.trim() ? (
                   <div className="mt-3.5 flex flex-wrap gap-2">
-                    <button type="button" className="press rounded-full px-3.5 py-2.5 text-[14px] font-bold" style={{ background: "var(--ember)", color: "var(--ember-ink)", border: 0 }} onClick={() => setName(fallback)}>
+                    <button type="button" className="press rounded-full px-3.5 py-2.5 text-[14px] font-bold" style={{ background: "var(--btn)", color: "var(--btn-ink)", border: 0 }} onClick={() => setName(fallback)}>
                       {fallback}
                     </button>
                   </div>
@@ -532,7 +527,7 @@ const bigCls = "min-w-0 flex-1 bg-transparent text-[22px] font-bold outline-none
 
 function BigInput({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="flex h-16 items-center rounded-[18px] pl-[18px] pr-2" style={{ background: "var(--card2)", boxShadow: "inset 0 0 0 2px var(--ember)" }}>
+    <div className="flex h-16 items-center rounded-[18px] pl-[18px] pr-2" style={{ background: "var(--card2)", boxShadow: "inset 0 0 0 2px var(--ink)" }}>
       {children}
       {right}
     </div>
