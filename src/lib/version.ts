@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.12";
+export const APP_VERSION = "2.13";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.13",
+    date: "2026-09-26",
+    lines: [
+      "Coaching: pick a diet mode (backed by the science), turn on weekly targets that adapt to your real weight trend, ask What should I eat?, get a 4 pm protein nudge, and use the fasting timer, recipe builder and micronutrient dashboard.",
+      "Training and body: routines with a weekly planner, a rest timer, PR charts, a muscle map for every exercise, body measurements, editable progress photos and a before/after slider.",
+      "Scan a restaurant menu, drag a meal to another meal time, clearer item cards, weekly and monthly recaps, Instagram share cards, and notifications on iPhone when a squadmate nudges you (add Locked In to your Home Screen first). Locked In Pro is free for every beta tester.",
+    ],
+  },
   {
     version: "2.12",
     date: "2026-09-26",
