@@ -28,7 +28,11 @@ export type TaskId =
   | "exercise_parse"
   | "food_lookup"
   | "menu_vision"
-  | "menu_vision_hard";
+  | "menu_vision_hard"
+  | "coach_chat"
+  | "coach_chat_vision"
+  | "coach_memory"
+  | "coach_note";
 
 /** A minimal JSON-Schema-compatible object description — the same shape Anthropic tool
  *  input_schema, Gemini responseSchema and an OpenAI json_schema response_format all accept. */

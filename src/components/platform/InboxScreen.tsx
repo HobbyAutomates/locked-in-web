@@ -10,7 +10,7 @@ import { LineIcon, type LineName } from "../lineIcons";
 import { ComingSoon, PCard } from "./kit";
 import { invalidateHomeEntries } from "./HomeEntries";
 
-const ICON: Record<NotificationKind, LineName> = { nudge: "users", protein: "drop", fasting: "flame", checkin: "chart", system: "bell" };
+const ICON: Record<NotificationKind, LineName> = { nudge: "users", protein: "drop", fasting: "flame", checkin: "chart", system: "bell", coach: "spark", buddy: "flame" };
 
 function ago(iso: string, now: number): string {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));

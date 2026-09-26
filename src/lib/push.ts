@@ -72,7 +72,7 @@ export async function dispatchPending(admin: AdminClient, userId: string | null)
     for (const s of byUser.get(n.user_id) ?? []) {
       if (dead.has(s.id)) continue;
       try {
-        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 6 * 3600, urgency: n.kind === "nudge" ? "high" : "normal" });
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 6 * 3600, urgency: n.kind === "nudge" || n.kind === "buddy" ? "high" : "normal" });
         out.sent += 1;
         ok.add(s.id);
       } catch (e) {

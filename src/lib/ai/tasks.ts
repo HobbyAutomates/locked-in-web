@@ -32,4 +32,9 @@ export const TASKS: Record<TaskId, TaskDef> = {
   // v2.13 restaurant menu scan: Haiku reads the menu first; Sonnet only when Haiku fails or finds nothing.
   menu_vision: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 4000, images: true, plannedAlternative: "gemini:gemini-flash" },
   menu_vision_hard: { defaultProvider: "anthropic", defaultModel: DEFAULT_VISION_MODEL, maxTokens: 4000, images: true, plannedAlternative: "gemini:gemini-pro" },
+  // v2.14 AI coach: Haiku by default, Sonnet when a photo is attached. Chat uses native tool calls.
+  coach_chat: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 700, images: false, anthropicOnly: true, plannedAlternative: "Claude only — multi-step tool use" },
+  coach_chat_vision: { defaultProvider: "anthropic", defaultModel: DEFAULT_VISION_MODEL, maxTokens: 700, images: true, anthropicOnly: true, plannedAlternative: "Claude only — multi-step tool use" },
+  coach_memory: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 300, images: false, plannedAlternative: "qwen:qwen-plus or gemini:gemini-flash" },
+  coach_note: { defaultProvider: "anthropic", defaultModel: DEFAULT_TEXT_MODEL, maxTokens: 250, images: false, plannedAlternative: "qwen:qwen-plus or gemini:gemini-flash" },
 };

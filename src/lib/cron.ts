@@ -1,6 +1,7 @@
 import type { AdminClient } from "./apiAuth";
 import { ageYears } from "./goals";
 import { dispatchPending, type DispatchResult } from "./push";
+import { coachStep } from "./coachServer";
 import { checkinDue, fastingReached, fastingUrl, isMissingSchema, localNow, nudgeTimeReached, parseDietMode, proteinNudgeText, proteinPicksFor, shouldProteinNudge, timeToMinutes, type LocalNow } from "./notify";
 
 /**
@@ -8,11 +9,12 @@ import { checkinDue, fastingReached, fastingUrl, isMissingSchema, localNow, nudg
  *   (a) protein nudges for people whose nudge time just passed (spec §3),
  *   (b) "fast complete" notices,
  *   (c) Monday check-in notices (adaptive targets on),
- *   (d) push everything pending.
+ *   (d) v2.14 coach notes (morning, Sunday roast, 8 pm nudge),
+ *   (e) push everything pending.
  * Each step is independent: a missing v36 table skips that step, nothing throws.
  */
 
-export type TickResult = { now: LocalNow; protein: number; fasting: number; checkin: number; dispatch: DispatchResult | null; skipped: string[] };
+export type TickResult = { now: LocalNow; protein: number; fasting: number; checkin: number; coach: number; dispatch: DispatchResult | null; skipped: string[] };
 
 const chunk = <T,>(xs: T[], n: number): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
 /** Midnight of an IST date as an ISO instant. */
@@ -152,11 +154,13 @@ export async function runTick(db: AdminClient, when: Date = new Date()): Promise
   const protein = await step("protein", () => proteinStep(db, now, skipped));
   const fasting = await step("fasting", () => fastingStep(db, now, skipped));
   const checkin = await step("checkin", () => checkinStep(db, now, skipped));
+  // v2.14: the coach's morning note / Sunday roast / 8 pm nudge (schema_v37; skipped without it).
+  const coach = await step("coach", () => coachStep(db, now, skipped));
   let dispatch: DispatchResult | null = null;
   try {
     dispatch = await dispatchPending(db, null);
   } catch (e) {
     skipped.push(`dispatch: ${e instanceof Error ? e.message : "failed"}`);
   }
-  return { now, protein, fasting, checkin, dispatch, skipped };
+  return { now, protein, fasting, checkin, coach, dispatch, skipped };
 }

@@ -4,11 +4,11 @@
  * alarm (util/Notify.kt).
  */
 
-export type NotificationKind = "nudge" | "protein" | "fasting" | "checkin" | "system";
+export type NotificationKind = "nudge" | "protein" | "fasting" | "checkin" | "system" | "coach" | "buddy";
 export type InboxItem = { id: string; kind: NotificationKind; title: string; body: string; url: string | null; created_at: string; read_at: string | null };
 
 export function parseKind(v: unknown): NotificationKind {
-  return v === "nudge" || v === "protein" || v === "fasting" || v === "checkin" ? v : "system";
+  return v === "nudge" || v === "protein" || v === "fasting" || v === "checkin" || v === "coach" || v === "buddy" ? v : "system";
 }
 
 /** The app's clock: Asia/Kolkata (the app stores no per-user timezone). */
