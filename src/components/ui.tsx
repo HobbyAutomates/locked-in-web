@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ChevronRight as ChevronRightIcon, Flame as FlameIcon } from "./icons";
 import { track } from "@/lib/track";
+import { HatchPattern } from "./Hatch";
 
 /** Spring used for anything spatial (rings, bars, rising cards) — mirrors Motion.spatialSlow(). */
 export const SPRING = { type: "spring" as const, stiffness: 190, damping: 22 };
@@ -242,12 +243,17 @@ export function Ring({
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const reduce = useReducedMotion();
+  const hatchId = `rh${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   // The first draw is the slow pen stroke; once it lands, later changes use the usual spring.
   const [slow, setSlow] = useState(draw != null);
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size, flex: "none" }}>
       <svg width={size} height={size} className="absolute -rotate-90" aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--track)" strokeWidth={stroke} />
+        {/* v2.14 "Hatch = remaining": the part still to go is a 45° hatch, not a faint tint. */}
+        <defs>
+          <HatchPattern id={hatchId} gap={stroke > 7 ? 6 : 5} width={stroke > 7 ? 1.8 : 1.5} />
+        </defs>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`url(#${hatchId})`} strokeWidth={stroke} />
         <motion.circle
           cx={size / 2}
           cy={size / 2}

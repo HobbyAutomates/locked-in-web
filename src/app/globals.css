@@ -763,7 +763,7 @@ button {
   flex: 1;
   height: 5px;
   border-radius: 999px;
-  background: var(--track);
+  background: repeating-linear-gradient(-45deg, var(--hatch) 0 1.4px, transparent 1.4px 5px);
   overflow: hidden;
 }
 .obar > span {
