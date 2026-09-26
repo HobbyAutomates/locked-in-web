@@ -52,7 +52,7 @@ export function ComingSoon({ what = "This" }: { what?: string }) {
         <LineIcon name="spark" size={18} />
         Coming with the next update
       </p>
-      <p className="text-[13px] muted">{what} needs a server update that's on its way. Nothing you've logged is affected.</p>
+      <p className="text-[13px] muted">{what} needs a server update that&rsquo;s on its way. Nothing you&rsquo;ve logged is affected.</p>
     </PCard>
   );
 }

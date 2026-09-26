@@ -262,9 +262,9 @@ export async function loadHomeEntries(): Promise<HomeEntries> {
 
 // ---------------------------------------------------------------- inbox
 
-export async function fetchInbox(): Promise<{ available: boolean; items: InboxItem[] }> {
+export async function fetchInbox(): Promise<{ available: boolean; items: InboxItem[]; at: number }> {
   const { supabase, user } = await me();
-  if (!user) return { available: false, items: [] };
+  if (!user) return { available: false, items: [], at: Date.now() };
   return loadInbox(supabase);
 }
 

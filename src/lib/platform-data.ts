@@ -97,10 +97,12 @@ export function inboxFromRow(r: Record<string, unknown>): InboxItem {
   };
 }
 
-export async function loadInbox(supabase: Client, limit = 60): Promise<{ available: boolean; items: InboxItem[] }> {
+/** `at` = when it was read (the inbox shows "5 min ago" relative to it). */
+export async function loadInbox(supabase: Client, limit = 60): Promise<{ available: boolean; items: InboxItem[]; at: number }> {
+  const at = Date.now();
   const { data, error } = await supabase.from("notifications").select("id, kind, title, body, url, created_at, read_at").order("created_at", { ascending: false }).limit(limit);
-  if (error) return { available: false, items: [] };
-  return { available: true, items: ((data ?? []) as Record<string, unknown>[]).map(inboxFromRow) };
+  if (error) return { available: false, items: [], at };
+  return { available: true, items: ((data ?? []) as Record<string, unknown>[]).map(inboxFromRow), at };
 }
 
 export async function loadUnread(supabase: Client): Promise<number | null> {

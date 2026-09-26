@@ -20,7 +20,7 @@ self.addEventListener("push", (event) => {
   let data = {};
   try {
     data = event.data ? event.data.json() : {};
-  } catch (e) {
+  } catch {
     data = { title: "Locked In", body: event.data ? event.data.text() : "" };
   }
   const title = data.title || "Locked In";
@@ -47,7 +47,7 @@ self.addEventListener("notificationclick", (event) => {
           if ("navigate" in c) {
             try {
               await c.navigate(url);
-            } catch (e) {
+            } catch {
               // Uncontrolled client: fall through and open a window instead.
               await self.clients.openWindow(url);
             }
