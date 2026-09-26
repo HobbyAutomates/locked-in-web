@@ -3,12 +3,21 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.13";
+export const APP_VERSION = "2.14";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.14",
+    date: "2026-09-26",
+    lines: [
+      "A new look: black, bone and ember, with new fonts. Rings and bars now hatch what's still to go, Home warms up as you hit your targets, every squad gets its own pattern, and real milestones get a full-screen moment.",
+      "Meet your AI coach: pick Calm, Balanced or No excuses, chat about food and training, see (and edit) what it remembers, and get a short note each morning.",
+      "Buddy streaks: pair up with one friend, keep a shared streak and nudge them when they go quiet. New sign-up with a quick plan preview, and a fresh sign-in screen.",
+    ],
+  },
   {
     version: "2.13",
     date: "2026-09-26",
