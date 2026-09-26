@@ -160,7 +160,11 @@ export async function menuFlow(input: {
   if (dishes.length) {
     const product = restaurant ?? "Menu scan";
     const verdict = best !== null ? `Best pick: ${dishes[best].name}` : "Nothing fits your diet here";
-    const { data, error } = await input.admin.from("label_scans").insert({ user_id: input.userId, kind: "menu", lens: "protein", product, verdict, report: { ...result, usage } }).select("id").single();
+    // The row's own id / thumb_path live in their columns; the report is everything else.
+    const { id: _id, thumb_path: _thumb, ...stored } = result;
+    void _id;
+    void _thumb;
+    const { data, error } = await input.admin.from("label_scans").insert({ user_id: input.userId, kind: "menu", lens: "protein", product, verdict, report: { ...stored, usage } }).select("id").single();
     if (error) console.error("[menuFlow] label_scans insert failed (schema_v36 applied?)", { code: error.code, message: error.message });
     result.id = (data?.id as string | undefined) ?? null;
     result.thumb_path = await attachThumb(input.admin, input.userId, result.id, input.thumb);

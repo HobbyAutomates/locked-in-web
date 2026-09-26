@@ -556,7 +556,8 @@ export type Wrap = {
 /** A row of the Scan tab's History list. */
 export type ScanHistoryItem = {
   id: string;
-  kind: "label" | "barcode" | "photo";
+  /** v2.13: "menu" is a restaurant menu scan (schema_v36). */
+  kind: "label" | "barcode" | "photo" | "menu";
   lens: string;
   product: string;
   verdict: string;
