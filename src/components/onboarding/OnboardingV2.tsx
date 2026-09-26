@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { skipOnboarding } from "@/lib/actions";
 import { md } from "@/components/motion";
 import { BottomSheet, ErrorNote } from "@/components/ui";
 import { Padlock } from "@/components/BrandMark";
@@ -186,7 +187,22 @@ export default function OnboardingV2({ signedIn, tune = false, firstName = "" }:
               <Option key={s.key} icon={SOURCE_ICON[s.key]} title={s.label} selected={a.heard_from === s.key} delay={450 + i * 150} onClick={() => answer({ heard_from: s.key })} />
             ))}
           </List>
-          <Cta label="Continue" disabled={!a.heard_from} onClick={go} secondary="Skip" onSecondary={go} />
+          <Cta
+            label="Continue"
+            disabled={!a.heard_from}
+            onClick={go}
+            secondary={signedIn ? "Skip setup for now" : "Skip"}
+            onSecondary={
+              signedIn
+                ? async () => {
+                    // Kept from the old flow: signed-in people can skip setup for 30 days on this device.
+                    await skipOnboarding();
+                    router.replace("/");
+                    router.refresh();
+                  }
+                : go
+            }
+          />
         </Shell>
       );
 

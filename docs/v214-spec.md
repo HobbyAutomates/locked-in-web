@@ -83,5 +83,14 @@ training_days?, sports?: string[], diet_mode?, obstacles?: string[], coach_style
 last_both_logged_on, created_at}[]` · `buddy_nudge(buddy uuid) → boolean`. Invite link: `<app>/buddy/<CODE>`.
 
 ### Milestones
-Keys `streak_7`, `streak_30`, `streak_100`, `goal_reached`, `pr:<exercise>:<date>` (PRs set in the last 2 days only).
+Keys `streak_7`, `streak_30`, `streak_100` (only in the first 7 days after reaching it; older ones are marked seen silently),
+`goal_reached:<goal kg>`, `pr:<exercise lower-case>:<date>` (PRs set in the last 2 days only). Logic: src/lib/milestones.ts.
 Seen keys go to `profiles.milestones_seen` (append) and to local storage (fallback when v37 isn't applied).
+
+### Squad textures
+Pattern = `[dots, stripes, grid, waves, checks, diagonal, rings, zigzag][fnv1a32(squad_id) % 8]` (FNV-1a 32-bit over the
+UUID string, offset 0x811c9dc5, prime 0x01000193). Mono: ink at ~55 % on surf2. Web: src/components/SquadTexture.tsx.
+
+### The day warms up
+warmth = (calories part + protein part + trained today + logged today) / 4; calories part = 1 inside 85–110 % of the
+budget, 0.5 over it, else 0.6 × eaten / (0.85 × budget); glow alpha = warmth × 0.18. Off with reduced motion / low battery.
