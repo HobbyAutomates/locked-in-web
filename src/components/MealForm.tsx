@@ -19,8 +19,16 @@ import { saveWhenReady, type PlateJob } from "./PendingMeals";
 import { BottomSheet, ErrorNote, Hair, MacroDot, PillButton, fmt } from "./ui";
 import { InfoButton, SourceSheet, VariantChips, lookUpSources } from "./SourceSheet";
 import { needsCheck, sourceInfoFor } from "@/lib/sourceInfo";
+import { ORIGIN_LABEL, gramRangeText, levelOf, originOf } from "@/lib/itemInfo";
 import { swapToVariant, type FoodVariant } from "@/lib/variants";
 import { track } from "@/lib/track";
+import Link from "next/link";
+import { listRecipes } from "@/lib/nutrition-actions";
+import { recipeMealItem, type Recipe } from "@/lib/recipes";
+import { COMING_SOON } from "@/lib/v36";
+import { LineIcon } from "./lineIcons";
+import { ComingSoon } from "./nutrition/kit";
+import { WhatToEatSheet } from "./nutrition/WhatToEatSheet";
 import type { MealMethod } from "@/lib/analytics";
 
 const CATEGORIES: { key: PresetCategory; label: string }[] = [
@@ -34,7 +42,7 @@ const CATEGORIES: { key: PresetCategory; label: string }[] = [
   { key: "sweet", label: "Sweets" },
   { key: "fruit", label: "Fruit" },
 ];
-type Cat = PresetCategory | "yours";
+type Cat = PresetCategory | "yours" | "recipes";
 
 const SOURCE_LABEL: Record<string, string> = { dish: "INDB", ifct: "IFCT", usda: "USDA", custom: "Curated", off: "OFF" };
 
@@ -608,7 +616,20 @@ export default function MealForm({
             />
           </>
         ) : (
-          <PresetGrid presets={presets} savedMeals={savedMeals} usage={usage} onPreset={(p) => addFood(presetFood(p), p.category === "restaurant", { src: p.image_url ?? null, kind: "preset" })} onSaved={addSaved} onEmpty={() => barRef.current?.focus()} />
+          <PresetGrid
+            presets={presets}
+            savedMeals={savedMeals}
+            usage={usage}
+            date={date}
+            onPreset={(p) => addFood(presetFood(p), p.category === "restaurant", { src: p.image_url ?? null, kind: "preset" })}
+            onSaved={addSaved}
+            onItem={(item, label) => {
+              addRows([{ item, image: item.image_url ?? null }]);
+              tapped.current.push(label);
+              say(`Added ${label} · ${Math.round(item.calories)} kcal`);
+            }}
+            onEmpty={() => barRef.current?.focus()}
+          />
         )}
       </div>
 
@@ -817,17 +838,23 @@ function PresetGrid({
   presets,
   savedMeals,
   usage,
+  date,
   onPreset,
   onSaved,
+  onItem,
   onEmpty,
 }: {
   presets: FoodPreset[];
   savedMeals: SavedMeal[];
   usage: Record<string, number>;
+  date: string;
   onPreset: (p: FoodPreset) => void;
   onSaved: (sm: SavedMeal) => void;
+  /** v2.13: a recipe serving or a what-to-eat pick, straight onto the plate. */
+  onItem: (item: MealItem, label: string) => void;
   onEmpty: () => void;
 }) {
+  const [wteOpen, setWteOpen] = useState(false);
   const freq = (p: FoodPreset) => usage[p.food_id] ?? 0;
   const bySort = (a: FoodPreset, b: FoodPreset) => freq(b) - freq(a) || a.sort - b.sort;
   const model = useMemo(() => {
@@ -841,7 +868,7 @@ function PresetGrid({
     for (const p of presets) catUse.set(p.category, (catUse.get(p.category) ?? 0) + (usage[p.food_id] ?? 0));
     const cats = CATEGORIES.filter((c) => presets.some((p) => p.category === c.key)).sort((a, b) => (catUse.get(b.key) ?? 0) - (catUse.get(a.key) ?? 0));
     const restaurant = presets.some((p) => p.category === "restaurant");
-    const chips: { key: Cat; label: string }[] = [...(yours.length || savedMeals.length ? [{ key: "yours" as Cat, label: "Yours" }] : []), ...cats, ...(restaurant ? [{ key: "restaurant" as Cat, label: "Restaurant" }] : [])];
+    const chips: { key: Cat; label: string }[] = [...(yours.length || savedMeals.length ? [{ key: "yours" as Cat, label: "Yours" }] : []), ...cats, ...(restaurant ? [{ key: "restaurant" as Cat, label: "Restaurant" }] : []), { key: "recipes" as Cat, label: "Recipes" }];
     const first: Cat = yours.length || savedMeals.length ? "yours" : cats[0] && (catUse.get(cats[0].key) ?? 0) > 0 ? cats[0].key : "breakfast";
     return { yours, chips, first };
   }, [presets, usage, savedMeals]);
@@ -859,9 +886,21 @@ function PresetGrid({
     );
   }
 
-  const list = cat === "yours" ? model.yours : presets.filter((p) => p.category === cat).sort(bySort);
+  const list = cat === "yours" ? model.yours : cat === "recipes" ? [] : presets.filter((p) => p.category === cat).sort(bySort);
   return (
     <div className="flex flex-col gap-2.5">
+      {/* v2.13: what fits today's remaining macros, one tap onto the plate. */}
+      <button type="button" className="card press flex w-full items-center gap-2.5 text-left" style={{ padding: "10px 12px", borderRadius: 16 }} onClick={() => setWteOpen(true)}>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent)" }}>
+          <LineIcon name="spark" size={16} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[14px] font-semibold">What should I eat?</span>
+          <span className="truncate text-[12px] muted">Picks for what&apos;s left today</span>
+        </span>
+        <LineIcon name="chev" size={16} style={{ color: "var(--muted)" }} />
+      </button>
+      <WhatToEatSheet open={wteOpen} onClose={() => setWteOpen(false)} date={date} onPick={onItem} />
       <div className="-mx-4 overflow-x-auto px-4 py-1" style={{ scrollbarWidth: "none" }}>
         <div className="flex w-max gap-1.5" role="radiogroup" aria-label="Food categories">
           {model.chips.map((c) => (
@@ -871,6 +910,7 @@ function PresetGrid({
           ))}
         </div>
       </div>
+      {cat === "recipes" ? <RecipePane onItem={onItem} /> : null}
       <div className="grid grid-cols-2 gap-2">
         {cat === "yours"
           ? savedMeals.map((sm) => (
@@ -904,6 +944,59 @@ function PresetGrid({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ---- v2.13 Log → Recipes ----
+
+function RecipePane({ onItem }: { onItem: (item: MealItem, label: string) => void }) {
+  const [state, setState] = useState<{ recipes: Recipe[] } | { error: string } | null>(null);
+  useEffect(() => {
+    let live = true;
+    listRecipes()
+      .then((r) => live && setState(r.ok ? { recipes: r.recipes } : { error: r.error }))
+      .catch(() => live && setState({ error: "Couldn't load your recipes" }));
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!state) {
+    return (
+      <p className="flex items-center gap-2 px-1 py-2 text-[13px] muted">
+        <Spinner size={14} /> Loading your recipes…
+      </p>
+    );
+  }
+  if ("error" in state) return state.error === COMING_SOON ? <ComingSoon what="Recipes" /> : <ErrorNote text={state.error} />;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        {state.recipes.map((r) => (
+          <button key={r.id} type="button" className="card press flex w-full items-center gap-2.5 text-left" style={{ padding: 10, borderRadius: 16, minHeight: 60 }} onClick={() => onItem(recipeMealItem(r, 1), r.name)} aria-label={`Add a serving of ${r.name}, ${r.per_serving.kcal} kcal`}>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]" style={{ background: "var(--card2)" }}>
+              <LineIcon name="bowl" size={20} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[14px] font-semibold">{r.name}</span>
+              <span className="block truncate text-[12px] muted">
+                1 serving · {r.per_serving.kcal} kcal · {fmt(r.per_serving.protein_g)} g P
+              </span>
+            </span>
+          </button>
+        ))}
+        <Link href="/recipes/new" className="card press flex w-full items-center gap-2.5" style={{ padding: 10, borderRadius: 16, minHeight: 60, color: "var(--ink)" }}>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]" style={{ background: "var(--card2)" }}>
+            <LineIcon name="plus" size={20} />
+          </span>
+          <span className="text-[14px] font-semibold">New recipe</span>
+        </Link>
+      </div>
+      {state.recipes.length ? (
+        <Link href="/recipes" className="press self-start px-1 text-[13px] font-semibold underline" style={{ color: "var(--ink)" }}>
+          Edit your recipes
+        </Link>
+      ) : null}
     </div>
   );
 }
@@ -1014,6 +1107,7 @@ function PlateRow({
   onPickVariant: (v: FoodVariant) => void;
 }) {
   const item = row.item;
+  const [expanded, setExpanded] = useState(false);
   const [delta, setDelta] = useState<number | null>(null);
   // Derived-state pattern: when the priced calories change, remember the jump for a moment.
   const [prevCal, setPrevCal] = useState(item.calories);
@@ -1034,11 +1128,19 @@ function PlateRow({
       <div className="flex items-center gap-2.5 py-2.5">
         <FoodImage name={item.name} kind={row.imageKind ?? (item.source === "scan" ? "product" : "generic")} src={row.image ?? item.image_url} size={40} fallback={<FoodFallback size={40} category={row.category} />} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex min-w-0 items-center gap-1">
-            <span className="truncate text-[15px] font-semibold">
+          {/* v2.13: full names (two lines, tap to see all), and what the numbers rest on. */}
+          <span className="flex min-w-0 items-start gap-1">
+            <button
+              type="button"
+              aria-expanded={expanded}
+              title={item.name}
+              className={`min-w-0 text-left text-[15px] font-semibold leading-[19px] ${expanded ? "" : "line-clamp-2"}`}
+              style={{ background: "none", border: 0, padding: 0, color: "var(--ink)", overflowWrap: "anywhere" }}
+              onClick={() => setExpanded((v) => !v)}
+            >
               {item.name}
               {item.source === "estimated" ? " ~" : ""}
-            </span>
+            </button>
             <InfoButton name={item.name} check={!row.confirmed && needsCheck(item)} onClick={onInfo} />
           </span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1052,6 +1154,10 @@ function PlateRow({
                 Cooked in…
               </button>
             ) : null}
+          </span>
+          <span className="text-[11px] muted">
+            {ORIGIN_LABEL[originOf(item)]} · {levelOf(item).toLowerCase()} confidence
+            {originOf(item) === "ai" ? ` · likely ${gramRangeText(item)}` : ""}
           </span>
           {item.cooked_in === "restaurant" ? <span className="text-[11px] muted">Restaurant portion · oil included</span> : fatLabel ? <span className="text-[11px] muted">Cooked in {fatLabel}</span> : null}
           {item.variants && item.variants.length > 1 ? <VariantChips variants={item.variants} currentId={item.food_id} onPick={onPickVariant} /> : null}

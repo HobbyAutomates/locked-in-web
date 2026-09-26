@@ -167,7 +167,7 @@ function LogWeightDialog({ initialKg, onClose, entry = null, onDelete }: { initi
       onClick={onClose}
     >
       <motion.form
-        className="w-full max-w-[360px]"
+        className="dialog-scroll w-full max-w-[360px]"
         style={{ background: "var(--card)", borderRadius: 28, padding: 22 }}
         initial={{ opacity: 0, scale: 0.94, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}

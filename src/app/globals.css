@@ -793,3 +793,23 @@ button {
   font-family: "Permanent Marker", "Rubik Mono One", system-ui, sans-serif;
   letter-spacing: 0.02em;
 }
+
+/* v2.13: every bottom sheet caps at the visible viewport (dvh, so iOS toolbars don't hide the
+   bottom) and its body scrolls on its own without dragging the page behind it. */
+.sheet-frame {
+  max-height: 88vh;
+  max-height: 88dvh;
+}
+.sheet-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+/* Centred dialogs (streak, weigh-in): scroll inside instead of running off a short screen. */
+.dialog-scroll {
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

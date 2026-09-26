@@ -18,6 +18,9 @@ import MealSections from "./MealSections";
 import { usePendingMeals, type Pending } from "./PendingMeals";
 import { BreathingFlame, Card, ErrorNote, PillButton, Ring, Rise } from "./ui";
 import { HomeBanner, InboxBell, TodaySessionCard } from "./platform/HomeEntries"; // v2.13 platform
+import { FastingHomeCard, HomeNutritionLinks } from "./nutrition/HomeNutrition";
+import { CheckinCard, checkinKey } from "./nutrition/CheckinCard";
+import type { CheckinRow, FastSession } from "@/lib/nutritionTypes";
 
 /** Background saves already pulled in by a refresh (see PendingMeals); survives remounts of Home. */
 let handledSaves = 0;
@@ -39,9 +42,13 @@ type Props = {
   nudges: Nudge[];
   /** v2.3: water logged over the last week (the week strip's range). */
   water?: WaterEntry[];
+  /** v2.13: this week's adaptive check-in, when there is one to decide on. */
+  checkin?: CheckinRow | null;
+  /** v2.13: the fast that's running (null under 18 or when none). */
+  fast?: FastSession | null;
 };
 
-export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [] }: Props) {
+export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [], checkin = null, fast = null }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(today);
   const { pending, savedCount, error } = usePendingMeals();
@@ -188,6 +195,19 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         {showHint ? <p className="mt-1.5 text-center text-[12px] muted">Tap a card to switch between left and eaten</p> : null}
       </Rise>
 
+      {/* v2.13: "What should I eat?" and the micros dashboard sit with the remaining macros. */}
+      {isToday ? (
+        <Rise index={3}>
+          <HomeNutritionLinks date={selected} />
+        </Rise>
+      ) : null}
+      {checkin && !checkin.applied ? <HomeCheckin row={checkin} hideNumbers={hideNumbers} /> : null}
+      {fast ? (
+        <Rise index={3}>
+          <FastingHomeCard fast={fast} />
+        </Rise>
+      ) : null}
+
       <Rise index={4}>
         <button
           type="button"
@@ -256,6 +276,17 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         {celebrate ? <Celebration thisWeek={thisWeek} target={profile.weekly_workout_target} streakWeeks={weekStreak} /> : null}
       </AnimatePresence>
     </div>
+  );
+}
+
+/** v2.13 Monday check-in on Home: shown until applied or "Keep current" on this device. */
+function HomeCheckin({ row, hideNumbers }: { row: CheckinRow; hideNumbers: boolean }) {
+  const kept = useDismissed(checkinKey(row));
+  if (kept) return null;
+  return (
+    <Rise index={3}>
+      <CheckinCard row={row} compact hideNumbers={hideNumbers} />
+    </Rise>
   );
 }
 
@@ -634,7 +665,7 @@ function Celebration({ thisWeek, target, streakWeeks }: { thisWeek: number; targ
       onClick={close}
     >
       <motion.div
-        className="w-full max-w-[360px] text-center"
+        className="dialog-scroll w-full max-w-[360px] text-center"
         style={{ background: "var(--card)", borderRadius: 28, padding: 24 }}
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}

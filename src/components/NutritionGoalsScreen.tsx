@@ -3,10 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveProfile } from "@/lib/actions";
-import { amdrNotes, capToFloor, edFlags, floorFor, missing, plan, screenInput, type EdFlag, type Plan, type Targets } from "@/lib/goals";
+import { ageYears, amdrNotes, capToFloor, edFlags, floorFor, isTeen, missing, plan, screenInput, type EdFlag, type Plan, type Targets } from "@/lib/goals";
 import { recordEdit } from "@/lib/targetEdits";
 import { DEFAULT_FIBER_G, DEFAULT_SUGAR_G, carbTargetG, fatTargetG, type Profile, type WeightEntry } from "@/lib/types";
 import { SafetyNote, ScienceButton, TeenGoalMigration } from "./Science";
+import { AdaptiveCard, DietModeCard } from "./nutrition/DietSettings";
+import { LineIcon } from "./lineIcons";
+import { dietTargets } from "@/lib/dietModes";
+import { DEFAULT_SETTINGS, type CheckinState, type NutritionSettings } from "@/lib/nutritionTypes";
+import Link from "next/link";
 import SubPage from "./SubPage";
 import { ChevronDown, ChevronRight, Flame } from "./icons";
 import { Card, ErrorNote, Hair, NumberField, PillButton, Ring, Rise, fmt } from "./ui";
@@ -64,7 +69,18 @@ function gramsFrom(calories: number, s: Split): Targets {
  * 100 % (grams follow the calories), and "Auto generate" — the Mifflin-St Jeor engine run in place
  * with a before → after preview. Nothing is stored until Save.
  */
-export default function NutritionGoalsScreen({ profile, weights = [] }: { profile: Profile; weights?: WeightEntry[] }) {
+export default function NutritionGoalsScreen({
+  profile,
+  weights = [],
+  settings = DEFAULT_SETTINGS,
+  checkin = { available: false, row: null, pending: null },
+}: {
+  profile: Profile;
+  weights?: WeightEntry[];
+  /** v2.13 diet mode / adaptive settings (schema_v36; `available` is false until it's applied). */
+  settings?: NutritionSettings;
+  checkin?: CheckinState;
+}) {
   const router = useRouter();
   const current: Targets = { calories: profile.calorie_target, protein: profile.protein_target_g, carbs: carbTargetG(profile), fat: fatTargetG(profile) };
   const [calories, setCalories] = useState(String(current.calories));
@@ -108,7 +124,8 @@ export default function NutritionGoalsScreen({ profile, weights = [] }: { profil
     }
     const pl = plan(profile);
     if (!pl) return;
-    const t = pl.targets;
+    // v2.13: the generated calories get the diet mode's macros (balanced is exactly goals.ts).
+    const t = dietTargets(profile, pl.targets.calories, settings.diet_mode);
     setGapNote(null);
     setPreview({ before: current, after: t, plan: pl });
     setCalories(String(t.calories));
@@ -255,6 +272,46 @@ export default function NutritionGoalsScreen({ profile, weights = [] }: { profil
         </Card>
       </Rise>
 
+      {/* ---- v2.13: diet mode and adaptive weekly targets ---- */}
+      <Rise index={3}>
+        <DietModeCard
+          profile={profile}
+          settings={settings}
+          onTargets={(t) => {
+            setCalories(String(t.calories));
+            setSplit(splitFrom(t));
+            setExact(t);
+            setPreview(null);
+            setSaved(true);
+          }}
+        />
+      </Rise>
+      <Rise index={3}>
+        <AdaptiveCard settings={settings} checkin={checkin} hideNumbers={profile.hide_numbers === true} />
+      </Rise>
+      <Rise index={3}>
+        <Card padding={0}>
+          {[
+            { href: "/nutrition/micros", icon: "chart" as const, label: "Micronutrient dashboard", sub: "Iron, calcium, fibre and more, today and this week" },
+            { href: "/recipes", icon: "bowl" as const, label: "Recipes", sub: "Build what you cook, log a serving in one tap" },
+            // v2.13 fasting is hidden under 18 (spec §7).
+            ...(isTeen(ageYears(profile.dob)) ? [] : [{ href: "/fasting", icon: "flame" as const, label: "Fasting timer", sub: "12:12 to 20:4, or your own" }]),
+          ].map((r, i) => (
+            <div key={r.href}>
+              {i ? <div className="px-4"><Hair /></div> : null}
+              <Link href={r.href} className="press flex min-h-[56px] items-center gap-3 px-4 py-2.5" style={{ color: "var(--ink)" }}>
+                <LineIcon name={r.icon} size={19} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[15px] font-semibold">{r.label}</span>
+                  <span className="text-[12px] muted">{r.sub}</span>
+                </span>
+                <LineIcon name="chev" size={16} style={{ color: "var(--muted)" }} />
+              </Link>
+            </div>
+          ))}
+        </Card>
+      </Rise>
+
       {/* ---- Micronutrients ---- */}
       <Rise index={3}>
         <Card padding={0}>
@@ -269,6 +326,14 @@ export default function NutritionGoalsScreen({ profile, weights = [] }: { profil
               <Hair />
               <MicroRow label="Sugar" sub="Limit: at most" color="var(--purple)" value={sugar} onChange={(v) => { setSugar(v); setSaved(false); }} />
               <p className="pb-2 text-[11px] leading-4 muted">Defaults: {DEFAULT_FIBER_G} g fiber, {DEFAULT_SUGAR_G} g sugar a day. Scans and meals count these from food labels and the food table.</p>
+              <Hair />
+              <Link href="/nutrition/micros" className="press flex min-h-[48px] items-center justify-between text-[14px] font-semibold" style={{ color: "var(--ink)" }}>
+                <span className="flex items-center gap-2.5">
+                  <LineIcon name="chart" size={18} />
+                  Micronutrient dashboard
+                </span>
+                <LineIcon name="chev" size={16} style={{ color: "var(--muted)" }} />
+              </Link>
             </div>
           ) : null}
         </Card>

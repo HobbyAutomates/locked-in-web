@@ -22,6 +22,8 @@ import { defaultMealType } from "@/lib/mealType";
 import CameraStage, { ScanIcon, type ScanMode } from "./scan/CameraStage";
 import PhotoStage from "./scan/PhotoStage";
 import sc from "./scan/scan.module.css";
+import MenuResult from "./nutrition/MenuResult";
+import type { MenuScanResult } from "@/lib/menuScan";
 
 const LENSES: { key: Lens; label: string }[] = [
   { key: "protein", label: "Protein" },
@@ -85,11 +87,35 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
   // v2.12: the gallery picker (no capture) and the viewfinder's mode, which only frames the shot.
   const galleryRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<ScanMode>("food");
+  // v2.13: a restaurant menu scan's result (Menu mode → /api/scan-menu).
+  const [menu, setMenu] = useState<MenuScanResult | null>(null);
 
   function reset() {
     setError(null);
     setRes(null);
     setOpened(null);
+    setMenu(null);
+  }
+
+  /** v2.13 Menu mode: the dishes, their ranges and the best pick for what's left today. */
+  async function runMenu(pl: Payload | null = payload) {
+    if (!pl) return;
+    setBusy(true);
+    setError(null);
+    setMenu(null);
+    setRes(null);
+    setOpened(null);
+    setStage("Reading the menu and picking for you… 10–30 s");
+    try {
+      const r = await postJson<MenuScanResult>("/api/scan-menu", { image: pl.base64, media_type: pl.media_type, thumb: pl.thumb ?? undefined, note: note.trim() || undefined });
+      setMenu(r);
+      track("scan_done", { kind: "menu", found: (r.dishes?.length ?? 0) > 0, forced: null });
+      if (r.id) router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read that menu");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function run(extra: { kind?: ScanKind; barcode?: string }, pl: Payload | null = payload) {
@@ -123,6 +149,10 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
       const pl: Payload = { base64: out.base64, media_type: out.media_type, thumb };
       setPayload(pl);
       setPreview(out.preview);
+      if (mode === "menu") {
+        await runMenu(pl);
+        return;
+      }
       setBusy(true);
       setStage("Reading the bars…");
       const code = await decodeBarcode(out.preview);
@@ -159,7 +189,7 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
     setPayload(null);
   }
 
-  const onCamera = !preview && !res && !opened;
+  const onCamera = !preview && !res && !opened && !menu;
   // A plate with items and its photo: the photo, chips and the whole sheet live in PlateReview.
   const plateSheet = !!(res?.plate && res.plate.items.length && preview);
   const digitsAndNote = (
@@ -175,14 +205,14 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
       {showNote ? (
         <div className="mt-1 flex gap-2">
           <input className="field" value={note} aria-label="Note" onChange={(e) => setNote(e.target.value)} placeholder={res?.kind === "plate" ? "e.g. the dal has ghee, two rotis" : "What is it / what do you want to know"} />
-          <PillButton height={48} className="!w-auto shrink-0 !px-5" disabled={busy || !note.trim() || (!payload && code.length < 8)} onClick={() => void run({ kind: res?.kind, barcode: code.length >= 8 ? code : undefined })}>
+          <PillButton height={48} className="!w-auto shrink-0 !px-5" disabled={busy || !note.trim() || (!payload && code.length < 8)} onClick={() => (menu ? void runMenu() : void run({ kind: res?.kind, barcode: code.length >= 8 ? code : undefined }))}>
             Redo
           </PillButton>
         </div>
       ) : null}
     </>
   );
-  const resultTitle = res?.kind === "plate" ? "Your plate" : res?.kind === "barcode" ? "Barcode" : res ? "Label check" : busy ? "Reading…" : "Your photo";
+  const resultTitle = menu ? "Menu" : res?.kind === "plate" ? "Your plate" : res?.kind === "barcode" ? "Barcode" : res ? "Label check" : busy ? "Reading…" : "Your photo";
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -202,7 +232,7 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
           onTypeDigits={() => setShowDigits(true)}
         />
       ) : preview && !plateSheet ? (
-        <PhotoStage src={preview} title={resultTitle} onClose={toCamera} busy={busy} stage={stage} mode={mode} short={!!res && !busy} />
+        <PhotoStage src={preview} title={resultTitle} onClose={toCamera} busy={busy} stage={stage} mode={mode} short={(!!res || !!menu) && !busy} />
       ) : null}
 
       {plateSheet ? null : (
@@ -218,7 +248,7 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
               <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showDigits} onClick={() => setShowDigits((v) => !v)}>
                 Type barcode digits
               </button>
-              {res || preview ? (
+              {res || preview || menu ? (
                 <button type="button" className="hit press py-2 text-[13px] font-semibold muted" aria-expanded={showNote} onClick={() => setShowNote((v) => !v)}>
                   Add a note
                 </button>
@@ -272,6 +302,7 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
           }
         />
       ) : null}
+      {menu ? <MenuResult key={menu.id ?? "menu"} result={menu} hideNumbers={profile.hide_numbers === true} /> : null}
       {opened ? <OpenedScan data={opened} onClose={() => setOpened(null)} /> : null}
 
       <History items={history} onOpen={open} />
@@ -1289,7 +1320,7 @@ function FloatChip({ label, value, tint, rot, style, onClick }: { label: string;
 
 // ---- history ----
 
-const KIND_LABEL: Record<string, string> = { label: "Label", barcode: "Barcode", photo: "Photo" };
+const KIND_LABEL: Record<string, string> = { label: "Label", barcode: "Barcode", photo: "Photo", menu: "Menu" };
 
 function History({ items, onOpen }: { items: ScanHistoryItem[]; onOpen: (i: ScanHistoryItem) => void }) {
   const router = useRouter();
@@ -1371,7 +1402,7 @@ function HistoryThumb({ item }: { item: ScanHistoryItem }) {
     </span>
   );
   // v2.4: a named product without its own photo gets the pack shot from the food-image service.
-  if (item.kind !== "photo" && item.product.trim()) return <FoodImage name={item.product} kind="product" size={44} fallback={icon} />;
+  if (item.kind !== "photo" && item.kind !== "menu" && item.product.trim()) return <FoodImage name={item.product} kind="product" size={44} fallback={icon} />;
   return icon;
 }
 
@@ -1388,7 +1419,9 @@ function OpenedScan({ data, onClose }: { data: Record<string, unknown>; onClose:
           </button>
         </div>
       </Rise>
-      {kind === "photo" ? (
+      {kind === "menu" ? (
+        <MenuResult result={data as unknown as MenuScanResult} />
+      ) : kind === "photo" ? (
         <>
           {typeof data.photo_url === "string" ? (
             <Rise index={2}>

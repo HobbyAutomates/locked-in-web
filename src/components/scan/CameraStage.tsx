@@ -15,13 +15,15 @@ import sc from "./scan.module.css";
  * in Barcode mode the preview is also polled for bars and the frame is taken as soon as one reads.
  */
 
-export type ScanMode = "food" | "barcode" | "label" | "facts";
+/** v2.13: "menu" sends the photo to the restaurant menu scan (/api/scan-menu) instead of /api/scan. */
+export type ScanMode = "food" | "barcode" | "label" | "facts" | "menu";
 
 export const MODES: { key: ScanMode; label: string; hint: string; title: string }[] = [
   { key: "food", label: "Scan food", hint: "Fit the whole plate in the frame", title: "Scan food" },
   { key: "barcode", label: "Barcode", hint: "Line up the bars inside the frame", title: "Barcode" },
   { key: "label", label: "Food label", hint: "Fit the front of the pack in the frame", title: "Food label" },
   { key: "facts", label: "Nutrition facts", hint: "Fill the frame with the nutrition table", title: "Nutrition facts" },
+  { key: "menu", label: "Menu", hint: "Fit the dishes on the menu in the frame", title: "Menu" },
 ];
 
 export const FRAME: Record<ScanMode, { w: string; h: string }> = {
@@ -29,6 +31,7 @@ export const FRAME: Record<ScanMode, { w: string; h: string }> = {
   barcode: { w: "74%", h: "20%" },
   label: { w: "64%", h: "44%" },
   facts: { w: "66%", h: "46%" },
+  menu: { w: "78%", h: "56%" },
 };
 
 // ---- thin line icons (24 grid, stroke 1.9, no emoji) ----
@@ -48,6 +51,7 @@ export const ICON = {
   barcode: "M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14",
   label: "M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8zM7 7h.01",
   facts: "M4 6h16M4 12h10M4 18h13",
+  menu: "M6 3h12v18H6zM9 8h6M9 12h6M9 16h4",
   pen: "M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z",
   camera: "M3 8h4l2-3h6l2 3h4v11H3zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
 } as const;
@@ -281,7 +285,7 @@ export default function CameraStage({
 
       {help ? (
         <div className={sc.help} role="note">
-          Point it at a pack&apos;s barcode, its nutrition label, or your plate: it works out which. The mode only sets the frame.
+          Point it at a pack&apos;s barcode, its nutrition label, or your plate: it works out which. Menu mode reads a restaurant menu and picks the best dish for what&apos;s left today.
           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             <button
               type="button"

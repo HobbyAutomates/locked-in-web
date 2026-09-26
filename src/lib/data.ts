@@ -331,7 +331,8 @@ export async function getScans(limit = 30): Promise<ScanHistoryItem[]> {
   return rows.map((r) => {
     const report = r.report ?? {};
     const info = (report.infographic ?? null) as { score_out_of_10?: number } | null;
-    const kind = (r.kind === "barcode" || r.kind === "photo" ? r.kind : r.kind === "plate" ? "photo" : "label") as ScanHistoryItem["kind"];
+    // v2.13: restaurant menu scans (schema_v36) keep their own kind.
+    const kind = (r.kind === "barcode" || r.kind === "photo" || r.kind === "menu" ? r.kind : r.kind === "plate" ? "photo" : "label") as ScanHistoryItem["kind"];
     const offImage = r.image_url ?? (typeof report.image_url === "string" ? report.image_url : null);
     return {
       id: r.id,
@@ -343,7 +344,7 @@ export async function getScans(limit = 30): Promise<ScanHistoryItem[]> {
       score: info?.score_out_of_10 ?? null,
       image_url: (r.thumb_path ? thumbs.get(r.thumb_path) : null) ?? offImage ?? (r.image_path ? plates.get(r.image_path) ?? null : null),
       image_path: r.image_path,
-      what_it_is: typeof report.what_it_is === "string" ? report.what_it_is.replace(/\s+/g, " ").trim() : kind === "photo" && typeof report.plate_note === "string" ? report.plate_note : "",
+      what_it_is: typeof report.what_it_is === "string" ? report.what_it_is.replace(/\s+/g, " ").trim() : kind === "photo" && typeof report.plate_note === "string" ? report.plate_note : kind === "menu" ? (r.verdict ?? "") : "",
     };
   });
 }
