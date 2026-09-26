@@ -19,13 +19,13 @@ alter table bandlog.profiles add constraint profiles_plan_check check (plan in (
 update bandlog.profiles set plan = 'beta' where plan is null or plan = 'free';
 
 -- Users may update their own profile row (policy "own profile"), so plan / pro_until are guarded:
--- only service_role (server) can change them. Clients silently keep the old values.
+-- only service_role (server) or the SQL console can change them. Clients silently keep the old values.
 create or replace function bandlog.guard_plan() returns trigger
 language plpgsql security definer set search_path = bandlog as $$
 begin
-  -- security definer makes current_user the owner, so check session_user (the SQL console runs
-  -- as postgres; API requests run as authenticator with a JWT role).
-  if coalesce(auth.role(), '') <> 'service_role' and session_user <> 'postgres' then
+  -- App requests carry a JWT role of authenticated/anon: they may never change plan / pro_until.
+  -- service_role (server) and the SQL console (no JWT) can. (Applied 2026-09-26 as v36 + v36b.)
+  if coalesce(auth.role(), '') in ('authenticated', 'anon') then
     new.plan := old.plan;
     new.pro_until := old.pro_until;
   end if;
