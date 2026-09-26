@@ -1,9 +1,10 @@
 "use client";
 
-import { useId } from "react";
 import { drawLen } from "./motion";
 
 /**
+ * v2.15: the owner preferred solid tracks, so the "remaining" part is a plain track again (the
+ * hatch pattern is kept for anything that still imports it).
  * v2.14 "Hatch = remaining" (canvas "Ember is earned", idea 02): rings and bars draw the done part
  * solid and what's still to go as a 45° hatch instead of a faint tint. Colour-blind safe, and it
  * keeps charts monochrome. `--hatch` is the line colour (ink or bone at ~30 %).
@@ -19,7 +20,7 @@ export function HatchPattern({ id, gap = 5, width = 1.6 }: { id: string; gap?: n
 }
 
 /** CSS background for a hatched bar track (the remaining part). */
-export const HATCH_BG = "repeating-linear-gradient(-45deg, var(--hatch) 0 1.4px, transparent 1.4px 5px)";
+export const HATCH_BG = "var(--track)";
 
 /** A mono ring: solid ink arc for what's done, hatched track for what's left. */
 export function HatchRing({
@@ -37,16 +38,12 @@ export function HatchRing({
   color?: string;
   children?: React.ReactNode;
 }) {
-  const id = `h${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const f = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0));
   const r = (size - stroke) / 2;
   return (
     <span className="relative grid place-items-center" style={{ width: size, height: size, flex: "none" }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute -rotate-90" aria-hidden="true">
-        <defs>
-          <HatchPattern id={id} />
-        </defs>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`url(#${id})`} strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke: "var(--track)" }} strokeWidth={stroke} />
         {f > 0 ? (
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} strokeLinecap="round" pathLength={1} className="m-draw" style={drawLen(f, delay, { stroke: color })} />
         ) : null}
