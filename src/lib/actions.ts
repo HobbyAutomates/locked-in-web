@@ -590,7 +590,7 @@ export async function deleteScan(id: string) {
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" }); // only this device, not every phone/browser
   redirect("/login");
 }
 
