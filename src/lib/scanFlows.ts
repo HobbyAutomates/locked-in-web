@@ -26,7 +26,7 @@ import { liveLookup } from "@/lib/liveFood";
 import { crossValidatePlateItem } from "@/lib/plateMatch";
 import { enrichItems } from "@/lib/itemSources";
 import { reportSourceInfo } from "@/lib/sourceInfo";
-import { RESTAURANT_MULTIPLIER, RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
+import { RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
 import { scanName } from "@/lib/scanNames";
 import type { ItemMicros, PlateEstimate, PlateItem } from "@/lib/types";
 import { toUsageEntry, type UsageEntry } from "@/lib/usage";
@@ -429,7 +429,9 @@ Nutrition per 100 g from your knowledge of the dish as cooked at home (with oil 
 
 Confidence: high when the dish and portion are clear, medium when the dish is clear but the portion is a guess, low when either is uncertain. List anything uncertain about an item in its uncertainties. If the picture is not food, set is_food=false with an empty items list.
 
-follow_up: only when ONE short question would meaningfully change the numbers (homemade vs restaurant, ghee added or not, a portion that could be much bigger or smaller than it looks) — 2-3 short options, each with an effect from the fixed list in the tool schema. Skip it when nothing is genuinely ambiguous; don't ask just to ask.`;
+follow_up: only when ONE short question would meaningfully change the numbers (homemade vs restaurant, ghee added or not, a portion that could be much bigger or smaller than it looks) — 2-3 short options, each with an effect from the fixed list in the tool schema, and each option's label must literally describe its effect ("Made with ghee" -> add_ghee, "Ordered in" -> restaurant, "Smaller than it looks" -> smaller). NEVER ask what the food is ("What's the base of this dish?") — those answers can't be expressed as effects; name your best guess instead and put the doubt in uncertainties. Skip it when nothing is genuinely ambiguous; don't ask just to ask.
+
+Bowls with liquid: for cereal, muesli, oats or granola in milk, a smoothie, a shake or a porridge, estimate the dry part and the liquid SEPARATELY as two items (e.g. "muesli" 40 g and "milk" 100 ml ≈ 103 g), never one blended "muesli with milk" item at dry-cereal density. A typical breakfast bowl is 30–60 g of cereal. If the bowl is partly eaten, estimate only what is left in the photo unless the note says otherwise.`;
 
 const CONF = new Set(["high", "medium", "low"]);
 
@@ -452,13 +454,30 @@ type PlateRaw = { items?: Record<string, unknown>[]; notes?: string[]; plate_not
 
 /** A well-formed `follow_up`: a non-empty question and 2+ options with a label and a recognised effect. */
 const KNOWN_EFFECTS = new Set(["restaurant", "homemade", "add_ghee", "no_oil", "smaller", "bigger"]);
+/**
+ * v2.15: each answer's words must actually say what its effect does. The model once asked "What's the
+ * base of this dish?" and wired "Protein shake with granola" to add_ghee — an identity question the
+ * fixed effects can't express. If ANY option's label doesn't fit its effect, the whole question is
+ * dropped (a wrong button is worse than no question). "homemade" also accepts a plain "no/none".
+ */
+const EFFECT_WORDS: Record<string, RegExp> = {
+  restaurant: /restaurant|outside|hotel|ordered|order|cafe|café|dhaba|takeaway|take-away|delivery|swiggy|zomato|canteen|mess|bought/i,
+  homemade: /home|made it|cooked it|mom|mum|maa|myself|no|none|normal|regular/i,
+  add_ghee: /ghee|butter|oil|tadka|fried|makhan|cream/i,
+  no_oil: /no oil|without|oil-free|oil free|less oil|dry|steamed|boiled|grilled|air/i,
+  smaller: /small|less|half|little|few|light|kid|mini|smaller/i,
+  bigger: /big|more|large|extra|full|double|second|heap|bigger|lots/i,
+};
+export function labelFitsEffect(label: string, effect: string): boolean {
+  const re = EFFECT_WORDS[effect];
+  return !!re && re.test(label);
+}
 function cleanFollowUp(raw: PlateRaw["follow_up"]): PlateEstimate["follow_up"] {
   const question = String(raw?.question ?? "").trim();
-  const options = (raw?.options ?? [])
-    .map((o) => ({ label: String(o?.label ?? "").trim(), effect: String(o?.effect ?? "") }))
-    .filter((o) => o.label && KNOWN_EFFECTS.has(o.effect));
-  if (!question || options.length < 2) return null;
-  return { question, options };
+  const all = (raw?.options ?? []).map((o) => ({ label: String(o?.label ?? "").trim(), effect: String(o?.effect ?? "") })).filter((o) => o.label);
+  if (!question || all.length < 2) return null;
+  if (all.some((o) => !KNOWN_EFFECTS.has(o.effect) || !labelFitsEffect(o.label, o.effect))) return null;
+  return { question, options: all };
 }
 
 /** Loose runtime shape check on `plate_estimate` output — every provider's structured JSON gets this,
@@ -566,28 +585,16 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
   //    plateMatch.ts. Living here means the fused classifier plate and plateFlow share the same rule.
   const items: PlateItem[] = await Promise.all(rawItems.map((it) => crossValidatePlateItem(it, { search: searchFoods, live: liveLookup })));
 
-  // 2b. Eaten out? Restaurant words in the note or the model's own description scale every portion
-  //     ×1.4 and add the hidden teaspoon of oil to curries / dal / sabzi — same rule as the Quantity sheet.
+  // 2b. Eaten out? v2.15: a PHOTO already shows the real portion, so the ×1.4 restaurant multiplier
+  //     (meant for typed meals like "1 plate biryani") no longer scales photo grams — it double-counted
+  //     (a 754 kcal sandwich became 923+). Only the hidden teaspoon of oil on curries / dal / sabzi stays.
   const noteText = String(note ?? "");
   const restaurant = mentionsRestaurant(`${noteText} ${String(raw.plate_note ?? "")}`);
   const scaledItems: PlateItem[] = restaurant
     ? items.map((it) => {
-        const k = RESTAURANT_MULTIPLIER;
         const oil = restaurantOil(it.name, null) ? RESTAURANT_OIL_G : 0;
-        const micros: ItemMicros = {};
-        for (const [key, v] of Object.entries(it.micros ?? {})) if (v != null) micros[key as keyof ItemMicros] = Math.round(v * k * 10) / 10;
-        return {
-          ...it,
-          grams: Math.round(it.grams * k),
-          grams_low: it.grams_low != null ? Math.round(it.grams_low * k) : it.grams_low,
-          grams_high: it.grams_high != null ? Math.round(it.grams_high * k) : it.grams_high,
-          calories: Math.round(it.calories * k + oil * 8.84),
-          protein_g: Math.round(it.protein_g * k * 10) / 10,
-          carbs_g: Math.round(it.carbs_g * k * 10) / 10,
-          fat_g: Math.round((it.fat_g * k + oil) * 10) / 10,
-          micros,
-          cooked_in: "restaurant",
-        };
+        if (!oil) return { ...it, cooked_in: "restaurant" };
+        return { ...it, calories: Math.round(it.calories + oil * 8.84), fat_g: Math.round((it.fat_g + oil) * 10) / 10, cooked_in: "restaurant" };
       })
     : items;
 
@@ -605,7 +612,7 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
     // A failed upload never blocks the estimate.
   }
   const notes = (raw.notes ?? []).map(String);
-  if (restaurant) notes.unshift(`Restaurant portion: amounts ×${RESTAURANT_MULTIPLIER}, plus 1 tsp hidden oil on curries, dal and sabzi.`);
+  if (restaurant) notes.unshift("Restaurant food: portion as seen in the photo, plus 1 tsp hidden oil on curries, dal and sabzi.");
   const plate_note = String(raw.plate_note ?? "");
   const portion_hint = restaurant ? ("restaurant" as const) : null;
   const follow_up = cleanFollowUp(raw.follow_up);

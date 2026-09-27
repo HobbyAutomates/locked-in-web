@@ -96,8 +96,8 @@ for (const c of cases) {
 // ---- plateFromEstimate's per-item cross-validation (src/lib/plateMatch.ts): the same code both the
 //      standalone plateFlow and the fused classifier plate (/api/scan's plate_estimate) run. ----
 
-function plateItem(name: string, grams: number): PlateItem {
-  return { name, grams, confidence: "medium", calories: 999, protein_g: 0, carbs_g: 0, fat_g: 0, micros: {}, source: "estimated", food_id: null };
+function plateItem(name: string, grams: number, calories = Math.round(grams * 0.18)): PlateItem {
+  return { name, grams, confidence: "medium", calories, protein_g: 0, carbs_g: 0, fat_g: 0, micros: {}, source: "estimated", food_id: null };
 }
 function withMacros(h: FoodHit, calories: number): FoodHit {
   return { ...h, calories, protein_g: 1, carbs_g: 3, fat_g: 0.1 };
@@ -111,8 +111,12 @@ const plainCucumber = withMacros(hit("Cucumber", "ifct", 0.9, true), 16);
 
 const plateCases: PlateCase[] = [
   { why: "cucumber vs the soup row: rejected, falls back to the live lookup (AI numbers stay labelled estimated)", item: plateItem("cucumber", 200), table: [soup], live: liveCucumber, expectSource: "estimated", expectFoodId: null, expectKcal: 30, expectLiveCalls: 1 },
-  { why: "cucumber vs the soup row, live lookup down: the model's own estimate stands", item: plateItem("cucumber", 200), table: [soup], live: null, expectSource: "estimated", expectFoodId: null, expectKcal: 999, expectLiveCalls: 1 },
+  { why: "cucumber vs the soup row, live lookup down: the model's own estimate stands", item: plateItem("cucumber", 200), table: [soup], live: null, expectSource: "estimated", expectFoodId: null, expectKcal: 36, expectLiveCalls: 1 },
   { why: "an acceptable table row wins without calling the live lookup", item: plateItem("cucumber", 100), table: [plainCucumber], live: liveCucumber, expectSource: "table", expectFoodId: plainCucumber.id, expectKcal: 16, expectLiveCalls: 0 },
+  // v2.15: the owner's muesli bowl (40 g muesli + 100 ml milk ≈ 190 kcal). The photo read was 180 g / 252 kcal;
+  // the live lookup answered with dry muesli (380/100 g) and the scan said 684. The density guard keeps the photo read.
+  { why: "soaked muesli with milk: a dry-muesli live lookup (380/100 g vs 140) is rejected, the photo read stands", item: plateItem("chocolate protein oats/muesli with milk", 180, 252), table: [], live: withMacros(hit("muesli", "ai", 1, true), 380), expectSource: "estimated", expectFoodId: null, expectKcal: 252, expectLiveCalls: 1 },
+  { why: "a table row 3x denser than what the photo shows is rejected too; a sane live lookup then wins", item: plateItem("dal", 150, 150), table: [withMacros(hit("Dal", "ifct", 0.95, true), 330)], live: withMacros(hit("dal", "ai", 1, true), 110), expectSource: "estimated", expectFoodId: null, expectKcal: 165, expectLiveCalls: 1 },
 ];
 
 async function runPlateCases() {
