@@ -155,3 +155,22 @@ web does exactly this in `src/lib/actions.ts`).
   Photos never read the food database any more.
 - Typed text (`/api/parse-meal`): items the database doesn't know are looked up on the web
   (≤ ~25 s). Show "Searching the web for <item>…" while it runs; set the client timeout to ≥ 60 s.
+
+---
+
+## Buddy requests (schema_v39 RPCs, called straight through PostgREST)
+
+`docs/schema_v39.sql`, **not applied yet**. Until it is, both calls fail with `PGRST202` /
+"Could not find the function": hide "Your squadmates" and the Home "Buddy up with …?" button and
+keep the v2.14 buddy page.
+
+- `rpc/buddy_candidates` `{}` → `[{ user_id, name, avatar_path, squads }]` — squadmates who aren't
+  your buddy yet, by name; `squads` is the shared squad names joined with ", ".
+- `rpc/buddy_request` `{ "other": "<uuid>" }` → `"AB12CD"` (your invite code) or `null` (already
+  buddies). Notifies them (kind `buddy`, url `/buddy/AB12CD`); a repeat within 24 h returns the
+  code without a second notification. Raises "You can only invite squadmates here. Share a link
+  instead." when you share no squad. Show "Sent" in the row on success.
+- `buddy_accept` / `buddy_invite_info` keep their signatures; a used code now still works for
+  anyone its owner sent it to as a request.
+- Push: the web sends the push right away; from Android the notification row is pushed by the next
+  cron tick (same as a nudge sent without the web).

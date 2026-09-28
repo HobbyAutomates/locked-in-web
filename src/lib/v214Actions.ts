@@ -96,3 +96,33 @@ export async function removeBuddy(buddyId: string): Promise<R<object>> {
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+/** v2.15 (schema_v39): a squadmate who isn't my buddy yet. */
+export type BuddyCandidate = { user_id: string; name: string; avatar_path: string | null; squads: string };
+
+/** Squadmates I could buddy up with. `unavailable` until schema_v39 is applied (hide the list). */
+export async function loadBuddyCandidates(): Promise<R<{ candidates: BuddyCandidate[] }>> {
+  const { supabase, user } = await me();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const { data, error } = await supabase.rpc("buddy_candidates");
+  if (error) return fail(error, "Couldn't load squadmates");
+  return { ok: true, candidates: ((data ?? []) as BuddyCandidate[]).map((c) => ({ ...c, name: c.name || "Squadmate", squads: c.squads ?? "" })) };
+}
+
+/**
+ * Send a squadmate a buddy request (a notification that opens /buddy/<my code>). `code` is null
+ * when you're already buddies. Repeats inside 24 h succeed without a second notification.
+ */
+export async function buddyRequest(otherId: string): Promise<R<{ code: string | null }>> {
+  const { supabase, user } = await me();
+  if (!user) return { ok: false, error: "Not signed in" };
+  const { data, error } = await supabase.rpc("buddy_request", { other: otherId });
+  if (error) return fail(error, "Couldn't send the request");
+  // Push it now (no-op without VAPID keys), like buddy nudges.
+  if (typeof data === "string") {
+    const { adminClient } = await import("./apiAuth");
+    const { dispatchQuietly } = await import("./push");
+    await dispatchQuietly(adminClient, otherId);
+  }
+  return { ok: true, code: typeof data === "string" ? data : null };
+}

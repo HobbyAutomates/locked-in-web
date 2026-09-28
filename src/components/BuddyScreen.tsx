@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { WEB_URL } from "@/lib/squadPosts";
-import { buddyAccept, buddyInvite, buddyNudge, loadBuddies, removeBuddy, type Buddy } from "@/lib/v214Actions";
+import { buddyAccept, buddyInvite, buddyNudge, buddyRequest, loadBuddies, loadBuddyCandidates, removeBuddy, type Buddy, type BuddyCandidate } from "@/lib/v214Actions";
+import { Avatar } from "./Avatar";
 import { ErrorNote } from "./ui";
 import { Flame } from "./icons";
 import { COMING_SOON } from "@/lib/v36";
@@ -12,6 +13,7 @@ import { COMING_SOON } from "@/lib/v36";
  * v2.14 buddy streaks (/buddy). Both log = the streak grows; one skips = the other can nudge;
  * break it and you both start over. Invite by link / code, or type a buddy's code. `invite`
  * opens the share sheet straight away (the onboarding's "Invite a buddy").
+ * v2.15: "Your squadmates" on top — one tap sends a buddy request (schema_v39; hidden without it).
  */
 export const buddyLink = (code: string) => `${WEB_URL}/buddy/${code}`;
 
@@ -24,6 +26,8 @@ export default function BuddyScreen({ autoInvite = false, code: incoming = null,
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mates, setMates] = useState<BuddyCandidate[]>([]);
+  const [sent, setSent] = useState<Record<string, "sending" | "sent" | "buddies">>({});
 
   const apply = (r: Awaited<ReturnType<typeof loadBuddies>>) => {
     if (r.ok) setList(r.buddies);
@@ -32,9 +36,16 @@ export default function BuddyScreen({ autoInvite = false, code: incoming = null,
       if (r.unavailable) setUnavailable(true);
     }
   };
-  const refresh = () => loadBuddies().then(apply);
+  const loadMates = () =>
+    loadBuddyCandidates()
+      .then((r) => setMates(r.ok ? r.candidates : []))
+      .catch(() => setMates([]));
+  const refresh = () => Promise.all([loadBuddies().then(apply), loadMates()]);
   useEffect(() => {
     let live = true;
+    loadBuddyCandidates()
+      .then((r) => live && setMates(r.ok ? r.candidates : []))
+      .catch(() => undefined);
     loadBuddies().then((r) => {
       if (!live) return;
       apply(r);
@@ -70,6 +81,21 @@ export default function BuddyScreen({ autoInvite = false, code: incoming = null,
   }
 
 
+  async function request(m: BuddyCandidate) {
+    setErr(null);
+    setSent((s) => ({ ...s, [m.user_id]: "sending" }));
+    const r = await buddyRequest(m.user_id);
+    if (!r.ok) {
+      setSent((s) => {
+        const next = { ...s };
+        delete next[m.user_id];
+        return next;
+      });
+      return setErr(r.error);
+    }
+    setSent((s) => ({ ...s, [m.user_id]: r.code ? "sent" : "buddies" }));
+  }
+
   async function accept(c: string) {
     setBusy(true);
     setErr(null);
@@ -99,6 +125,36 @@ export default function BuddyScreen({ autoInvite = false, code: incoming = null,
           <button type="button" className="pill press" style={{ background: "var(--ember)", color: "var(--ember-ink)" }} disabled={busy} onClick={() => void accept(incoming)}>
             {busy ? "Joining…" : "Lock in together"}
           </button>
+        </div>
+      ) : null}
+
+      {mates.length ? (
+        <div className="card flex flex-col gap-3">
+          <div>
+            <p className="m-0 text-[17px] font-bold">Your squadmates</p>
+            <p className="m-0 mt-0.5 text-sm muted">Both log daily and the streak grows. One skips, the other can nudge.</p>
+          </div>
+          {mates.map((m) => {
+            const state = sent[m.user_id];
+            return (
+              <div key={m.user_id} className="flex items-center gap-3">
+                <Avatar path={m.avatar_path} name={m.name} size={42} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[15px] font-bold">{m.name}</div>
+                  {m.squads ? <div className="truncate text-xs muted">{m.squads}</div> : null}
+                </div>
+                <button
+                  type="button"
+                  className="press shrink-0 rounded-full px-3.5 py-2 text-[13px] font-bold"
+                  style={state ? { background: "var(--card2)", color: "var(--ink)", border: 0 } : { background: "var(--ember)", color: "var(--ember-ink)", border: 0 }}
+                  disabled={!!state}
+                  onClick={() => void request(m)}
+                >
+                  {state === "sent" ? "Sent" : state === "buddies" ? "Buddies" : state === "sending" ? "Sending…" : "Send buddy request"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       ) : null}
 
@@ -156,7 +212,7 @@ export default function BuddyScreen({ autoInvite = false, code: incoming = null,
 
       <div className="card flex flex-col gap-3">
         <p className="m-0 text-[17px] font-bold">Invite a buddy</p>
-        <p className="m-0 text-sm muted">Both log = streak grows. One skips = the other gets to nudge. Break it and you both start over.</p>
+        <p className="m-0 text-sm muted">Not in a squad yet? Send them a link.</p>
         {code ? (
           <p className="display num m-0 text-center text-[34px] font-extrabold" style={{ letterSpacing: "0.12em" }}>
             {code}
