@@ -19,7 +19,8 @@ import { InfoButton, SourceSheet, VariantChips } from "./SourceSheet";
 import { needsCheck, reportSourceInfo, sourceInfoFor } from "@/lib/sourceInfo";
 import { swapToVariant, type FoodVariant } from "@/lib/variants";
 import { track } from "@/lib/track";
-import { defaultMealType } from "@/lib/mealType";
+import { defaultMealType, mealTypeLabel, type MealType } from "@/lib/mealType";
+import { LogItCard, MealSlotChips } from "./scan/LogIt";
 import CameraStage, { ScanIcon, type ScanMode } from "./scan/CameraStage";
 import PhotoStage from "./scan/PhotoStage";
 import sc from "./scan/scan.module.css";
@@ -469,6 +470,9 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
   const [logFood, setLogFood] = useState<QuantityFood | null>(null);
   const [logged, setLogged] = useState<string | null>(null);
   const [logErr, setLogErr] = useState<string | null>(null);
+  // v2.17: which meal it goes into (the hour rule picks, like Home) and a busy flag for "Log to …".
+  const [slot, setSlot] = useState<MealType>(() => defaultMealType());
+  const [logging, setLogging] = useState(false);
   const food = reportFood(r);
 
   if (!r.readable) {
@@ -491,13 +495,17 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
   async function logServing(item: MealItem) {
     setLogFood(null);
     setLogErr(null);
+    setLogging(true);
     try {
-      await saveMeal({ date: today(), raw_text: `${r.product || "Scanned product"} (scan)`, items: [item] });
+      // v2.17: into the chosen meal (Breakfast / Lunch / Dinner / Snacks), not just the hour's default.
+      await saveMeal({ date: today(), raw_text: `${r.product || "Scanned product"} (scan)`, items: [{ ...item, image_url: r.image_url ?? null }], meal_type: slot });
       track("meal_logged", { method: r.kind === "barcode" ? "barcode" : "label", items: 1, from: "scan" });
-      setLogged(`Logged ${item.servings != null && item.unit === "serving" ? `${fmt(item.servings)} serving${item.servings === 1 ? "" : "s"}` : `${Math.round(item.grams)} g`} · ${Math.round(item.calories)} kcal`);
+      setLogged(`Logged ${item.servings != null && item.unit === "serving" ? `${fmt(item.servings)} serving${item.servings === 1 ? "" : "s"}` : `${Math.round(item.grams)} g`} · ${Math.round(item.calories)} kcal to ${mealTypeLabel(slot)}`);
       router.refresh();
     } catch (e) {
       setLogErr(e instanceof Error ? e.message : "Could not log that");
+    } finally {
+      setLogging(false);
     }
   }
 
@@ -550,11 +558,11 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
 
       {food ? (
         <Rise index={3}>
-          <PillButton onClick={() => setLogFood(food)}>Log 1 serving{r.serving_g ? ` · ${Math.round(r.serving_g)} g` : ""}</PillButton>
+          <LogItCard food={food} slot={slot} onSlot={setSlot} busy={logging} onLog={(item) => void logServing(item)} onAdjust={() => setLogFood(food)} />
           <PillButton
             soft
             height={46}
-            className="mt-2"
+            className="mt-2.5"
             onClick={() => {
               const serving = food.servings[0];
               const item = priceItem(food, serving ? { unit: "serving", value: 1 } : { unit: "g", value: 100 });
@@ -567,7 +575,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
           {logged ? (
             <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-semibold" style={{ color: "var(--green)" }}>
               <Check size={14} />
-              {logged} — on Home
+              {logged}. It&apos;s on Home
             </p>
           ) : null}
           {logErr ? <p className="mt-2 text-center text-xs" style={{ color: "var(--danger)" }}>{logErr}</p> : null}
@@ -595,7 +603,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
           </AnimatePresence>
         </div>
       </Rise>
-      <QuantitySheet food={logFood} title="Log from this scan" cta="Log" accuracy={{ inputKind: r.kind === "barcode" ? "barcode" : "label", scanId: r.id ?? null, rawInput: r.product ?? null }} onClose={() => setLogFood(null)} onDone={(item) => void logServing(item)} />
+      <QuantitySheet food={logFood} title="Log from this scan" cta={`Log to ${mealTypeLabel(slot)}`} accuracy={{ inputKind: r.kind === "barcode" ? "barcode" : "label", scanId: r.id ?? null, rawInput: r.product ?? null }} onClose={() => setLogFood(null)} onDone={(item) => void logServing(item)} />
     </>
   );
 }
@@ -1070,7 +1078,7 @@ function GramsInput({ original, current, onScale }: { original: PlateItem; curre
  * The plate estimate (v2.12 "Scan 2 · meal result"): with a `photo`, the photo fills the top with
  * floating Calories / Protein chips and everything else sits in a sheet that rises over it: the
  * total with its ± range, the follow-up question, each item with its gram range, confidence, the
- * sources button and the "Which one?" picker, then "Log as <meal>". The logic (edits, variants,
+ * sources button and the "Which one?" picker, then (v2.17) the meal chips and "Log to <meal>". The logic (edits, variants,
  * follow-up effects, saving) is unchanged from v2.9.
  */
 export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }: { plate: PlateEstimate; onSaved?: () => void; readOnly?: boolean; photo?: string | null; onClose?: () => void; extra?: React.ReactNode }) {
@@ -1144,7 +1152,8 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
     listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     listRef.current?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
   };
-  const meal = defaultMealType();
+  // v2.17: which meal this plate goes into; the hour rule picks, one tap changes it.
+  const [slot, setSlot] = useState<MealType>(() => defaultMealType());
 
   const body = (
     <>
@@ -1259,7 +1268,8 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
       {plate.notes.length ? <p className="px-1 text-xs muted">{plate.notes.join(" · ")}</p> : null}
       <ErrorNote text={error} />
       {!readOnly ? (
-        <div>
+        <div className="flex flex-col gap-2.5">
+          <MealSlotChips value={slot} onChange={setSlot} />
           <PillButton
             disabled={saving || !items.length}
             onClick={() =>
@@ -1270,6 +1280,7 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
                     raw_text: plate.plate_note || items.map((i) => i.name).join(", "),
                     photo_path: plate.photo_path ?? null,
                     items: items.map(mealItemFromPlate),
+                    meal_type: slot,
                   });
                   track("meal_logged", { method: "photo", items: items.length, from: "scan" });
                   accept("log");
@@ -1282,7 +1293,7 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
               })
             }
           >
-            {saving ? <Spinner size={18} /> : `Log as ${meal}`}
+            {saving ? <Spinner size={18} /> : `Log to ${mealTypeLabel(slot)}`}
           </PillButton>
           <button
             type="button"
