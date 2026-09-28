@@ -15,8 +15,25 @@ export const TOUR_DONE_KEY = "li-tour-v216-done";
 /** Set to "1" by Preferences → "Replay the tour"; cleared when the tour ends. */
 export const TOUR_REPLAY_KEY = "li-tour-v216-replay";
 
-/** Replay always shows; otherwise only when neither this device nor the account has seen it. */
-export function tourShouldShow(s: { done: boolean; replay: boolean; serverSeen: boolean }): boolean {
+/**
+ * v2.17: the tour is for accounts created after the v2.16 release only. Existing users never see it
+ * (schema_v41 also marks every existing profile as seen); this client check covers the time before
+ * v41 is applied. Android: the same instant in ui/tour/Tour.kt.
+ */
+export const TOUR_NEW_USERS_FROM = "2026-09-28T21:00:00Z";
+
+/** True when the account was created strictly after the v2.16 release. Unknown / unreadable = false. */
+export function isNewForTour(createdAt: string | null | undefined): boolean {
+  if (!createdAt) return false;
+  const t = Date.parse(createdAt.trim().replace(" ", "T"));
+  return Number.isFinite(t) && t > Date.parse(TOUR_NEW_USERS_FROM);
+}
+
+/**
+ * Replay (Preferences → "Replay the tour") always shows, for anyone. Otherwise only a new account
+ * (see isNewForTour) that neither this device nor the account (profiles.tour_seen_at) has seen.
+ */
+export function tourShouldShow(s: { done: boolean; replay: boolean; serverSeen: boolean; createdAt: string | null | undefined }): boolean {
   if (s.replay) return true;
-  return !s.done && !s.serverSeen;
+  return !s.done && !s.serverSeen && isNewForTour(s.createdAt);
 }

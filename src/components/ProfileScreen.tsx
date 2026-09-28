@@ -17,7 +17,7 @@ import { TierLabel } from "./Medal";
 import { jewelItems, nextJewel } from "@/lib/jewels";
 import { COVER_STORAGE_KEY, DEFAULT_COVER, isCoverId } from "@/lib/covers";
 import { saveCoverPreset } from "@/lib/v216Actions";
-import { isFoundingMember } from "@/lib/founder";
+import type { MemberPlate } from "@/lib/memberPlate";
 import { Jewel } from "./Jewel";
 import { Cover } from "./Cover";
 import CoverPicker from "./CoverPicker";
@@ -56,6 +56,7 @@ export default function ProfileScreen({
   isAdmin = false,
   proLabel = "Beta",
   cover = { available: false, preset: null },
+  plate = null,
 }: {
   profile: Profile;
   email: string;
@@ -72,6 +73,8 @@ export default function ProfileScreen({
   proLabel?: string;
   /** v2.16 (schema_v40): the saved cover; available false = column not there yet (local storage then). */
   cover?: { available: boolean; preset: string | null };
+  /** v2.17 (schema_v41): FOUNDER, "OG #nn" or none (lib/memberPlate.ts). Null before v41 = no plate. */
+  plate?: MemberPlate | null;
 }) {
   const router = useRouter();
   const [sheet, setSheet] = useState<null | "news" | "home" | "edit">(null);
@@ -91,7 +94,6 @@ export default function ProfileScreen({
   const eta = goalEta(current, goal, slopePerDay(weightTrend(weights, today, 30)), profile.goal_speed_kg_wk, today);
   const reminders = onCount(profile.reminders);
   const joinedText = monthYear(joined);
-  const founder = isFoundingMember(joined);
   const place = [squadName, joinedText ? `since ${joinedText}` : null].filter(Boolean).join(" · ");
   const [coverId, setCoverId] = useState<string>(isCoverId(cover.preset) ? cover.preset : DEFAULT_COVER);
   const [picker, setPicker] = useState(false);
@@ -194,12 +196,10 @@ export default function ProfileScreen({
                   Create a username
                 </button>
               )}
-              {founder ? (
+              {plate ? (
                 <>
                   <span aria-hidden="true" className="inline-block h-[3px] w-[3px] rounded-full" style={{ background: "var(--muted)" }} />
-                  <span className="inline-flex h-[22px] items-center rounded-md px-[9px] text-[9.5px] font-bold" style={{ background: "linear-gradient(135deg, var(--gold), var(--gold-deep))", color: "#1a1206", letterSpacing: ".14em", boxShadow: "0 4px 12px rgba(168,130,58,.35)" }} title="Founding member">
-                    FOUNDER
-                  </span>
+                  <PlateBadge plate={plate} />
                 </>
               ) : null}
             </p>
@@ -502,6 +502,29 @@ function BadgeShelf({ progress }: { progress: BadgeProgress }) {
         <NextUp next={next} bare />
       </div>
     </section>
+  );
+}
+
+// ---------------------------------------------------------------- member plate
+
+/**
+ * v2.17 member plate: the gold FOUNDER plate (the owner only), or the same plate in gunmetal with a
+ * silver face for "OG #07" (the first 50 accounts), so FOUNDER stays the special one.
+ */
+function PlateBadge({ plate }: { plate: MemberPlate }) {
+  const founder = plate.kind === "founder";
+  return (
+    <span
+      className="inline-flex h-[22px] items-center rounded-md px-[9px] text-[9.5px] font-bold"
+      style={
+        founder
+          ? { background: "linear-gradient(135deg, var(--gold), var(--gold-deep))", color: "#1a1206", letterSpacing: ".14em", boxShadow: "0 4px 12px rgba(168,130,58,.35)" }
+          : { background: "linear-gradient(135deg, #c9ccd2 0%, #7d828b 45%, #3a3d43 100%)", color: "#f4f5f7", letterSpacing: ".14em", boxShadow: "inset 0 1px 0 rgba(255,255,255,.35), 0 4px 12px rgba(40,42,48,.35)", textShadow: "0 1px 0 rgba(0,0,0,.35)" }
+      }
+      title={founder ? "Founder" : "One of the first 50 members"}
+    >
+      {plate.label}
+    </span>
   );
 }
 

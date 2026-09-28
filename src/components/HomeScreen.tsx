@@ -61,11 +61,13 @@ type Props = {
   milestonesSeen?: string[] | null;
   /** v2.16 (schema_v40): the account has seen the first-run tour. */
   tourSeen?: boolean;
+  /** v2.17: when the account was created (the tour is for accounts after the v2.16 release only). */
+  createdAt?: string | null;
   /** v2.16: badge progress, for the unlock moment when one is newly earned. */
   badges?: BadgeProgress | null;
 };
 
-export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [], checkin = null, fast = null, onboardedV2 = null, milestonesSeen = null, tourSeen = false, badges = null }: Props) {
+export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [], checkin = null, fast = null, onboardedV2 = null, milestonesSeen = null, tourSeen = false, createdAt = null, badges = null }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(today);
   const { pending, savedCount, error } = usePendingMeals();
@@ -144,7 +146,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   return (
     <div className="flex flex-col gap-3.5">
       <DayGlow level={glow} />
-      <GuidedTour serverSeen={tourSeen} />
+      <GuidedTour serverSeen={tourSeen} createdAt={createdAt} />
       {badges ? <BadgeUnlock progress={badges} /> : null}
       <MilestoneFlood
         serverSeen={milestonesSeen}

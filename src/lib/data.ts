@@ -603,6 +603,23 @@ export async function getV216Profile(): Promise<{ available: boolean; coverPrese
 }
 
 /**
+ * v2.17 (schema_v41): the member plate columns and when the profile was created (the tour is for
+ * accounts after the v2.16 release). A database without v41 falls back to created_at alone, and
+ * the plate columns read as null (no plate at all, never FOUNDER).
+ */
+export async function getV217Profile(): Promise<{ memberNo: number | null; isFounder: boolean | null; createdAt: string | null }> {
+  const supabase = await createClient();
+  const full = await supabase.from("profiles").select("member_no, is_founder, created_at").maybeSingle();
+  if (!full.error) {
+    const d = (full.data ?? {}) as { member_no?: number | string | null; is_founder?: boolean | null; created_at?: string | null };
+    const n = d.member_no == null ? null : Number(d.member_no);
+    return { memberNo: n != null && Number.isFinite(n) ? n : null, isFounder: typeof d.is_founder === "boolean" ? d.is_founder : null, createdAt: d.created_at ?? null };
+  }
+  const base = await supabase.from("profiles").select("created_at").maybeSingle();
+  return { memberNo: null, isFounder: null, createdAt: ((base.data ?? null) as { created_at?: string | null } | null)?.created_at ?? null };
+}
+
+/**
  * v2.16 premium squad list: per squad, the leaderboard (avatars, best streak, am I #1) and the
  * newest posts (latest activity line, friends who logged today). Photo URLs aren't signed here.
  * Any squad that fails just gets an empty card.

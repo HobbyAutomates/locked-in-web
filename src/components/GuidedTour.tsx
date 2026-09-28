@@ -34,10 +34,11 @@ function local(key: string): string | null {
 /**
  * v2.16 first-run tour (boards TourF1–TourF5), over Home: a dim layer with a rounded spotlight on
  * each stop and a pulsing ember outline, plus a card ("n OF 5", title, text, dots, Skip tour, Next /
- * Let's go). Shown once: remembered on this device and, with schema_v40, on the account.
+ * Let's go). Shown once, and (v2.17) only to accounts created after the v2.16 release: remembered on
+ * this device and, with schema_v40, on the account.
  * Preferences → "Replay the tour" sets a local flag that brings it back on the next Home visit.
  */
-export default function GuidedTour({ serverSeen }: { serverSeen: boolean }) {
+export default function GuidedTour({ serverSeen, createdAt = null }: { serverSeen: boolean; /** v2.17: the account's sign-up time (only accounts after the v2.16 release get the tour). */ createdAt?: string | null }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
@@ -45,12 +46,12 @@ export default function GuidedTour({ serverSeen }: { serverSeen: boolean }) {
   const [vh, setVh] = useState(844);
 
   useEffect(() => {
-    const show = tourShouldShow({ done: local(TOUR_DONE_KEY) === "1", replay: local(TOUR_REPLAY_KEY) === "1", serverSeen });
+    const show = tourShouldShow({ done: local(TOUR_DONE_KEY) === "1", replay: local(TOUR_REPLAY_KEY) === "1", serverSeen, createdAt });
     if (!show) return;
     // Let Home's entrance animations settle first.
     const t = setTimeout(() => setOpen(true), 900);
     return () => clearTimeout(t);
-  }, [serverSeen]);
+  }, [serverSeen, createdAt]);
 
   const cur = TOUR_STEPS[step];
 

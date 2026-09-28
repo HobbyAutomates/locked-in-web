@@ -1,4 +1,4 @@
-import { getBadgeProgress, getDashboard, getMyNudges, getV216Profile, getWater } from "@/lib/data";
+import { getBadgeProgress, getDashboard, getMyNudges, getV216Profile, getV217Profile, getWater } from "@/lib/data";
 import { getFasting, getNutritionSettings, getWeeklyCheckin } from "@/lib/nutrition-data";
 import { addDays, today as todayIso } from "@/lib/dates";
 import { ageYears, isTeen } from "@/lib/goals";
@@ -23,11 +23,12 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const [{ today, profile, workouts, meals, exercises }, nudges, sp, water, settings, v214] = await Promise.all([getDashboard(), getMyNudges(), searchParams, getWater(addDays(t, -7), t), getNutritionSettings(), getV214Home()]);
   // v2.13: the Monday check-in (computed once a week when adaptive targets are on) and a running fast.
   const teen = isTeen(ageYears(profile.dob));
-  const [checkin, fasting, v216, badges] = await Promise.all([
+  const [checkin, fasting, v216, badges, v217] = await Promise.all([
     getWeeklyCheckin(profile, settings, meals),
     teen || !settings.available ? Promise.resolve(null) : getFasting(),
     getV216Profile(),
     getBadgeProgress(profile, workouts, meals).catch(() => null),
+    getV217Profile().catch(() => ({ memberNo: null, isFounder: null, createdAt: null })),
   ]);
   const workoutDates = workouts.map((w) => w.date);
   // v2.5: cardio / sport / yoga on the exercise log count toward the week streak too.
@@ -53,6 +54,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       onboardedV2={v214.onboardedV2}
       milestonesSeen={v214.milestonesSeen}
       tourSeen={v216.tourSeen}
+      createdAt={v217.createdAt}
       badges={badges}
     />
   );
