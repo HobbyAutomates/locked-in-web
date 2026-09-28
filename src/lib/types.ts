@@ -59,6 +59,9 @@ export type MealItem = {
   per_unit_kcal?: number | null;
   /** v2.15: the web pages the numbers came from (web lookup), max 3. */
   source_urls?: string[] | null;
+  /** v2.18 (schema_v42): the honest kcal range stored with the item; null = derive (lib/food/honesty.ts). */
+  kcal_low?: number | null;
+  kcal_high?: number | null;
 };
 
 export type Meal = {
@@ -379,6 +382,8 @@ export type PlateItem = {
   user_verified?: boolean | null;
   /** v2.15: kcal of ONE piece when the person set it in the editor. */
   per_unit_kcal?: number | null;
+  /** v2.18 A1: added from what the person said, not seen in the photo. */
+  from_voice?: boolean | null;
 };
 
 /** v2.8: one clarifying question the model can ask after a plate scan, with a fixed effect vocabulary
@@ -398,6 +403,11 @@ export type PlateEstimate = {
   portion_hint?: "restaurant" | null;
   /** v2.8: one optional clarifying question, shown as quick-reply chips. */
   follow_up?: FollowUp | null;
+  /** v2.18 A5: the reference object the portion was sized against ("katori", "hand"…), null when none. */
+  sized_using?: string | null;
+  /** v2.18 A1: what the person said, and the changes it made ("Roti → 2 roti (80 g)"). */
+  voice?: string | null;
+  voice_changes?: string[];
 };
 
 // ---- v2.0: squads ----

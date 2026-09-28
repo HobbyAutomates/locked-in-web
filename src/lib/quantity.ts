@@ -1,4 +1,5 @@
 import type { ItemMicros, MealItem, PresetServing } from "./types";
+import { rangeFromGrams } from "./food/honesty";
 
 /**
  * The shared quantity model behind the Quantity sheet (web) and its Android twin: a food known
@@ -236,7 +237,9 @@ export function mentionsRestaurant(text: string): boolean {
 }
 
 /** A plate-photo item as a meal item (the confidence word becomes a number, like the Android app). */
-export function mealItemFromPlate(i: { food_id: string | null; name: string; grams: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; source: "table" | "estimated"; confidence: "high" | "medium" | "low"; micros: ItemMicros; cooked_in?: string | null; variants?: MealItem["variants"]; source_info?: MealItem["source_info"]; user_verified?: boolean | null; per_unit_kcal?: number | null; source_urls?: string[] | null }): MealItem {
+export function mealItemFromPlate(i: { food_id: string | null; name: string; grams: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; source: "table" | "estimated"; confidence: "high" | "medium" | "low"; micros: ItemMicros; cooked_in?: string | null; variants?: MealItem["variants"]; source_info?: MealItem["source_info"]; user_verified?: boolean | null; per_unit_kcal?: number | null; source_urls?: string[] | null; grams_low?: number | null; grams_high?: number | null }): MealItem {
+  // v2.18 A3: the photo's gram range becomes the item's stored ± kcal range (schema_v42).
+  const range = i.user_verified ? null : rangeFromGrams(i);
   // v2.15: a photo roti / idli / egg arrives counted ("2 roti"), so the plate opens the stepper on it.
   const piece = i.cooked_in === "restaurant" ? null : pieceUnitOf(i.name, i.grams);
   return {
@@ -257,6 +260,7 @@ export function mealItemFromPlate(i: { food_id: string | null; name: string; gra
     ...(i.user_verified ? { user_verified: true } : {}),
     ...(i.per_unit_kcal ? { per_unit_kcal: i.per_unit_kcal } : {}),
     ...(i.source_urls?.length ? { source_urls: i.source_urls } : {}),
+    ...(range ?? {}),
     // v2.9: display-only provenance rides along to the plate (never written to meal_items).
     ...(i.variants?.length ? { variants: i.variants } : {}),
     ...(i.source_info ? { source_info: i.source_info } : {}),
