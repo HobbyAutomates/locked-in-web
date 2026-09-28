@@ -5,7 +5,9 @@
  * the score search_foods would actually return for that name.
  */
 import { isAcceptableMatch, sourceBonus, type FoodHit } from "../src/lib/foodSearch";
-import { crossValidatePlateItem } from "../src/lib/plateMatch";
+import { crossValidatePlateItem, webCheckPlateItem, type WebHit } from "../src/lib/plateMatch";
+import { applyCorrection, median, overrideKey, pctError, per100Kcal, perUnitKcal, rescalePer100, rescalePerUnit } from "../src/lib/perUnit";
+import { webResultFrom } from "../src/lib/webFood";
 import { applyFollowUpEffect, gramsRangeLabel, totalKcalRange } from "../src/lib/scanFollowUp";
 import type { PlateItem } from "../src/lib/types";
 
@@ -233,8 +235,79 @@ console.log("\nFollow-up effects");
   }
 }
 
-runPlateCases().then(() => {
-  const total = cases.length + plateCases.length + 3 + 8; // + gram-range/kcal-band checks + follow-up effect cases
+// ---- v2.15: photos go to the web (plateMatch.webCheckPlateItem) — density guard on WEB results ----
+
+let extra = 0;
+function expect(label: string, ok: boolean, detail = "") {
+  extra++;
+  if (!ok) failures++;
+  console.log(`${ok ? "PASS" : "FAIL"}  ${label}${detail ? ` — ${detail}` : ""}`);
+}
+
+function webHit(calories: number, confidence: WebHit["confidence"] = "high"): WebHit {
+  return { calories, protein_g: 5, carbs_g: 10, fat_g: 3, sources: [{ label: "IFCT", url: "https://www.ifct2017.com/" }], confidence, matched_name: "x", basis: "cooked" };
+}
+
+async function runWebCases() {
+  console.log("\nPhoto web lookup (no DB) + density guard");
+  const muesli = plateItem("chocolate protein oats/muesli with milk", 180, 252); // 140 kcal/100 g as seen
+  {
+    let calls = 0;
+    const out = await webCheckPlateItem(muesli, { web: async () => (calls++, webHit(392)) });
+    expect("dry-muesli web answer (392 vs 140/100 g, 2.8x) is rejected: photo numbers stay, low confidence", out.calories === 252 && out.confidence === "low" && out.source_info?.kind === "estimate" && calls === 1, `${out.calories} kcal, ${out.confidence}`);
+  }
+  {
+    const out = await webCheckPlateItem(plateItem("roti", 80, 216), { web: async () => webHit(280) }); // 270 vs 280
+    expect("roti web answer inside the band wins: 80 g × 280/100 g = 224 kcal, web source + links", out.calories === 224 && out.source_info?.kind === "web" && out.source_info.links.length === 1 && out.source_urls?.[0] === "https://www.ifct2017.com/" && out.food_id === null, `${out.calories} kcal`);
+  }
+  {
+    const lo = await webCheckPlateItem(plateItem("dal", 100, 100), { web: async () => webHit(50) }); // exactly 0.5x
+    const hi = await webCheckPlateItem(plateItem("dal", 100, 100), { web: async () => webHit(201) }); // just over 2x
+    expect("band edges: 0.5x accepted, 2.01x rejected", lo.calories === 50 && hi.calories === 100 && hi.confidence === "low");
+  }
+  {
+    const out = await webCheckPlateItem(plateItem("sambar", 150, 90), { web: async () => null });
+    expect("web down / timeout: the photo's numbers stand, labelled AI estimate", out.calories === 90 && out.source_info?.kind === "estimate" && out.source_info.label === "AI estimate");
+  }
+  {
+    const out = await webCheckPlateItem({ ...plateItem("paneer bhurji", 120, 300), confidence: "high" }, { web: async () => webHit(265, "low") });
+    expect("a low-confidence web answer lowers the item's confidence", out.confidence === "low" && out.calories === 318);
+  }
+}
+
+console.log("\nWeb result sanity (webResultFrom)");
+{
+  const good = webResultFrom({ calories: 280, protein_g: 7.5, carbs_g: 48, fat_g: 6, sources: [{ url: "https://a.example/roti", title: "A" }, { url: "not-a-url" }], confidence: "high", matched_name: "Roti" }, [{ label: "B", url: "https://b.example" }]);
+  expect("a consistent report passes, bad URLs dropped, searched pages fill in", !!good && good.calories === 280 && good.sources.length === 2 && good.sources[0].url === "https://a.example/roti" && good.sources[1].url === "https://b.example");
+  const bad = webResultFrom({ calories: 100, protein_g: 20, carbs_g: 40, fat_g: 10, sources: [], confidence: "high" }, []);
+  expect("macros that don't add up to the kcal (330 vs 100) are rejected", bad === null);
+  const noLinks = webResultFrom({ calories: 34, protein_g: 3.3, carbs_g: 4.5, fat_g: 0.3, sources: [], confidence: "high" }, []);
+  expect("no source links → never 'high' confidence", noLinks?.confidence === "medium");
+}
+
+console.log("\nPer-unit / per-100 g rescale + corrections (perUnit.ts)");
+{
+  const roti = { name: "Roti", food_id: "roti", grams: 80, calories: 240, protein_g: 6, carbs_g: 40, fat_g: 4 }; // 2 × 120
+  expect("per-unit kcal from the total: 240 / 2 = 120", perUnitKcal(roti, 2) === 120);
+  const r95 = rescalePerUnit(roti, 2, 95);
+  expect("2 roti at 95 kcal each = 190 kcal, macros scale ×190/240", r95.calories === 190 && r95.protein_g === 4.8 && r95.carbs_g === 31.7 && r95.fat_g === 3.2 && r95.per_unit_kcal === 95, `${r95.calories} P${r95.protein_g} C${r95.carbs_g} F${r95.fat_g}`);
+  const r3 = rescalePerUnit(roti, 3, 95, { protein_g: 3 });
+  expect("3 roti at 95 each with protein 3 g per roti typed: 285 kcal, P 9 (typed), carbs scaled", r3.calories === 285 && r3.protein_g === 9 && r3.carbs_g === 47.5);
+  const rice = { name: "rice", food_id: null, grams: 150, calories: 195, protein_g: 4, carbs_g: 42, fat_g: 0.5 };
+  expect("per 100 g from the total: 195 / 150 g = 130", per100Kcal(rice) === 130);
+  const r140 = rescalePer100(rice, 140);
+  expect("150 g at 140 kcal/100 g = 210 kcal, macros ×210/195", r140.calories === 210 && r140.carbs_g === 45.2, `${r140.calories} C${r140.carbs_g}`);
+  const fixed = applyCorrection(roti, { calories: 200, fat_g: 8 });
+  expect("correction: kcal and typed fat win, blank macros follow the kcal, user_verified", fixed.calories === 200 && fixed.fat_g === 8 && fixed.protein_g === 5 && fixed.user_verified === true);
+  const zero = rescalePerUnit({ ...roti, calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }, 2, 95);
+  expect("a 0 kcal item still takes the new kcal (macros stay 0)", zero.calories === 190 && zero.protein_g === 0);
+  expect("% error: 684 app vs 190 user = +260%", pctError(684, 190) === 260);
+  expect("median of [10, -5, 40, 2] = 6", median([10, -5, 40, 2]) === 6);
+  expect("override key: '2 Roti' and 'roti' share a key", overrideKey({ name: "2 Roti" }) === overrideKey({ name: "roti", food_id: "x" }) && overrideKey({ name: "roti" }) === "roti");
+}
+
+runPlateCases().then(runWebCases).then(() => {
+  const total = cases.length + plateCases.length + 3 + 8 + extra; // + gram-range/kcal-band checks + follow-up effect cases + v2.15 checks
   console.log(`\n${total - failures}/${total} passed.`);
   if (failures) process.exit(1);
 });

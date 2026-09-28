@@ -11,6 +11,8 @@ import { cachedFoodImages, resolveFoodImage } from "@/lib/foodImage";
 import { extractWater } from "@/lib/waterParse";
 import { enrichItems } from "@/lib/itemSources";
 import type { ParseResult, ParsedItem } from "@/lib/types";
+import { webSourceInfo } from "@/lib/sourceInfo";
+import { webLookup, type WebNutrition } from "@/lib/webFood";
 
 /**
  * "do roti, ek katori dal tadka, thoda ghee, 2 eggs" → priced items.
@@ -121,6 +123,31 @@ function priced(it: HaikuItem, food: FoodHit | null): ParsedItem {
   };
 }
 
+/** At most this many web lookups per typed meal (each is a Sonnet + web_search call). */
+const MAX_WEB_LOOKUPS = 6;
+
+/** v2.15: an item the food table didn't know, priced from the web lookup's per-100 g at the parser's grams. */
+function webPriced(it: HaikuItem, w: WebNutrition): ParsedItem {
+  const base = priced(it, null);
+  const k = base.grams / 100;
+  const r1 = (v: number) => Math.round(v * k * 10) / 10;
+  const micros: ParsedItem["micros"] = {};
+  if (w.fiber_g != null) micros.fiber_g = r1(w.fiber_g);
+  if (w.sugar_g != null) micros.sugar_g = r1(w.sugar_g);
+  if (w.sodium_mg != null) micros.sodium_mg = r1(w.sodium_mg);
+  return {
+    ...base,
+    calories: Math.round(w.calories * k),
+    protein_g: r1(w.protein_g),
+    carbs_g: r1(w.carbs_g),
+    fat_g: r1(w.fat_g),
+    micros,
+    confidence: w.confidence === "high" ? 0.9 : w.confidence === "medium" ? 0.7 : 0.4,
+    source_urls: w.sources.map((s) => s.url),
+    source_info: webSourceInfo({ matched_name: w.matched_name, basis: w.basis, links: w.sources, confidence: w.confidence }),
+  };
+}
+
 /** Did the person give an amount for this item ("2", "do", "दो", "aadha", "thoda", "200 g")? */
 const SAID_AMOUNT = /\d|[०-९]|\b(ek|do|teen|tin|char|chaar|paanch|panch|chhe|chhah|saat|aath|nau|das|aadha|adha|aadhi|dedh|dhai|half|one|two|three|four|five|six|seven|eight|nine|ten|couple|dozen|thoda|thodi|zyada|jyada|bahut|extra|little|double)\b|एक|दो|तीन|चार|पाँच|पांच|छह|सात|आठ|नौ|दस|आधा|आधी|डेढ़|ढाई|थोड़ा|थोड़ी|ज़्यादा|ज्यादा|बहुत/i;
 const SAID_WEIGHT = /\d+(\.\d+)?\s*(g|gm|gms|gram|grams|kg|ml|l|litre|liter)\b|ग्राम/i;
@@ -213,7 +240,7 @@ export class ParseError extends Error {
  * The parse itself (v2.14: shared by /api/parse-meal and the coach's log_meal tool). `userId` null
  * = the signed-out onboarding preview: no profile read and no background image lookups (no writes).
  */
-export async function parseMealText(opts: { admin: AdminClient; userId: string | null; text: string; correction?: string; previous?: unknown }): Promise<ParseResult> {
+export async function parseMealText(opts: { admin: AdminClient; userId: string | null; text: string; correction?: string; previous?: unknown; web?: typeof webLookup }): Promise<ParseResult> {
   const { admin, text, correction, previous } = opts;
   const user = opts.userId ? { id: opts.userId } : null;
   const isPreview = !user;
@@ -285,7 +312,7 @@ export async function parseMealText(opts: { admin: AdminClient; userId: string |
     throw new ParseError("Parser returned nothing", 502);
   }
 
-  const items: ParsedItem[] = [];
+  const resolved: { it: HaikuItem; food: FoodHit | null }[] = [];
   for (const it of raw.items ?? []) {
     if (!(Number(it.grams) > 0)) continue;
     let food: FoodHit | null = (it.food_id && candidates.get(it.food_id)) || null;
@@ -298,8 +325,25 @@ export async function parseMealText(opts: { admin: AdminClient; userId: string |
       const [hit] = await searchFoods(it.food, 1).catch(() => [] as FoodHit[]);
       food = hit && hit.score >= 1 ? hit : localHit(it.food) ?? localHit(it.input);
     }
-    items.push(counted(it, food));
+    resolved.push({ it, food });
   }
+
+  // v2.15: DB first, then the web. Items the food table had no acceptable match for are looked up on
+  // the web (webFood.ts: Sonnet + web_search, ~25 s), in parallel; a good answer is cached as a
+  // source 'web' row so the next person's typed "roti" finds it in the table. When the web fails,
+  // the parser's own estimate stands (labelled "AI estimate").
+  const misses = resolved.filter((r) => !r.food).slice(0, MAX_WEB_LOOKUPS);
+  const webHits = new Map<HaikuItem, WebNutrition>();
+  await Promise.all(
+    misses.map(async ({ it }) => {
+      const w = await (opts.web ?? webLookup)(it.food || it.input, { context: `Typed by the person: "${String(it.input ?? "").slice(0, 160)}"` }).catch(() => null);
+      if (w) webHits.set(it, w);
+    }),
+  );
+  const items: ParsedItem[] = resolved.map(({ it, food }) => {
+    const w = !food ? webHits.get(it) : undefined;
+    return w ? webPriced(it, w) : counted(it, food);
+  });
 
   // v2.9: optional `source_info` + `variants` ("Which one?") per item, AFTER pricing — nothing here
   // changes a number, and older clients simply ignore the extra fields.

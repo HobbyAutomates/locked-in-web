@@ -1,9 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
-import { run } from "@/lib/ai/router";
-import type { JsonSchema } from "@/lib/ai/types";
+import { sanityCheck, slugify, type RawNutrition } from "@/lib/nutritionSanity";
+import { webLookup } from "@/lib/webFood";
 import type { FoodHit } from "@/lib/foodSearch";
 
 /**
+ * v2.15: the default path is now the WEB lookup (webFood.ts, router task `food_web_lookup`: Sonnet +
+ * web_search, ~25 s budget). The sanity check (nutritionSanity.ts) and the bandlog.foods cache stay.
+ * The older Haiku-only `food_lookup` task is no longer called; the openai-compatible switch below is
+ * kept only for deployments that set LIVE_FOOD_PROVIDER=openai-compatible.
+ *
  * v2.7: live AI nutrition lookup — the fallback when bandlog.foods has no acceptable match for a
  * named food (see foodSearch.ts's isAcceptableMatch and scanFlows.ts's plateFlow). Returns
  * realistic per-100 g macros (Indian foods in mind), sanity-checks them, and caches a good result
@@ -19,18 +24,9 @@ import type { FoodHit } from "@/lib/foodSearch";
  *   LIVE_FOOD_API_KEY     API key for that host — openai-compatible only
  */
 
-const TIMEOUT_MS = 4000;
+const TIMEOUT_MS = 25_000;
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 
-type RawNutrition = {
-  calories: number;
-  protein_g: number;
-  carbs_g: number;
-  fat_g: number;
-  fiber_g?: number | null;
-  sugar_g?: number | null;
-  sodium_mg?: number | null;
-};
 
 function admin() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -49,24 +45,6 @@ function userPrompt(name: string): string {
   return `Food: ${name}\n\nGive per-100g nutrition: calories (kcal), protein_g, carbs_g, fat_g, and if you can estimate them, fiber_g, sugar_g, sodium_mg.`;
 }
 
-const LOOKUP_TOOL = {
-  name: "nutrition",
-  description: "Report per-100g nutrition for the named food.",
-  input_schema: {
-    type: "object" as const,
-    properties: {
-      calories: { type: "number", description: "kcal per 100g" },
-      protein_g: { type: "number" },
-      carbs_g: { type: "number" },
-      fat_g: { type: "number" },
-      fiber_g: { type: "number" },
-      sugar_g: { type: "number" },
-      sodium_mg: { type: "number" },
-    },
-    required: ["calories", "protein_g", "carbs_g", "fat_g"],
-  },
-};
-
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(null), ms);
@@ -83,21 +61,6 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
   });
 }
 
-function isRawNutrition(v: unknown): v is RawNutrition {
-  if (!v || typeof v !== "object") return false;
-  const o = v as Record<string, unknown>;
-  return ["calories", "protein_g", "carbs_g", "fat_g"].every((k) => o[k] != null && Number.isFinite(Number(o[k])));
-}
-
-/** Through the model router (task `food_lookup`), like every other AI call. */
-async function fromRouter(name: string): Promise<RawNutrition | null> {
-  const r = await run<RawNutrition>(
-    "food_lookup",
-    { kind: "json", system: SYSTEM, text: userPrompt(name), maxTokens: 300, schema: LOOKUP_TOOL.input_schema as unknown as JsonSchema, schemaName: LOOKUP_TOOL.name },
-    isRawNutrition,
-  );
-  return r.data;
-}
 
 async function fromOpenAiCompatible(name: string): Promise<RawNutrition | null> {
   const base = process.env.LIVE_FOOD_BASE_URL;
@@ -133,45 +96,6 @@ async function fromOpenAiCompatible(name: string): Promise<RawNutrition | null> 
   }
 }
 
-/**
- * Sanity-check a model's nutrition guess. Rejects it if calories are implausibly high, any macro
- * is negative, the macros sum past 100g, or the stated calories don't roughly match the Atwater
- * calculation (4p + 4c + 9f), within ~25% + 15 kcal.
- */
-function sanityCheck(raw: RawNutrition | null): RawNutrition | null {
-  if (!raw) return null;
-  const calories = Number(raw.calories);
-  const protein_g = Number(raw.protein_g);
-  const carbs_g = Number(raw.carbs_g);
-  const fat_g = Number(raw.fat_g);
-  if (![calories, protein_g, carbs_g, fat_g].every(Number.isFinite)) return null;
-  if (calories < 0 || calories > 905) return null; // pure fats are 884-902
-  if (protein_g < 0 || carbs_g < 0 || fat_g < 0) return null;
-  if (protein_g + carbs_g + fat_g > 100) return null;
-  const atwater = 4 * protein_g + 4 * carbs_g + 9 * fat_g;
-  if (Math.abs(atwater - calories) > calories * 0.25 + 15) return null;
-
-  const num = (v: unknown) => (v == null ? null : Number(v));
-  const fiber_g = num(raw.fiber_g);
-  const sugar_g = num(raw.sugar_g);
-  const sodium_mg = num(raw.sodium_mg);
-  if (fiber_g != null && (!Number.isFinite(fiber_g) || fiber_g < 0 || fiber_g > 100)) return null;
-  if (sugar_g != null && (!Number.isFinite(sugar_g) || sugar_g < 0 || sugar_g > carbs_g + 5)) return null;
-  if (sodium_mg != null && (!Number.isFinite(sodium_mg) || sodium_mg < 0 || sodium_mg > 20000)) return null;
-
-  return { calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g, sodium_mg };
-}
-
-function slugify(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s]/g, "")
-      .replace(/\s+/g, "-")
-      .slice(0, 60) || "food"
-  );
-}
 
 /**
  * Cache a good lookup in bandlog.foods under a deterministic id derived from the normalized name
@@ -218,9 +142,13 @@ export async function liveLookup(name: string): Promise<FoodHit | null> {
   const food = name.trim();
   if (!food) return null;
   const provider = (process.env.LIVE_FOOD_PROVIDER || "anthropic").trim();
-  const call = provider === "openai-compatible" ? fromOpenAiCompatible(food) : fromRouter(food);
-  const raw = await withTimeout(call.catch(() => null), TIMEOUT_MS);
-  const good = sanityCheck(raw);
-  if (!good) return null;
-  return cache(food, good);
+  if (provider === "openai-compatible") {
+    const raw = await withTimeout(fromOpenAiCompatible(food).catch(() => null), 4000);
+    const good = sanityCheck(raw);
+    return good ? cache(food, good) : null;
+  }
+  // v2.15: the web lookup sanity-checks and caches (source 'web') on its own.
+  const web = await webLookup(food, { timeoutMs: TIMEOUT_MS });
+  if (!web) return null;
+  return { id: `web-${slugify(food)}`, name: food, aliases: [], calories: web.calories, protein_g: web.protein_g, carbs_g: web.carbs_g, fat_g: web.fat_g, fiber_g: web.fiber_g ?? null, sugar_g: web.sugar_g ?? null, sodium_mg: web.sodium_mg ?? null, micros: {}, source: "web", region: null, names_local: {}, units: [], unit_name: null, unit_grams: null, score: 1 };
 }

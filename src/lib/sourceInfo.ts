@@ -13,7 +13,7 @@
  *   custom / ai / estimate → a label only (plus any web-search citations a label analysis captured).
  */
 
-export type SourceKind = "ifct" | "usda" | "off" | "dish" | "custom" | "ai" | "estimate" | "label";
+export type SourceKind = "ifct" | "usda" | "off" | "dish" | "custom" | "ai" | "estimate" | "label" | "web" | "user";
 export type SourceLink = { label: string; url: string };
 export type SourceInfo = {
   kind: SourceKind;
@@ -103,6 +103,41 @@ export function sourceInfoFor(input: {
     default:
       return { kind: "custom", label: "Locked In food list", detail: "Hand-checked everyday values, per 100 g as usually eaten.", links: [] };
   }
+}
+
+/**
+ * v2.15: numbers looked up on the web (webFood.ts). `links` are the pages the lookup read (max 3).
+ * Older clients render any kind generically (label + detail + links), so this is backward compatible.
+ */
+export function webSourceInfo(input: { matched_name?: string; basis?: string; links: SourceLink[]; confidence?: string }): SourceInfo {
+  const what = input.matched_name ? `“${input.matched_name}”` : "this food";
+  const basis = input.basis ? ` (${input.basis})` : "";
+  return {
+    kind: "web",
+    label: "Web sources",
+    detail: `Looked up on the web for ${what}${basis}, per 100 g, then sanity-checked (the macros have to add up to the calories).${input.confidence === "low" ? " The sources didn't agree well." : ""}`,
+    links: input.links.slice(0, 3),
+  };
+}
+
+/** v2.15: the photo's own numbers, when the web lookup failed, timed out or didn't fit the photo. */
+export function photoEstimateInfo(reason: "no_web" | "density" = "no_web"): SourceInfo {
+  return {
+    kind: "estimate",
+    label: "AI estimate",
+    detail:
+      reason === "density"
+        ? "The web numbers didn't fit what the photo shows (too dense or too light for this portion), so this keeps the AI's own estimate from the photo."
+        : "Estimated by the AI from the photo — the web lookup didn't come back in time.",
+    links: [],
+  };
+}
+
+/** v2.15: the person typed their own numbers ("Correct the numbers"). */
+export function userSourceInfo(source?: string | null): SourceInfo {
+  const s = (source ?? "").trim();
+  const isUrl = /^https?:\/\//i.test(s);
+  return { kind: "user", label: "Your numbers", detail: s ? `You entered these${isUrl ? "" : ` (source: ${s.slice(0, 80)})`}.` : "You entered these numbers yourself.", links: isUrl ? [{ label: "Your source", url: s }] : [] };
 }
 
 /** A label / barcode scan report's provenance (nutrition_source + barcode), plus any research links. */

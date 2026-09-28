@@ -53,6 +53,12 @@ export type MealItem = {
   variants?: FoodVariant[];
   /** v2.9: where the numbers came from, for the ⓘ sheet (display only). */
   source_info?: SourceInfo | null;
+  /** v2.15: the person typed these numbers themselves ("Correct the numbers") — shows "✓ Your numbers". */
+  user_verified?: boolean | null;
+  /** v2.15: kcal of ONE unit (one roti) when the person set it — count × this = calories. */
+  per_unit_kcal?: number | null;
+  /** v2.15: the web pages the numbers came from (web lookup), max 3. */
+  source_urls?: string[] | null;
 };
 
 export type Meal = {
@@ -367,6 +373,10 @@ export type PlateItem = {
   variants?: FoodVariant[];
   /** v2.9: where the numbers came from, for the ⓘ sheet — optional. */
   source_info?: SourceInfo | null;
+  /** v2.15: the web pages the numbers came from (web lookup), max 3. */
+  source_urls?: string[] | null;
+  /** v2.15: the person corrected this item's numbers. */
+  user_verified?: boolean | null;
 };
 
 /** v2.8: one clarifying question the model can ask after a plate scan, with a fixed effect vocabulary

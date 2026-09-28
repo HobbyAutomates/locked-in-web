@@ -22,9 +22,8 @@ import {
   type ReportCache,
 } from "@/lib/labelAnalysis";
 import { extractBarcode, parseNutritionLabel, reportNutritionTrusted, roundPer100, sanityCheckPer100 } from "@/lib/labelParse";
-import { liveLookup } from "@/lib/liveFood";
-import { crossValidatePlateItem } from "@/lib/plateMatch";
-import { enrichItems } from "@/lib/itemSources";
+import { webCheckPlateItem } from "@/lib/plateMatch";
+import { webLookup, WEB_LOOKUP_TIMEOUT_MS } from "@/lib/webFood";
 import { reportSourceInfo } from "@/lib/sourceInfo";
 import { RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
 import { scanName } from "@/lib/scanNames";
@@ -421,11 +420,11 @@ const PLATE_TOOL: Anthropic.Tool = {
 
 const PLATE_SYSTEM = `You estimate the food on a plate from one photo for a 17-year-old in Bengaluru who eats mostly home-cooked Indian food, plus some Western meals.
 
-Identify each distinct food and call it by its real name — Indian dishes by their actual names ("dal tadka", "jeera rice", "aloo gobi", "roti", "curd", "paneer bhurji", "rajma", "sambar", "idli", "poha"), Western ones plainly ("grilled chicken breast", "scrambled eggs", "toast"). Never invent a dish you cannot see; combine what is clearly one dish into one item. Your job is to identify the food and its portion as a gram range — the app's own food database, not your macro numbers, decides the final nutrition whenever it has a confident match, and it always does the actual per-gram arithmetic.
+Identify each distinct food and call it by its real name — Indian dishes by their actual names ("dal tadka", "jeera rice", "aloo gobi", "roti", "curd", "paneer bhurji", "rajma", "sambar", "idli", "poha"), Western ones plainly ("grilled chicken breast", "scrambled eggs", "toast"). Never invent a dish you cannot see; combine what is clearly one dish into one item. If a pack, brand or restaurant is visible, put it in the name ("Pintola high protein muesli", "Amul masti dahi") so the app can look that exact product up. Your job is to identify the food and its portion as a gram range — the app then looks each item up on the web and uses those per-100 g numbers when they fit what the photo shows, and it always does the actual per-gram arithmetic.
 
 Portion in grams. Use these as scale: a dinner plate is ~27 cm across, a roti ~18 cm, a katori (small steel bowl) holds ~150 ml, a tablespoon ~15 g, a hand's palm ~100 g of meat. Typical portions: roti 40 g each, paratha 80 g, idli 40 g, dosa 100 g, egg 50 g, a katori of dal or sabzi 150 g, a heap of rice on a plate 150–200 g, a piece of paneer 30 g. Count items you can count (3 rotis = 120 g). Alongside your best-estimate grams, give a plausible grams_low/grams_high range — wider when the angle, occlusion or portion size is unclear, tight (or omitted) when it's obvious.
 
-Nutrition per 100 g from your knowledge of the dish as cooked at home (with oil / ghee). Give macros and the micros you can estimate — this is the fallback the app uses only when it can't match the dish in its own database.
+Nutrition per 100 g from your knowledge of the dish as cooked at home (with oil / ghee). Give macros and the micros you can estimate — the app checks these against web sources, and uses them when the web lookup fails or when the web numbers don't fit what the photo shows (so make them match the food as it actually looks: soaked, with gravy, with milk).
 
 Confidence: high when the dish and portion are clear, medium when the dish is clear but the portion is a guess, low when either is uncertain. List anything uncertain about an item in its uncertainties. If the picture is not food, set is_food=false with an empty items list.
 
@@ -580,10 +579,20 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
     };
   });
 
-  // 2. Cross-validate against the food table (keep the model's grams, take the table's per-100 g):
-  //    isAcceptableMatch, else the liveLookup fallback, else the model's own estimate — see
-  //    plateMatch.ts. Living here means the fused classifier plate and plateFlow share the same rule.
-  const items: PlateItem[] = await Promise.all(rawItems.map((it) => crossValidatePlateItem(it, { search: searchFoods, live: liveLookup })));
+  // 2. v2.15 internet first: every item is looked up on the web in parallel (Sonnet + web_search,
+  //    webFood.ts) — NEVER bandlog.foods for a photo. The model's grams stay; the web's per-100 g wins
+  //    unless it fails the density guard (plateMatch.webCheckPlateItem), in which case — or on a
+  //    timeout — the photo's own numbers stand, labelled "AI estimate". Up to ~30 s in total.
+  const context = `Seen on a meal photo (usually home-cooked Indian food in Bengaluru).${raw.plate_note ? ` The plate: ${String(raw.plate_note).slice(0, 160)}.` : ""}${note ? ` The person says: "${String(note).slice(0, 200)}".` : ""}`;
+  const webUsage: UsageEntry[] = [];
+  const web = async (name: string, ctx: string) => {
+    const r = await webLookup(name, { context: ctx, timeoutMs: WEB_LOOKUP_TIMEOUT_MS });
+    if (r?.usage) webUsage.push(...r.usage);
+    return r;
+  };
+  const items: PlateItem[] = await Promise.all(rawItems.slice(0, 8).map((it) => webCheckPlateItem(it, { web }, context)));
+  if (rawItems.length > 8) items.push(...rawItems.slice(8).map((it) => ({ ...it, source_info: null })));
+  usage.push(...webUsage);
 
   // 2b. Eaten out? v2.15: a PHOTO already shows the real portion, so the ×1.4 restaurant multiplier
   //     (meant for typed meals like "1 plate biryani") no longer scales photo grams — it double-counted
@@ -598,9 +607,9 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
       })
     : items;
 
-  // 2c. v2.9: optional provenance + "Which one?" variants per item, after every number is final
-  //     (plateMatch and the restaurant rule above) — nothing here changes a number.
-  const finalItems: PlateItem[] = await enrichItems(scaledItems).catch(() => scaledItems);
+  // 2c. v2.15: no enrichItems here — its "Which one?" variants come from bandlog.foods, and a photo
+  //     never reads the database. Every item already carries its source_info from step 2.
+  const finalItems: PlateItem[] = scaledItems;
 
   // 3. Store the photo and the estimate.
   let photo_path: string | null = null;

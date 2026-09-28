@@ -27,6 +27,7 @@ export type TaskId =
   | "meal_text_parse"
   | "exercise_parse"
   | "food_lookup"
+  | "food_web_lookup"
   | "menu_vision"
   | "menu_vision_hard"
   | "coach_chat"

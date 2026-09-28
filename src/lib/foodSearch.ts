@@ -13,7 +13,7 @@ export type FoodHit = {
   sugar_g: number | null;
   sodium_mg: number | null;
   micros: Record<string, number>;
-  source: "custom" | "dish" | "ifct" | "usda" | "off" | "ai";
+  source: "custom" | "dish" | "ifct" | "usda" | "off" | "ai" | "web";
   region: string | null;
   names_local: Record<string, string>;
   units: { name: string; grams: number }[];

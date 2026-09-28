@@ -4,6 +4,8 @@ import { ParseError, parseMealText } from "@/lib/parseMeal";
 import { allow, clientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
+// v2.15: a typed food the table doesn't know is looked up on the web (up to ~25 s).
+export const maxDuration = 60;
 
 /** "do roti, ek katori dal tadka, thoda ghee, 2 eggs" → priced items. The work is in lib/parseMeal.ts. */
 export async function POST(req: Request) {
