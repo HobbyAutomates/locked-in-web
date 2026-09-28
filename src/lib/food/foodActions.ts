@@ -20,7 +20,7 @@ import { groceryList, pantryCategory, type DietKind, type GroceryItem, type Pant
 
 export type FoodResult<T = object> = ({ ok: true } & T) | { ok: false; error: string; unavailable?: boolean };
 
-export const FOOD_SOON = "Coming with the next update";
+const FOOD_SOON = "Coming with the next update";
 
 function missing(error: { code?: string; message?: string; details?: string | null; hint?: string | null } | null | undefined): boolean {
   if (!error) return false;
