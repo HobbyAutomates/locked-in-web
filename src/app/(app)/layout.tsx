@@ -5,6 +5,8 @@ import { getProfile } from "@/lib/data";
 import { ONBOARD_SKIP_COOKIE, needsOnboarding } from "@/lib/onboarding";
 import BottomNav from "@/components/BottomNav";
 import WaterReminderClock from "@/components/WaterReminderClock";
+import SocialBoot from "@/components/social/SocialBoot";
+import { LANG_COOKIE, parseLang } from "@/lib/social/i18n";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -33,7 +35,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       >
         {children}
       </main>
-      <BottomNav />
+      {/* v2.18: offline sync chip, daily freeze sync, invite claim (E1 / D5 / D2); tab labels in the chosen language (E2). */}
+      <SocialBoot lang={parseLang(jar.get(LANG_COOKIE)?.value)} />
+      <BottomNav lang={parseLang(jar.get(LANG_COOKIE)?.value)} />
       <WaterReminderClock from={profile.water_reminder_from} to={profile.water_reminder_to} every={profile.water_reminder_every_min} />
     </>
   );

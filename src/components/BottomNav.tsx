@@ -9,6 +9,11 @@ import { today } from "@/lib/dates";
 import { deleteWater } from "@/lib/actions";
 import { logDefaultGlass } from "@/lib/activityActions";
 import { UndoSnackbar } from "./LogBits";
+import { t, type Lang, type StringKey } from "@/lib/social/i18n";
+
+/** v2.18 E2: tab and dial labels in the chosen language (English when a key is missing). */
+const TAB_KEY: Record<string, StringKey> = { "/": "nav.home", "/squad": "nav.squad", "/scan": "nav.scan", "/progress": "nav.progress", "/profile": "nav.profile" };
+const DIAL_KEY: Partial<Record<DialKey, { label: StringKey; sub?: StringKey }>> = { food: { label: "dial.food", sub: "dial.food.sub" }, activity: { label: "dial.activity" }, water: { label: "dial.water" }, scan: { label: "nav.scan" } };
 
 /** v2.4: five tabs. Calendar moved to a button in the Home header (the /calendar route stays). */
 const TABS = [
@@ -38,7 +43,7 @@ const DIAL: { key: DialKey; label: string; sub?: string; Icon: (p: { size?: numb
  * v2.8: Water adds one glass (your glass size) straight away with an Undo snackbar; long-press it,
  * or tap the small arrow beside it, for the Water page.
  */
-export default function BottomNav() {
+export default function BottomNav({ lang = "en" }: { lang?: Lang } = {}) {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -134,7 +139,11 @@ export default function BottomNav() {
                 exit="closed"
                 variants={{ open: { transition: { staggerChildren: 0.035 } }, closed: { transition: { staggerChildren: 0.02, staggerDirection: -1 } } }}
               >
-                {DIAL.map(({ key, label, sub, Icon, tint }) => (
+                {DIAL.map(({ key, label: label0, sub: sub0, Icon, tint }) => {
+                  const k = DIAL_KEY[key];
+                  const label = k ? t(k.label, lang) : label0;
+                  const sub = k?.sub ? t(k.sub, lang) : sub0;
+                  return (
                   <motion.li
                     key={key}
                     variants={{ open: { opacity: 1, y: 0, scale: 1 }, closed: { opacity: 0, y: 14, scale: 0.9 } }}
@@ -193,7 +202,8 @@ export default function BottomNav() {
                       </button>
                     </span>
                   </motion.li>
-                ))}
+                  );
+                })}
               </motion.ul>
             ) : null}
           </AnimatePresence>
@@ -219,7 +229,8 @@ export default function BottomNav() {
             className="mx-auto flex w-full max-w-[480px] justify-between pt-2.5 pl-3"
             style={{ paddingRight: 76, paddingBottom: "calc(6px + env(safe-area-inset-bottom, 0px))" }}
           >
-            {TABS.map(({ href, label, Icon }) => {
+            {TABS.map(({ href, label: label0, Icon }) => {
+              const label = TAB_KEY[href] ? t(TAB_KEY[href], lang) : label0;
               // Calendar is reached from Home, so Home stays lit there.
               const active = href === "/" ? path === "/" || path.startsWith("/calendar") : path.startsWith(href);
               return (

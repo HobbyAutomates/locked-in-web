@@ -1,5 +1,6 @@
 "use client";
 
+import { withQueue } from "@/lib/social/offlineStore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -430,7 +431,8 @@ export default function MealForm({
     setSaving(true);
     setError(null);
     try {
-      const saved = await saveMeal({ date, raw_text: raw, items, photo_path: photoPath, meal_type: type });
+      // v2.18 E1: offline (or a network failure) queues the meal and it syncs later; saved is null then.
+      const saved = await withQueue("meal", { date, raw_text: raw, items, photo_path: photoPath, meal_type: type }, saveMeal);
       track("meal_logged", { method: mealMethod(), items: items.length });
       logEvent("log", { meal_id: saved?.id ?? null, payload: { method: mealMethod(), items: items.map(nums), total_kcal: Math.round(totalKcal), raw_text: raw } });
       onClose();

@@ -1,5 +1,6 @@
 "use client";
 
+import { withQueue } from "@/lib/social/offlineStore";
 import { useEffect, useState } from "react";
 import { deleteExercise, saveDescribedExercises, saveExercise, searchActivities, type saveWorkout } from "@/lib/actions";
 import { updateExercise } from "@/lib/activityActions";
@@ -308,8 +309,9 @@ export default function ExerciseForm({
         if (mode === "manual") await updateExercise(editing.id, { activity_code: null, name: manualName.trim() || "Exercise", minutes: Math.max(1, mins), intensity: "medium", kcal: Number(manualKcal), note: notes });
         else if (pick) await updateExercise(editing.id, { activity_code: code, name: pick.name, minutes: mins, intensity: pctToIntensity(pct), kcal: pickKcal, note: notes, ...details() });
       } else if (mode === "described") await saveDescribedExercises(date, described);
-      else if (mode === "manual") await saveExercise({ date, activity_code: null, name: manualName.trim() || "Exercise", minutes: Math.max(1, mins), intensity: "medium", kcal: Number(manualKcal), source: "manual", note: notes });
-      else if (pick) await saveExercise({ date, activity_code: code, name: pick.name, minutes: mins, intensity: pctToIntensity(pct), kcal: pickKcal, source: "manual", note: notes, ...details() });
+      // v2.18 E1: new manual / picked activities queue offline and sync later.
+      else if (mode === "manual") await withQueue("exercise", { date, activity_code: null, name: manualName.trim() || "Exercise", minutes: Math.max(1, mins), intensity: "medium" as const, kcal: Number(manualKcal), source: "manual" as const, note: notes }, saveExercise);
+      else if (pick) await withQueue("exercise", { date, activity_code: code, name: pick.name, minutes: mins, intensity: pctToIntensity(pct), kcal: pickKcal, source: "manual" as const, note: notes, ...details() }, saveExercise);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");

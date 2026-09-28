@@ -1,5 +1,6 @@
 "use client";
 
+import { withQueue } from "@/lib/social/offlineStore";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -351,7 +352,8 @@ function WaterCard({ date, isToday, ml, goal, glassMl }: { date: string; isToday
     setError(null);
     setExtra((x) => x + glass);
     try {
-      await logWater(glass, date, "glass");
+      // v2.18 E1: offline → queued; the chip shows it and it syncs later.
+      await withQueue("water", { ml: glass, date, vessel: "glass" as const }, (p) => logWater(p.ml, p.date, p.vessel));
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not log that");

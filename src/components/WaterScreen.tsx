@@ -1,5 +1,6 @@
 "use client";
 
+import { withQueue } from "@/lib/social/offlineStore";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { deleteWater, logWater, saveProfile, undoLastWater } from "@/lib/actions";
@@ -75,8 +76,9 @@ export default function WaterScreen({ date, isToday, entries: initial, goalMl: i
     const before = total;
     setEntries((list) => [temp, ...list]);
     try {
-      const row = await logWater(ml, date, vessel);
-      setEntries((list) => list.map((e) => (e.id === temp.id ? row : e)));
+      // v2.18 E1: offline → queued (null); the optimistic row stays until the next refresh.
+      const row = await withQueue("water", { ml, date, vessel }, (p) => logWater(p.ml, p.date, p.vessel));
+      if (row) setEntries((list) => list.map((e) => (e.id === temp.id ? row : e)));
       if (before < goal && before + ml >= goal) celebrate();
     } catch (e) {
       setEntries((list) => list.filter((x) => x.id !== temp.id));
