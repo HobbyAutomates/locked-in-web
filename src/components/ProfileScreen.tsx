@@ -15,6 +15,7 @@ import { AvatarPicker } from "./Avatar";
 import TrophyWall from "./TrophyWall";
 import { COVER_STORAGE_KEY, DEFAULT_COVER, isCoverId } from "@/lib/covers";
 import { saveCoverPreset } from "@/lib/v216Actions";
+import { isGoldCover } from "@/lib/social/packs";
 import type { MemberPlate } from "@/lib/memberPlate";
 import { Cover } from "./Cover";
 import CoverPicker from "./CoverPicker";
@@ -91,7 +92,8 @@ export default function ProfileScreen({
   const reminders = onCount(profile.reminders);
   const joinedText = monthYear(joined);
   const place = [squadName, joinedText ? `since ${joinedText}` : null].filter(Boolean).join(" · ");
-  const [coverId, setCoverId] = useState<string>(isCoverId(cover.preset) ? cover.preset : DEFAULT_COVER);
+  // v2.18 D11: a gold cover (Packs) counts as a valid saved cover too.
+  const [coverId, setCoverId] = useState<string>(isCoverId(cover.preset) || isGoldCover(cover.preset) ? (cover.preset as string) : DEFAULT_COVER);
   const [picker, setPicker] = useState(false);
   // Until schema_v40 is applied the cover lives in this browser; once it is, a local pick moves up.
   useEffect(() => {
@@ -101,7 +103,7 @@ export default function ProfileScreen({
     } catch {
       local = null;
     }
-    if (!isCoverId(local)) return;
+    if (!isCoverId(local) && !isGoldCover(local)) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the local cover (pre-v40) is read after mount
     if (!cover.available || cover.preset == null) setCoverId(local);
     if (cover.available && cover.preset == null && local !== DEFAULT_COVER) void saveCoverPreset(local);
