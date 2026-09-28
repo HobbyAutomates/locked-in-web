@@ -349,6 +349,10 @@ function SignIn({
             <input id="password" className={inputCls} style={NO_OUTLINE} type={show ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
           </Field>
           <ErrorNote text={msg} />
+          {/* v2.18 E5: password reset by email. TODO(v2.18 E5): "Continue with Google" once a Google OAuth client is set up in Supabase (none exists today; see lib/social/safety.ts GOOGLE_SIGN_IN_ENABLED). */}
+          <a href="/forgot" className="press self-end py-1 text-[13.5px] font-semibold" style={{ color: "var(--ink)" }}>
+            Forgot password?
+          </a>
         </div>
         <div className="m-rise mt-auto flex flex-col gap-3 pt-8" style={md(270)}>
           <Btn kind="accent" type="submit" disabled={busy || !email || password.length < 6}>

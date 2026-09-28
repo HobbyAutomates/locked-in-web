@@ -1,5 +1,6 @@
 "use server";
 
+import { regionalQuery } from "./social/regionalFoods";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -576,7 +577,8 @@ export async function deleteSavedMeal(id: string) {
  */
 export async function searchFoodsForPicker(q: string, limit = 12): Promise<FoodSearchHit[]> {
   const { supabase } = await userOrThrow();
-  const key = q.trim().toLowerCase().replace(/\s+/g, " ");
+  // v2.18 E2: Marathi / Tamil / Bengali food words ("macher jhol", "poli") → the names the table knows.
+  const key = regionalQuery(q.trim().toLowerCase().replace(/\s+/g, " "));
   if (key.length < 2) return [];
   const { data, error } = await supabase.rpc("search_foods", { q: key, n: limit });
   if (error) throw new Error(error.message);
