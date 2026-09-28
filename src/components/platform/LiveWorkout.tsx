@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveWorkout } from "@/lib/actions";
+import { useLiveBroadcast } from "../social/useLiveBroadcast";
 import { exerciseDef, exercisesText, lastSets, musclesOf } from "@/lib/exercises";
 import { MUSCLES } from "@/lib/muscles";
 import { isNewPr } from "@/lib/e1rm";
@@ -141,6 +142,8 @@ export default function LiveWorkout({ routineId, routineName, dayIndex, day, his
   // v2.17: after saving, a short summary with the trained-muscles mini map, then Home.
   const [summary, setSummary] = useState<null | { primary: Region[]; secondary: Region[]; sets: number; minutes: number; exercises: number }>(null);
   const goHome = () => router.replace("/?celebrate=1");
+  // v2.18 D7: opted-in people show as "training now" in their squads while this runs.
+  useLiveBroadcast(startedAt != null && !summary, day.name || routineName, startedAt);
 
   async function finish() {
     const exercises: WorkoutExercise[] = list

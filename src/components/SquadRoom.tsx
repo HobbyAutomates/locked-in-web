@@ -22,6 +22,8 @@ import { SquadPodium } from "./SquadPodium";
 import { SquadIcon } from "./SquadIcon";
 import { AddReactionButton, ReactionBar, ReactionChips, ReactorsSheet, SeenSheet, Ticks, useLongPress } from "./SquadReactions";
 import { BottomSheet, BreathingFlame, ErrorNote } from "./ui";
+import { MemberSafety, SafetyMenu, SquadSocialTop, StampMark, StampRow, StampsProvider, VerifiedTick, useBlocked } from "./social/SquadSocial";
+import { withoutBlocked } from "@/lib/social/safety";
 
 
 type Tab = "chat" | "challenges" | "battle" | "feed" | "leaderboard";
@@ -88,6 +90,8 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
   const [profileSheet, setProfileSheet] = useState<LeaderRow | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
   const isOwner = squad.owner_id === me;
+  // v2.18 E5: posts and messages from people I blocked don't show.
+  const blocked = useBlocked();
   useEffect(() => track("squad_opened", { squad_id: squad.id, owner: isOwner }), [squad.id, isOwner]);
   const [reads, setReads] = useState<ReadRow[] | null>(reads0);
   const [chatUnread, setChatUnread] = useState(unread0);
@@ -258,6 +262,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-[17px] font-extrabold leading-tight" style={{ letterSpacing: "-0.02em" }}>
                 {squad.name}
+                <VerifiedTick squadId={squad.id} />
               </span>
               <span className="text-[11px] font-semibold muted">
                 {squad.member_count ?? 1} member{(squad.member_count ?? 1) === 1 ? "" : "s"} · {squad.is_public ? "Public" : "Private"}
@@ -305,7 +310,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
       ) : null}
 
       {tab === "chat" ? (
-        <ChatTab me={me} today={today} posts={chat.filter((p) => !dels.isPending(p.id))} reads={reads} reacting={reacting} isOwner={isOwner} onDelete={deletePost} onPhoto={() => photoRef.current?.click()} onSent={() => void refresh("chat")} squadId={squad.id} setPosts={setChat} onError={setError} />
+        <ChatTab me={me} today={today} posts={withoutBlocked(chat.filter((p) => !dels.isPending(p.id)), blocked)} reads={reads} reacting={reacting} isOwner={isOwner} onDelete={deletePost} onPhoto={() => photoRef.current?.click()} onSent={() => void refresh("chat")} squadId={squad.id} setPosts={setChat} onError={setError} />
       ) : tab === "challenges" ? (
         <ChallengesTab
           me={me}
@@ -320,7 +325,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           }}
         />
       ) : tab === "feed" ? (
-        <FeedTab me={me} today={today} squadId={squad.id} posts={feed.filter((p) => !dels.isPending(p.id))} reacting={reacting} shareStats={shareStats} isOwner={isOwner} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDelete={deletePost} />
+        <FeedTab me={me} today={today} squadId={squad.id} posts={withoutBlocked(feed.filter((p) => !dels.isPending(p.id)), blocked)} reacting={reacting} shareStats={shareStats} isOwner={isOwner} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDelete={deletePost} />
       ) : tab === "leaderboard" ? (
         <LeaderboardTab me={me} squadId={squad.id} rows={board} challenges={challenges} boards={challengeBoards} sentNudges={sentNudges} onError={setError} onOpenProfile={setProfileSheet} />
       ) : (
@@ -350,7 +355,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
           void refresh(tab === "chat" ? "chat" : "feed");
         }}
       />
-      <MemberProfileSheet squadId={squad.id} row={profileSheet} onClose={() => setProfileSheet(null)} />
+      <MemberProfileSheet squadId={squad.id} row={profileSheet} onClose={() => setProfileSheet(null)} me={me} />
       <ReactorsSheet
         postId={reactorsFor}
         me={me}
@@ -374,7 +379,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
 }
 
 /** A leaderboard row's mini profile — name, streak and points, with a link through to the full Members page. */
-function MemberProfileSheet({ squadId, row, onClose }: { squadId: string; row: LeaderRow | null; onClose: () => void }) {
+function MemberProfileSheet({ squadId, row, onClose, me }: { squadId: string; row: LeaderRow | null; onClose: () => void; me?: string }) {
   return (
     <BottomSheet open={!!row} title="Member" onClose={onClose}>
       {row ? (
@@ -406,6 +411,7 @@ function MemberProfileSheet({ squadId, row, onClose }: { squadId: string; row: L
               <span className="text-[11px] muted">pts this wk</span>
             </div>
           </div>
+          {me ? <MemberSafety userId={row.user_id} name={row.name} squadId={squadId} me={me} /> : null}
           <Link href={`/squad/${squadId}/members`} className="press mt-4 text-[13px] font-bold underline" style={{ color: "var(--ink)" }} onClick={onClose}>
             See all members
           </Link>
@@ -660,6 +666,8 @@ function FeedTab({
   const [barFor, setBarFor] = useState<string | null>(null);
   return (
     <div className="flex flex-col gap-3 px-4 pb-10 pt-3">
+      {/* v2.18: who's training now (D7), active pledges (D8), "Get verified" for owners (D3). */}
+      <SquadSocialTop squadId={squadId} isOwner={isOwner} />
       <button type="button" className="card press flex items-center gap-3 text-left" style={{ padding: "12px 14px", color: "var(--ink)" }} onClick={onPhoto}>
         <span className="grid h-10 w-10 place-items-center rounded-full" style={{ background: "var(--blue-bg)", color: "var(--blue)" }}>
           <Photo size={20} />
@@ -686,6 +694,7 @@ function FeedTab({
           <p className="mt-3 max-w-[280px] text-[12px] muted">Meals, workouts and gym PRs you log show up here on their own.</p>
         </div>
       ) : (
+        <StampsProvider posts={posts}>
         <AnimatePresence initial={false}>
           {posts.map((p) => (
             <FeedCard
@@ -702,6 +711,7 @@ function FeedTab({
             />
           ))}
         </AnimatePresence>
+        </StampsProvider>
       )}
     </div>
   );
@@ -778,10 +788,14 @@ function FeedCard({
           <meta.Icon size={16} />
         </span>
         {onDelete ? <PostMenu align="right" onDelete={onDelete} /> : null}
+        {p.user_id !== me && !onDelete ? <SafetyMenu post={p} squadId={squadId} /> : null}
       </div>
       {p.photo_url ? (
-        // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL
-        <img src={p.photo_url} alt="" className="mt-3 max-h-80 w-full rounded-2xl object-cover" loading="lazy" draggable={false} />
+        <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element -- signed Storage URL */}
+          <img src={p.photo_url} alt="" className="mt-3 max-h-80 w-full rounded-2xl object-cover" loading="lazy" draggable={false} />
+          <StampMark post={p} />
+        </div>
       ) : null}
       {p.body ? (
         <p className={`mt-2.5 whitespace-pre-wrap break-words ${p.kind === "photo" ? "text-[14px]" : "text-[16px] font-bold"}`} style={{ letterSpacing: p.kind === "photo" ? undefined : "-0.01em" }}>
@@ -804,6 +818,7 @@ function FeedCard({
         <ReactionChips state={state} onOpen={() => reacting.openReactors(p.id)}>
           <AddReactionButton onClick={() => setBar(!barOpen)} />
         </ReactionChips>
+        <StampRow post={p} />
       </div>
       <AnimatePresence>
         {heart ? (

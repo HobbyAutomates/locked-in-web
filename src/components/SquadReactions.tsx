@@ -82,7 +82,8 @@ export function ReactionBar({ open, mine, align, onPick, onClose, below = false 
       initial={{ opacity: 0, scale: 0.85, y: below ? -4 : 4 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 420, damping: 28 }}
-      className="absolute z-40 flex items-center gap-0.5 rounded-full px-1.5 py-1"
+      // v2.18: 13 reactions in two rows of 7 (fits a 375 px phone).
+      className="absolute z-40 grid grid-cols-7 gap-0.5 rounded-[22px] px-1.5 py-1"
       style={{ [align]: 0, ...(below ? { top: "calc(100% + 6px)" } : { bottom: "calc(100% + 6px)" }), background: "var(--card)", boxShadow: "var(--shadow-lg)", transformOrigin: `${align} ${below ? "top" : "bottom"}` }}
       onPointerDown={(e) => e.stopPropagation()}
     >
