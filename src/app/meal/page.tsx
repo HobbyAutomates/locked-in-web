@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { getFoodUsage, getMeal, getPresets } from "@/lib/data";
+import { getFoodUsage, getMeal, getPresets, getRecentFoods } from "@/lib/data";
 import { listSavedMeals } from "@/lib/actions";
 import { today as todayIso } from "@/lib/dates";
 import { isMealType } from "@/lib/mealType";
@@ -23,13 +23,14 @@ export default async function MealPage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const t = todayIso();
   const back = backPath(sp.back);
-  const [existing, savedMeals, presets, usage] = await Promise.all([
+  const [existing, savedMeals, presets, usage, recentFoods] = await Promise.all([
     sp.id ? getMeal(sp.id) : Promise.resolve(null),
     listSavedMeals().catch(() => []),
     getPresets().catch(() => []),
     getFoodUsage().catch(() => ({})),
+    sp.id ? Promise.resolve([]) : getRecentFoods().catch(() => []),
   ]);
   if (sp.id && !existing) redirect(back);
   const date = existing?.date ?? (sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) && sp.date <= t ? sp.date : t);
-  return <MealScreen date={date} mealType={isMealType(sp.type) ? sp.type : null} existing={existing} back={back} savedMeals={savedMeals} presets={presets} usage={usage} />;
+  return <MealScreen date={date} mealType={isMealType(sp.type) ? sp.type : null} existing={existing} back={back} savedMeals={savedMeals} presets={presets} usage={usage} recentFoods={recentFoods} />;
 }

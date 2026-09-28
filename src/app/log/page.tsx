@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/supabase/server";
-import { getExercises, getFoodUsage, getPresets, getProfile, getRecentLiftWorkouts, getWorkout, getWorkouts } from "@/lib/data";
+import { getExercises, getFoodUsage, getPresets, getProfile, getRecentFoods, getRecentLiftWorkouts, getWorkout, getWorkouts } from "@/lib/data";
 import { getExercise } from "@/lib/activityActions";
 import { listSavedMeals } from "@/lib/actions";
 import { addDays, today as todayIso } from "@/lib/dates";
@@ -24,7 +24,7 @@ export default async function LogPage({
   // A workout's auto-burn row edits through its workout.
   if (editingExercise?.source === "workout" && editingExercise.note) redirect(`/log?workout=${encodeURIComponent(editingExercise.note)}`);
   const t = todayIso();
-  const [profile, existing, savedMeals, presets, usage, recentWorkouts, recentExercises, liftHistory] = await Promise.all([
+  const [profile, existing, savedMeals, presets, usage, recentWorkouts, recentExercises, liftHistory, recentFoods] = await Promise.all([
     getProfile(),
     sp.workout ? getWorkout(sp.workout) : Promise.resolve(null),
     listSavedMeals().catch(() => []),
@@ -33,6 +33,7 @@ export default async function LogPage({
     getWorkouts(addDays(t, -120), t).catch(() => []),
     getExercises(addDays(t, -60), t).catch(() => []),
     getRecentLiftWorkouts().catch(() => []),
+    getRecentFoods().catch(() => []),
   ]);
   return (
     <LogScreen
@@ -48,6 +49,7 @@ export default async function LogPage({
       recentWorkouts={recentWorkouts}
       liftHistory={liftHistory}
       prefill={sp.prefill === "1"}
+      recentFoods={recentFoods}
     />
   );
 }

@@ -31,6 +31,8 @@ import { ComingSoon } from "./nutrition/kit";
 import { WhatToEatSheet } from "./nutrition/WhatToEatSheet";
 import type { MealMethod } from "@/lib/analytics";
 import { loadOverrides, logEvent, nums, withOverride, type InputKind, type Override } from "@/lib/accuracyClient";
+import type { RecentFood } from "@/lib/recents";
+import { RecentRow, quantityOf } from "./scan/LogIt";
 
 const CATEGORIES: { key: PresetCategory; label: string }[] = [
   { key: "breakfast", label: "Breakfast" },
@@ -141,6 +143,7 @@ export default function MealForm({
   prefill = false,
   mealType = null,
   existing = null,
+  recent = [],
 }: {
   date: string;
   savedMeals: SavedMeal[];
@@ -155,6 +158,8 @@ export default function MealForm({
   mealType?: MealType | null;
   /** v2.8 meal editor: the saved meal being edited (items, type, date; Save updates it, Delete removes it). */
   existing?: Meal | null;
+  /** v2.17 "Recent": past foods and scans; "+" puts one on the plate at its last amount. */
+  recent?: RecentFood[];
 }) {
   const router = useRouter();
   const seq = useRef(1);
@@ -187,6 +192,8 @@ export default function MealForm({
   // v2.9: the row whose "Where's this from?" sheet is open, and the row "Pick another" is replacing via search.
   const [infoKey, setInfoKey] = useState<number | null>(null);
   const [swapKey, setSwapKey] = useState<number | null>(null);
+  // v2.17: the Recent food being adjusted before it goes on the plate.
+  const [recentAdjust, setRecentAdjust] = useState<RecentFood | null>(null);
   const tapped = useRef<string[]>([]);
   const promises = useRef(new Map<number, Promise<PlateJob>>());
   const handedOff = useRef(false);
@@ -640,6 +647,19 @@ export default function MealForm({
             />
           </>
         ) : (
+          <>
+          {recent.length ? (
+            <RecentRow
+              items={recent}
+              hint={`Adds to your plate`}
+              onAdd={(r) => {
+                addRows([{ item: { ...r.item }, servings: r.food.servings, servingLabel: r.servingLabel, image: r.image, imageKind: r.kind === "food" ? "generic" : "product" }]);
+                tapped.current.push(r.name);
+                say(`Added ${r.qty} ${r.name} · ${r.kcal} kcal`);
+              }}
+              onAdjust={setRecentAdjust}
+            />
+          ) : null}
           <PresetGrid
             presets={presets}
             savedMeals={savedMeals}
@@ -654,6 +674,7 @@ export default function MealForm({
             }}
             onEmpty={() => barRef.current?.focus()}
           />
+          </>
         )}
       </div>
 
@@ -770,6 +791,21 @@ export default function MealForm({
         </div>
       ) : null}
 
+      <QuantitySheet
+        food={recentAdjust?.food ?? null}
+        initial={recentAdjust ? quantityOf(recentAdjust.item) : undefined}
+        title="How much?"
+        cta="Add"
+        onClose={() => setRecentAdjust(null)}
+        onDone={(item, _q, servingLabel) => {
+          const r = recentAdjust;
+          setRecentAdjust(null);
+          if (!r) return;
+          addRows([{ item, servings: r.food.servings, servingLabel: servingLabel ?? r.servingLabel, image: r.image, imageKind: r.kind === "food" ? "generic" : "product" }]);
+          tapped.current.push(r.name);
+          say(`Added ${r.name} · ${Math.round(item.calories)} kcal`);
+        }}
+      />
       <QuantitySheet
         food={editFood}
         initial={editInitial}

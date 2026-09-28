@@ -9,6 +9,7 @@ import { isMealType, missingMealTypeColumn } from "./mealType";
 import { parseAutoPost, parseAutoShare } from "./squadSharing";
 import { normalizeReaction, parseCounts, type ReadRow } from "./reactions";
 import { friendsToday, squadCard, type CardPost, type FriendToday, type SquadCard } from "./squadCards";
+import { recentFoods, type RecentFood } from "./recents";
 
 const PROFILE_COLS =
   "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml, units, username, water_glass_ml, water_reminder_from, water_reminder_to, water_reminder_every_min";
@@ -363,8 +364,46 @@ export async function getScans(limit = 30): Promise<ScanHistoryItem[]> {
       image_url: (r.thumb_path ? thumbs.get(r.thumb_path) : null) ?? offImage ?? (r.image_path ? plates.get(r.image_path) ?? null : null),
       image_path: r.image_path,
       what_it_is: typeof report.what_it_is === "string" ? report.what_it_is.replace(/\s+/g, " ").trim() : kind === "photo" && typeof report.plate_note === "string" ? report.plate_note : kind === "menu" ? (r.verdict ?? "") : "",
+      per100: kind === "label" || kind === "barcode" ? scanPer100(report.per_100g) : null,
+      serving_g: typeof report.serving_g === "number" && report.serving_g > 0 ? report.serving_g : null,
     };
   });
+}
+
+/** v2.17: a report's per_100g as numbers, or null when it has no calories (nothing to re-add). */
+function scanPer100(raw: unknown): ScanHistoryItem["per100"] {
+  if (!raw || typeof raw !== "object") return null;
+  const p = raw as Record<string, unknown>;
+  const n = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+  const calories = n(p.calories);
+  if (calories == null) return null;
+  return { calories, protein_g: n(p.protein_g), carbs_g: n(p.carbs_g), fat_g: n(p.fat_g) };
+}
+
+/**
+ * v2.17 "Recent" on Scan and Add food: past logged foods (the last 45 days' newest 60 meals, no
+ * photo signing) plus label / barcode scans (pass the Scan page's list to skip a second fetch).
+ */
+export async function getRecentFoods(scans?: ScanHistoryItem[]): Promise<RecentFood[]> {
+  const supabase = await createClient();
+  const query = () =>
+    supabase
+      .from("meals")
+      .select(`created_at, meal_items(${itemCols()})`)
+      .gte("date", addDays(today(), -45))
+      .order("created_at", { ascending: false })
+      .limit(60);
+  let res = await query();
+  if (res.error && missingV38(res.error)) {
+    itemV38 = false;
+    res = await query();
+  }
+  const meals = ((res.data ?? []) as unknown as { created_at: string; meal_items: MealItem[] | null }[]).map((m) => ({
+    created_at: m.created_at,
+    items: (m.meal_items ?? []).map((i) => ({ ...i, grams: Number(i.grams), calories: Number(i.calories), protein_g: Number(i.protein_g), carbs_g: Number(i.carbs_g), fat_g: Number(i.fat_g), servings: i.servings == null ? null : Number(i.servings) })),
+  }));
+  const list = scans ?? (await getScans(30).catch(() => []));
+  return recentFoods(meals, list);
 }
 
 /** The full stored report of one scan (for the read-only view). */

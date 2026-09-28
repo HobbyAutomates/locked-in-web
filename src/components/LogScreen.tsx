@@ -7,6 +7,7 @@ import { Segmented } from "./ui";
 import MealForm from "./MealForm";
 import WorkoutForm from "./WorkoutForm";
 import type { ExerciseEntry, FoodPreset, Profile, SavedMeal, Workout } from "@/lib/types";
+import type { RecentFood } from "@/lib/recents";
 
 /**
  * Full-screen Log page. v2.8: Food · Activity (the old Workout and Exercise segments are one
@@ -26,6 +27,7 @@ export default function LogScreen({
   recentWorkouts = [],
   liftHistory = [],
   prefill = false,
+  recentFoods = [],
 }: {
   existing: Workout | null;
   /** v2.8: a logged run / activity to edit. */
@@ -44,6 +46,8 @@ export default function LogScreen({
   liftHistory?: Workout[];
   /** v2.4: opened from a scan's "Add to plate" — the Meal form starts with those items. */
   prefill?: boolean;
+  /** v2.17: past foods and scans, one tap to re-add. */
+  recentFoods?: RecentFood[];
 }) {
   const router = useRouter();
   const editing = !!existing || !!editingExercise;
@@ -88,7 +92,7 @@ export default function LogScreen({
           history={liftHistory.filter((w) => w.id !== existing?.id)}
         />
       ) : (
-        <MealForm date={date} savedMeals={savedMeals} presets={presets} usage={usage} onClose={close} prefill={prefill} />
+        <MealForm date={date} savedMeals={savedMeals} presets={presets} usage={usage} onClose={close} prefill={prefill} recent={recentFoods} />
       )}
     </div>
   );

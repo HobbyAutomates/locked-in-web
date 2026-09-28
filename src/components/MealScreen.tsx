@@ -5,6 +5,7 @@ import { ArrowLeft } from "./icons";
 import MealForm from "./MealForm";
 import type { MealType } from "@/lib/mealType";
 import type { FoodPreset, Meal, SavedMeal } from "@/lib/types";
+import type { RecentFood } from "@/lib/recents";
 
 /** v2.8: the Add-food screen on its own page — a meal type's "+ Add", or a logged meal opened for editing. */
 export default function MealScreen({
@@ -15,6 +16,7 @@ export default function MealScreen({
   savedMeals,
   presets,
   usage,
+  recentFoods = [],
 }: {
   date: string;
   mealType: MealType | null;
@@ -23,6 +25,8 @@ export default function MealScreen({
   savedMeals: SavedMeal[];
   presets: FoodPreset[];
   usage: Record<string, number>;
+  /** v2.17: past foods and scans, one tap to re-add. */
+  recentFoods?: RecentFood[];
 }) {
   const router = useRouter();
   const close = () => router.push(back);
@@ -35,7 +39,7 @@ export default function MealScreen({
         <h1 className="flex-1 text-center text-[17px] font-bold">{existing ? "Edit meal" : "Add food"}</h1>
         <span className="w-10" />
       </div>
-      <MealForm key={existing?.id ?? `${date}:${mealType ?? ""}`} date={date} mealType={mealType} existing={existing} savedMeals={savedMeals} presets={presets} usage={usage} onClose={close} />
+      <MealForm key={existing?.id ?? `${date}:${mealType ?? ""}`} date={date} mealType={mealType} existing={existing} savedMeals={savedMeals} presets={presets} usage={usage} recent={recentFoods} onClose={close} />
     </div>
   );
 }

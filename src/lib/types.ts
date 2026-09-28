@@ -580,6 +580,9 @@ export type ScanHistoryItem = {
   image_path: string | null;
   /** v2.2: one line from the report ("A sweetened whey protein bar"), "" when there is none. */
   what_it_is: string;
+  /** v2.17 (Recent): a label / barcode scan's per-100 g numbers and serving, when it has them. */
+  per100?: { calories?: number | null; protein_g?: number | null; carbs_g?: number | null; fat_g?: number | null } | null;
+  serving_g?: number | null;
 };
 
 /** Macro targets, exactly as Android's Profile: explicit if set, else fat 25% of kcal and carbs the remainder. */

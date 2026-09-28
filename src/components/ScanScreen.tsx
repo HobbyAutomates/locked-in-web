@@ -20,7 +20,8 @@ import { needsCheck, reportSourceInfo, sourceInfoFor } from "@/lib/sourceInfo";
 import { swapToVariant, type FoodVariant } from "@/lib/variants";
 import { track } from "@/lib/track";
 import { defaultMealType, mealTypeLabel, type MealType } from "@/lib/mealType";
-import { LogItCard, MealSlotChips } from "./scan/LogIt";
+import { LogItCard, MealSlotChips, RecentRow, quantityOf } from "./scan/LogIt";
+import type { RecentFood } from "@/lib/recents";
 import CameraStage, { ScanIcon, type ScanMode } from "./scan/CameraStage";
 import PhotoStage from "./scan/PhotoStage";
 import sc from "./scan/scan.module.css";
@@ -70,7 +71,7 @@ function toResult(r: Record<string, unknown>): ScanResult {
  * pipeline. Analysis starts as soon as the photo is taken. A chip row under the result lets the
  * user correct the guess, which re-runs the scan with that kind forced.
  */
-export default function ScanScreen({ history, profile }: { history: ScanHistoryItem[]; profile: Profile }) {
+export default function ScanScreen({ history, profile, recent = [] }: { history: ScanHistoryItem[]; profile: Profile; recent?: RecentFood[] }) {
   const router = useRouter();
   const [preview, setPreview] = useState<string | null>(null);
   const [payload, setPayload] = useState<Payload | null>(null);
@@ -91,6 +92,28 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
   const [mode, setMode] = useState<ScanMode>("food");
   // v2.13: a restaurant menu scan's result (Menu mode → /api/scan-menu).
   const [menu, setMenu] = useState<MenuScanResult | null>(null);
+  // v2.17 Recent: which meal "+" logs into, per-row busy / done, and the row being adjusted first.
+  const [recentSlot, setRecentSlot] = useState<MealType>(() => defaultMealType());
+  const [recentState, setRecentState] = useState<Record<string, "busy" | "ok">>({});
+  const [recentAdjust, setRecentAdjust] = useState<RecentFood | null>(null);
+
+  async function logRecent(r: RecentFood, item: MealItem) {
+    setRecentState((s) => ({ ...s, [r.key]: "busy" }));
+    setError(null);
+    try {
+      await saveMeal({ date: today(), raw_text: `${r.name} (recent)`, items: [{ ...item, id: undefined }], meal_type: recentSlot });
+      track("meal_logged", { method: "search", items: 1, from: "scan_recent" });
+      setRecentState((s) => ({ ...s, [r.key]: "ok" }));
+      router.refresh();
+    } catch (e) {
+      setRecentState((s) => {
+        const n = { ...s };
+        delete n[r.key];
+        return n;
+      });
+      setError(e instanceof Error ? e.message : "Could not log that");
+    }
+  }
 
   function reset() {
     setError(null);
@@ -262,6 +285,20 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
       )}
 
       <ErrorNote text={error} />
+
+      {onCamera && recent.length ? (
+        <Rise index={2}>
+          <div className="flex flex-col gap-2.5">
+            <RecentRow items={recent} state={recentState} hint={`+ logs to ${mealTypeLabel(recentSlot)}`} onAdd={(r) => void logRecent(r, r.item)} onAdjust={setRecentAdjust} />
+            <MealSlotChips value={recentSlot} onChange={setRecentSlot} compact />
+          </div>
+        </Rise>
+      ) : null}
+      <QuantitySheet food={recentAdjust?.food ?? null} initial={recentAdjust ? quantityOf(recentAdjust.item) : undefined} title="How much?" cta={`Log to ${mealTypeLabel(recentSlot)}`} onClose={() => setRecentAdjust(null)} onDone={(item) => {
+        const r = recentAdjust;
+        setRecentAdjust(null);
+        if (r) void logRecent(r, item);
+      }} />
 
       {res && payload && !plateSheet ? (
         <Rise index={2}>
