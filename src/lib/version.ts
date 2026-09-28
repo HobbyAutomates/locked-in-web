@@ -3,7 +3,7 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.14";
+export const APP_VERSION = "2.15";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
