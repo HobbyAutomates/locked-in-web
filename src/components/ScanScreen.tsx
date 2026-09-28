@@ -1100,6 +1100,8 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
   const listRef = useRef<HTMLDivElement>(null);
   // v2.15: the row open in the item editor (count stepper, calories per piece, "Correct the numbers").
   const [editIdx, setEditIdx] = useState<number | null>(null);
+  // v2.17: which meal this plate goes into; the hour rule picks, one tap changes it.
+  const [slot, setSlot] = useState<MealType>(() => defaultMealType());
   // v2.15 beta log: a result closed without "Log" / "Add to plate" is a scan_dismiss.
   const accepted = useRef(false);
   useEffect(() => {
@@ -1152,8 +1154,6 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
     listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     listRef.current?.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
   };
-  // v2.17: which meal this plate goes into; the hour rule picks, one tap changes it.
-  const [slot, setSlot] = useState<MealType>(() => defaultMealType());
 
   const body = (
     <>
