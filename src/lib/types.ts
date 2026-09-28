@@ -377,6 +377,8 @@ export type PlateItem = {
   source_urls?: string[] | null;
   /** v2.15: the person corrected this item's numbers. */
   user_verified?: boolean | null;
+  /** v2.15: kcal of ONE piece when the person set it in the editor. */
+  per_unit_kcal?: number | null;
 };
 
 /** v2.8: one clarifying question the model can ask after a plate scan, with a fixed effect vocabulary

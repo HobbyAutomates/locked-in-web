@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { deleteScan, saveMeal } from "@/lib/actions";
 import { today } from "@/lib/dates";
 import { decodeBarcode, makeThumb, postJson, toJpegBase64 } from "@/lib/image";
-import { mealItemFromPlate, priceItem, type QuantityFood } from "@/lib/quantity";
+import { foodFromItem, mealItemFromPlate, priceItem, type QuantityFood } from "@/lib/quantity";
+import { logEvent, nums } from "@/lib/accuracyClient";
 import { initialLens, type Fit, type LabelReport, type Lens, type MealItem, type PlateEstimate, type PlateItem, type Profile, type ScanHistoryItem } from "@/lib/types";
 import { applyFollowUpEffect, gramsRangeLabel, totalKcalRange } from "@/lib/scanFollowUp";
 import { Alert, Barcode, Camera, Check, ChevronDown, Close, Spinner, Spoon, Tag, Trash } from "./icons";
@@ -123,7 +124,7 @@ export default function ScanScreen({ history, profile }: { history: ScanHistoryI
     setError(null);
     setRes(null);
     setOpened(null);
-    setStage(extra.kind === "plate" ? "Looking at the plate… 10–20 s" : extra.barcode ? "Looking it up and writing your report… 15–30 s" : "Working out what it is, then reading it… 15–45 s");
+    setStage(extra.kind === "plate" ? "Looking at the plate, then checking sources for each item… 20–40 s" : extra.barcode ? "Looking it up and writing your report… 15–30 s" : "Working out what it is, then reading it… 15–45 s");
     try {
       const r = await postJson<Record<string, unknown>>("/api/scan", { image: pl?.base64, media_type: pl?.media_type, thumb: pl?.thumb ?? undefined, lens, note: note.trim() || undefined, ...extra });
       if (typeof r.barcode === "string" && r.barcode) setDigits(r.barcode);
@@ -594,7 +595,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
           </AnimatePresence>
         </div>
       </Rise>
-      <QuantitySheet food={logFood} title="Log from this scan" cta="Log" onClose={() => setLogFood(null)} onDone={(item) => void logServing(item)} />
+      <QuantitySheet food={logFood} title="Log from this scan" cta="Log" accuracy={{ inputKind: r.kind === "barcode" ? "barcode" : "label", scanId: r.id ?? null, rawInput: r.product ?? null }} onClose={() => setLogFood(null)} onDone={(item) => void logServing(item)} />
     </>
   );
 }
@@ -1089,6 +1090,24 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
   const [infoIdx, setInfoIdx] = useState<number | null>(null);
   const [confirmed, setConfirmed] = useState<Set<number>>(() => new Set());
   const listRef = useRef<HTMLDivElement>(null);
+  // v2.15: the row open in the item editor (count stepper, calories per piece, "Correct the numbers").
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  // v2.15 beta log: a result closed without "Log" / "Add to plate" is a scan_dismiss.
+  const accepted = useRef(false);
+  useEffect(() => {
+    if (readOnly || !plate.items.length) return;
+    const opened = Date.now();
+    return () => {
+      // (> 1.5 s: ignores React's dev double-mount.)
+      if (!accepted.current && Date.now() - opened > 1500) logEvent("scan_dismiss", { payload: { scan_id: plate.id ?? null, kind: "plate", items: plate.items.length, total_kcal: plate.items.reduce((a, i) => a + i.calories, 0) } });
+    };
+  }, [readOnly, plate]);
+  function accept(how: "log" | "plate") {
+    accepted.current = true;
+    logEvent("scan_accept", { payload: { scan_id: plate.id ?? null, kind: "plate", how, items: items.map(nums), total_kcal: items.reduce((a, i) => a + i.calories, 0), plate_note: plate.plate_note } });
+  }
+  const editItem = editIdx !== null ? (items[editIdx] ?? null) : null;
+  const editMeal = editItem ? mealItemFromPlate(editItem) : null;
   const kcalTotal = totalKcalRange(items);
   const prot = items.reduce((a, i) => a + i.protein_g, 0);
 
@@ -1142,7 +1161,7 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
         <p className="mt-0.5 text-xs muted">This is an estimate — edit anything.</p>
         {plate.portion_hint === "restaurant" ? (
           <p className="mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold" style={{ background: "var(--orange-bg)", color: "var(--orange)" }}>
-            Restaurant portion · ×1.4 + hidden oil
+            Restaurant · hidden oil added
           </p>
         ) : null}
       </div>
@@ -1167,10 +1186,17 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
           return (
             <div key={idx} className={`${sc.item}${low ? ` ${sc.itemLow}` : ""}`}>
               <div className="flex items-center gap-2">
-                <span className="min-w-0 truncate text-[14px] font-bold">
-                  {it.name}
-                  {it.source === "estimated" ? " ~" : ""}
-                </span>
+                {readOnly ? (
+                  <span className="min-w-0 truncate text-[14px] font-bold">
+                    {it.name}
+                    {it.source === "estimated" ? " ~" : ""}
+                  </span>
+                ) : (
+                  <button type="button" className="press min-w-0 truncate text-left text-[14px] font-bold underline decoration-dotted underline-offset-4" style={{ background: "none", border: 0, padding: 0, color: "var(--ink)" }} aria-label={`Edit ${it.name}`} onClick={() => setEditIdx(idx)}>
+                    {it.name}
+                    {it.source === "estimated" ? " ~" : ""}
+                  </button>
+                )}
                 <span className={sc.confDot} style={{ background: low ? "var(--danger)" : c.color }} aria-hidden="true" />
                 <span className="shrink-0 text-[11px] muted">{it.confidence}</span>
                 <span className="num ml-auto shrink-0 text-[15px] font-extrabold">
@@ -1189,6 +1215,11 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
                   </button>
                 ) : null}
               </div>
+              {it.user_verified ? (
+                <span className="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }}>
+                  ✓ Your numbers
+                </span>
+              ) : null}
               {it.uncertainties?.length ? <p className="text-[11px]" style={{ color: "var(--orange)" }}>{it.uncertainties.join(" · ")}</p> : null}
               {!readOnly && it.variants && it.variants.length > 1 ? <VariantChips variants={it.variants} currentId={it.food_id} onPick={(v) => pickVariant(idx, v)} /> : null}
               {open === idx ? (
@@ -1211,6 +1242,7 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
                     className="hit press ml-auto grid h-8 w-8 place-items-center rounded-full"
                     style={{ color: "var(--muted)" }}
                     onClick={() => {
+                      logEvent("skip", { item_name: it.name, payload: { before: nums(it), input_kind: "photo", scan_id: plate.id ?? null, source: it.source_info?.kind ?? null, plate_note: plate.plate_note } });
                       setItems(items.filter((_, i) => i !== idx));
                       setOriginals(originals.filter((_, i) => i !== idx));
                       setConfirmed((cur) => new Set([...cur].filter((i) => i !== idx).map((i) => (i > idx ? i - 1 : i))));
@@ -1240,6 +1272,8 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
                     items: items.map(mealItemFromPlate),
                   });
                   track("meal_logged", { method: "photo", items: items.length, from: "scan" });
+                  accept("log");
+                  logEvent("log", { payload: { method: "photo", scan_id: plate.id ?? null, items: items.map(nums), total_kcal: items.reduce((a, i) => a + i.calories, 0), raw_text: plate.plate_note } });
                   onSaved?.();
                   router.push("/");
                 } catch (e) {
@@ -1254,13 +1288,49 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
             type="button"
             className="hit press mt-1 w-full py-2 text-center text-[13px] font-semibold muted"
             disabled={!items.length}
-            onClick={() => openOnPlate(router, { items: items.map(mealItemFromPlate), label: plate.plate_note || "Plate photo", photo_path: plate.photo_path ?? null })}
+            onClick={() => {
+              accept("plate");
+              openOnPlate(router, { items: items.map(mealItemFromPlate), label: plate.plate_note || "Plate photo", photo_path: plate.photo_path ?? null });
+            }}
           >
             Add to plate to change or add food
           </button>
         </div>
       ) : null}
       {extra}
+      {!readOnly ? (
+        <QuantitySheet
+          food={editMeal ? { ...foodFromItem(editMeal, editMeal.serving_unit ? [editMeal.serving_unit] : []), defaultServing: editMeal.serving_unit?.label ?? null } : null}
+          initial={editMeal ? { unit: "g", value: editMeal.grams } : undefined}
+          title="Change this item"
+          cta="Update"
+          accuracy={{ inputKind: "photo", scanId: plate.id ?? null, rawInput: plate.plate_note || null }}
+          onClose={() => setEditIdx(null)}
+          onDone={(m) => {
+            const idx = editIdx;
+            setEditIdx(null);
+            if (idx === null) return;
+            const apply = (x: PlateItem): PlateItem => ({
+              ...x,
+              grams: m.grams,
+              grams_low: undefined,
+              grams_high: undefined,
+              calories: m.calories,
+              protein_g: m.protein_g,
+              carbs_g: m.carbs_g,
+              fat_g: m.fat_g,
+              micros: m.micros ?? x.micros,
+              user_verified: m.user_verified ?? x.user_verified ?? null,
+              per_unit_kcal: m.per_unit_kcal ?? x.per_unit_kcal ?? null,
+              source_info: m.source_info ?? x.source_info ?? null,
+              confidence: m.user_verified ? "high" : x.confidence,
+            });
+            setItems((cur) => cur.map((x, i) => (i === idx ? apply(x) : x)));
+            setOriginals((cur) => cur.map((x, i) => (i === idx ? apply(x) : x)));
+            if (m.user_verified) setConfirmed((cur) => new Set(cur).add(idx));
+          }}
+        />
+      ) : null}
       <SourceSheet
         item={infoIdx !== null ? (items[infoIdx] ?? null) : null}
         onClose={() => setInfoIdx(null)}

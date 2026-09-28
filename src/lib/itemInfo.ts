@@ -17,12 +17,17 @@ export type ItemLike = {
   cooked_in?: string | null;
   grams_low?: number | null;
   grams_high?: number | null;
+  /** v2.15 */
+  user_verified?: boolean | null;
+  source_info?: { kind?: string } | null;
 };
 
-export type Origin = "database" | "ai" | "scan" | "recipe";
+export type Origin = "database" | "ai" | "scan" | "recipe" | "web" | "yours";
 
 export function originOf(it: ItemLike): Origin {
   if (isRecipeItem(it)) return "recipe";
+  if (it.user_verified || it.source_info?.kind === "user") return "yours";
+  if (it.source_info?.kind === "web") return "web";
   if (it.source === "scan") return "scan";
   if (it.source === "estimated" || !it.food_id) return "ai";
   return "database";
@@ -33,6 +38,8 @@ export const ORIGIN_LABEL: Record<Origin, string> = {
   ai: "AI estimate",
   scan: "From the label",
   recipe: "Your recipe",
+  web: "Web sources",
+  yours: "Your numbers",
 };
 
 export type Level = "High" | "Medium" | "Low";
@@ -47,6 +54,8 @@ export function confidenceWhy(it: ItemLike): string {
   const o = originOf(it);
   const level = levelOf(it);
   if (o === "recipe") return "Worked out from your own recipe's ingredients.";
+  if (o === "yours") return "You entered these numbers yourself.";
+  if (o === "web") return level === "Low" ? "Looked up on the web, but the sources didn't agree well or the portion is a guess." : "Looked up on the web (links below); only the amount is an estimate.";
   if (o === "scan") return "Read off the pack's nutrition table, so only the amount can differ.";
   if (o === "database") {
     if (it.cooked_in === "restaurant") return "A food-table match with extra oil for a restaurant portion; the oil is the big unknown.";

@@ -30,6 +30,7 @@ import { LineIcon } from "./lineIcons";
 import { ComingSoon } from "./nutrition/kit";
 import { WhatToEatSheet } from "./nutrition/WhatToEatSheet";
 import type { MealMethod } from "@/lib/analytics";
+import { loadOverrides, logEvent, nums, withOverride, type InputKind, type Override } from "@/lib/accuracyClient";
 
 const CATEGORIES: { key: PresetCategory; label: string }[] = [
   { key: "breakfast", label: "Breakfast" },
@@ -50,7 +51,19 @@ const SOURCE_LABEL: Record<string, string> = { dish: "INDB", ifct: "IFCT", usda:
  * One plate row: the priced item plus the serving sizes it came with (so the Quantity sheet can
  * offer them again). v2.4: `image` / `imageKind` are the row's picture (display only).
  */
-type Row = { key: number; item: MealItem; servings?: PresetServing[]; servingLabel?: string | null; category?: string | null; image?: string | null; imageKind?: FoodImageKind; confirmed?: boolean };
+type Row = {
+  key: number;
+  item: MealItem;
+  servings?: PresetServing[];
+  servingLabel?: string | null;
+  category?: string | null;
+  image?: string | null;
+  imageKind?: FoodImageKind;
+  confirmed?: boolean;
+  /** v2.15: where the row came from (for "Correct the numbers"), and whether the AI suggested it (removing it = a "skip"). */
+  origin?: InputKind;
+  ai?: boolean;
+};
 
 /** v2.9: a search hit as a variant, so "Pick another" -> search swaps the row at the same grams. */
 function hitVariant(h: FoodSearchHit): FoodVariant {
@@ -178,6 +191,11 @@ export default function MealForm({
   const promises = useRef(new Map<number, Promise<PlateJob>>());
   const handedOff = useRef(false);
   const barRef = useRef<HTMLInputElement>(null);
+  // v2.15: the person's "calories per roti" overrides, applied to every newly added row.
+  const overrides = useRef<Map<string, Override>>(new Map());
+  useEffect(() => {
+    void loadOverrides().then((m) => (overrides.current = m));
+  }, []);
 
   const items = rows.map((r) => r.item);
   const totalKcal = items.reduce((a, i) => a + Number(i.calories), 0);
@@ -208,7 +226,8 @@ export default function MealForm({
     if (!data?.items?.length) return;
     const d = data;
     // Hydrating from storage once on mount is the point of this effect.
-    setRows((cur) => [...cur, ...d.items.map((item) => ({ item, key: seq.current++, image: item.image_url ?? null, imageKind: d.kind ?? "generic" }))]);
+    const origin: InputKind = d.method === "barcode" || d.method === "label" ? d.method : d.photo_path ? "photo" : "manual";
+    setRows((cur) => [...cur, ...d.items.map((item) => ({ item, key: seq.current++, image: item.image_url ?? null, imageKind: d.kind ?? "generic", servings: item.serving_unit ? [item.serving_unit] : undefined, servingLabel: item.serving_unit?.label ?? null, origin, ai: origin === "photo" }))]);
     if (d.photo_path) setPhotoPath(d.photo_path);
     if (d.method) via.current = d.method;
     tapped.current.push(d.label);
@@ -262,7 +281,7 @@ export default function MealForm({
   }
 
   function addRows(next: Omit<Row, "key">[]) {
-    setRows((cur) => [...cur, ...next.map((r) => ({ ...r, key: seq.current++ }))]);
+    setRows((cur) => [...cur, ...next.map((r) => ({ ...r, item: withOverride(r.item, r.servingLabel, overrides.current), key: seq.current++ }))]);
     setError(null);
   }
 
@@ -338,7 +357,7 @@ export default function MealForm({
     setJobs((j) => [...j, { id, kind, label }]);
     p.then((r) => {
       if (handedOff.current) return;
-      addRows(r.items.map((item) => ({ item, image: item.image_url ?? null, servings: item.serving_unit ? [item.serving_unit] : undefined, servingLabel: item.serving_unit?.label ?? null })));
+      addRows(r.items.map((item) => ({ item, image: item.image_url ?? null, servings: item.serving_unit ? [item.serving_unit] : undefined, servingLabel: item.serving_unit?.label ?? null, origin: kind === "photo" ? "photo" : "text", ai: true })));
       if (r.notes?.length) setNotes((n) => [...n, ...(r.notes ?? [])]);
       if (r.photo_path) setPhotoPath((pp) => pp ?? r.photo_path ?? null);
     })
@@ -357,6 +376,7 @@ export default function MealForm({
     if (!t) return;
     setText("");
     setRawParts((p) => [...p, t]);
+    logEvent("note", { payload: { where: "meal_text", text: t } });
     startJob(
       "parse",
       t,
@@ -384,6 +404,7 @@ export default function MealForm({
       try {
         const added = [...rawParts, ...tapped.current];
         await updateMeal({ id: existing.id, date: day, meal_type: type, items, raw_text: added.length ? [existing.raw_text, ...added].filter(Boolean).join(", ") : undefined });
+        logEvent("edit", { meal_id: existing.id, payload: { what: "meal", items: items.map(nums), total_kcal: Math.round(totalKcal) } });
         onClose();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not save");
@@ -395,14 +416,16 @@ export default function MealForm({
       // Still working something out: close now, Home shows the pending row, the save lands when it's done.
       handedOff.current = true;
       saveWhenReady({ label: jobs.map((j) => j.label).join(", ") || raw, date, raw_text: raw, items, photo_path: photoPath, meal_type: type, jobs: [...promises.current.values()], method: mealMethod() });
+      logEvent("log", { payload: { method: mealMethod(), items: items.map(nums), pending_jobs: promises.current.size, raw_text: raw } });
       onClose();
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      await saveMeal({ date, raw_text: raw, items, photo_path: photoPath, meal_type: type });
+      const saved = await saveMeal({ date, raw_text: raw, items, photo_path: photoPath, meal_type: type });
       track("meal_logged", { method: mealMethod(), items: items.length });
+      logEvent("log", { meal_id: saved?.id ?? null, payload: { method: mealMethod(), items: items.map(nums), total_kcal: Math.round(totalKcal), raw_text: raw } });
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
@@ -450,7 +473,8 @@ export default function MealForm({
     setError(null);
     try {
       const r = await parseMeal(rawParts.join(", ") || items.map((i) => i.name).join(", "), fixText, items);
-      setRows(plain(r.items).map((item) => ({ item, key: seq.current++, image: item.image_url ?? null, servings: item.serving_unit ? [item.serving_unit] : undefined, servingLabel: item.serving_unit?.label ?? null })));
+      logEvent("note", { payload: { where: "fix", text: fixText } });
+      setRows(plain(r.items).map((item) => ({ item: withOverride(item, item.serving_unit?.label, overrides.current), key: seq.current++, image: item.image_url ?? null, servings: item.serving_unit ? [item.serving_unit] : undefined, servingLabel: item.serving_unit?.label ?? null, origin: "text" as const, ai: true })));
       setNotes([...r.assumptions, ...r.unparsed.map((u) => `Ignored: ${u}`)]);
       setFixText("");
       setFixOpen(false);
@@ -679,7 +703,12 @@ export default function MealForm({
                 showCookedIn={fats.length > 0 && !r.item.cooked_in && r.item.source !== "scan" && r.category !== "fat" && wantsCookedIn(r.item.name, r.category) && !fats.some((f) => f.food_id === r.item.food_id)}
                 onCookedIn={() => setCookedKey(r.key)}
                 onOpen={() => setEditKey(r.key)}
-                onRemove={() => setRows((cur) => cur.filter((x) => x.key !== r.key))}
+                onRemove={() => {
+                  // v2.15 beta log: an AI-suggested item removed before saving is a "skip" (usually wrong); a saved one is a "delete".
+                  if (existing && r.key < 0) logEvent("delete", { meal_id: existing.id, item_name: r.item.name, payload: { before: nums(r.item) } });
+                  else if (r.ai) logEvent("skip", { item_name: r.item.name, payload: { before: nums(r.item), input_kind: r.origin ?? "text", raw_text: rawParts.join(", ") } });
+                  setRows((cur) => cur.filter((x) => x.key !== r.key));
+                }}
                 onInfo={() => setInfoKey(r.key)}
                 onPickVariant={(v) => pickVariant(r.key, v)}
               />
@@ -689,7 +718,7 @@ export default function MealForm({
                 {rows.length || i > 0 ? <Hair /> : null}
                 <div className="flex items-center gap-2.5 py-3">
                   <Spinner size={16} />
-                  <span className="min-w-0 flex-1 truncate text-[13px] muted">{j.kind === "photo" ? "Estimating your plate…" : `Working out “${j.label}”…`}</span>
+                  <JobLabel job={j} />
                 </div>
               </div>
             ))}
@@ -746,12 +775,28 @@ export default function MealForm({
         initial={editInitial}
         title="Change the amount"
         cta="Update"
+        accuracy={{ inputKind: editing?.origin ?? "manual", mealId: existing?.id ?? null, rawInput: rawParts.join(", ") || existing?.raw_text || null }}
         onClose={() => setEditKey(null)}
         onDone={(item, _q, servingLabel) => {
           const key = editKey;
           setEditKey(null);
           // A row entered by weight reads in grams; counted rows keep their one-piece unit ("1 roti").
-          setRows((cur) => cur.map((r) => (r.key === key ? { ...r, servingLabel: servingLabel ?? null, item: { ...item, name: item.cooked_in === "restaurant" ? item.name : r.item.name, confidence: r.item.confidence, cooked_in: item.cooked_in ?? r.item.cooked_in ?? null, source: r.item.source, food_id: r.item.food_id, image_url: r.item.image_url } } : r)));
+          setRows((cur) => cur.map((r) => (r.key === key ? { ...r, servingLabel: servingLabel ?? null, item: {
+                    ...item,
+                    name: item.cooked_in === "restaurant" ? item.name : r.item.name,
+                    confidence: r.item.confidence,
+                    cooked_in: item.cooked_in ?? r.item.cooked_in ?? null,
+                    source: r.item.source,
+                    food_id: r.item.food_id,
+                    image_url: r.item.image_url,
+                    // v2.15: corrections / per-unit edits ride along; a plain amount change keeps what the row had.
+                    user_verified: item.user_verified ?? r.item.user_verified ?? null,
+                    per_unit_kcal: item.per_unit_kcal ?? (item.user_verified ? null : r.item.per_unit_kcal ?? null),
+                    source_urls: r.item.source_urls ?? null,
+                    source_info: item.source_info ?? r.item.source_info ?? null,
+                  },
+                }
+              : r)));
         }}
       />
 
@@ -1155,6 +1200,11 @@ function PlateRow({
               </button>
             ) : null}
           </span>
+          {item.user_verified ? (
+            <span className="inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: "var(--card2)", color: "var(--ink)" }}>
+              ✓ Your numbers
+            </span>
+          ) : null}
           <span className="text-[11px] muted">
             {ORIGIN_LABEL[originOf(item)]} · {levelOf(item).toLowerCase()} confidence
             {originOf(item) === "ai" ? ` · likely ${gramRangeText(item)}` : ""}
@@ -1178,5 +1228,23 @@ function PlateRow({
         </button>
       </div>
     </>
+  );
+}
+
+/**
+ * v2.15: a job's progress line. Typed text first says "Working out…"; after a few seconds (the food
+ * table didn't know something and the server is searching the web) it says so. Photos check sources.
+ */
+function JobLabel({ job }: { job: Job }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), job.kind === "photo" ? 12000 : 4000);
+    return () => clearTimeout(t);
+  }, [job.kind]);
+  const text = job.kind === "photo" ? (slow ? "Checking sources for each item…" : "Estimating your plate…") : slow ? `Searching the web for “${job.label}”…` : `Working out “${job.label}”…`;
+  return (
+    <span className="min-w-0 flex-1 truncate text-[13px] muted" aria-live="polite">
+      {text}
+    </span>
   );
 }

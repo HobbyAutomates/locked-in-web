@@ -9,6 +9,7 @@ import { LENS_DEFAULTS, type LensDefault, type Profile, type Units } from "@/lib
 import { AUTO_SHARE_KINDS, AUTO_SHARE_LABELS, withAutoShareKind, type AutoShareKind } from "@/lib/squadSharing";
 import { displayName } from "@/lib/display";
 import type { PrefSection } from "@/lib/preferences";
+import { ANALYTICS_ON } from "@/lib/analytics";
 import { Bell, Bowl, Check, Dumbbell, Exit, Flame, Glass, Lock, Mail, Medal, Moon, Person, Refresh, Scale, Scan, Share, Steps, Target, Trash } from "./icons";
 import { NameField } from "./ProfileScreen";
 import SubPage from "./SubPage";
@@ -366,6 +367,14 @@ function Privacy({ profile }: { profile: Profile }) {
           Your squads always see your name, photo and streak. Auto-posts put what you log in each squad&apos;s Feed: meal names with kcal, workouts and gym PRs. To stop posting in one squad, open it, tap its name and turn off &quot;Auto-post my logs here&quot;. Weight and scans are never shared.
         </p>
       </Rise>
+      {ANALYTICS_ON ? (
+        <Rise index={2}>
+          <p className="px-1 pt-2 text-xs font-semibold muted">Beta: helping the numbers get better</p>
+          <p className="px-1 pt-1 text-[13px] leading-relaxed muted">
+            During the beta, Locked In keeps a private log of what you enter so we can fix wrong estimates: every meal you log, every item you change, delete or leave out, every scan you use or throw away, the notes you type, and any numbers you enter under &quot;Correct the numbers&quot; (with the source you give). It&apos;s tied to your account, never shown to squads, and only the Locked In team can read it. Ask us to delete it any time from Account.
+          </p>
+        </Rise>
+      ) : null}
     </>
   );
 }

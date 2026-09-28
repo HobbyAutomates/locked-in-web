@@ -20,6 +20,9 @@ import {
   type QuantityFood,
 } from "@/lib/quantity";
 import type { MealItem } from "@/lib/types";
+import { applyCorrection, rescalePer100, rescalePerUnit } from "@/lib/perUnit";
+import { userSourceInfo } from "@/lib/sourceInfo";
+import { logEvent, nums, postCorrection, putOverride, type AccuracyContext } from "@/lib/accuracyClient";
 import { BottomSheet, MacroDot, PillButton, Toggle, fmt } from "./ui";
 
 /**
@@ -32,6 +35,10 @@ import { BottomSheet, MacroDot, PillButton, Toggle, fmt } from "./ui";
  * v2.8 (B2): counts single pieces through `unitFor`, like Android's Counting.unitFor — a "2 tbsp"
  * preset counts tbsp from 1, "10 almonds" counts almonds from 10 — so one tap logs the same grams
  * on both platforms.
+ * v2.15: quick 1 · 2 · 3 chips under the stepper; "Calories per roti" (count foods) or "Calories per
+ * 100 g" (loose foods) — editing it rescales the item (macros follow unless typed) and is remembered
+ * for this food; and "Correct the numbers" (My calories + optional macros, source, note), which
+ * replaces the numbers, marks the item "Your numbers" and files a beta correction.
  */
 export default function QuantitySheet({
   food,
@@ -39,6 +46,7 @@ export default function QuantitySheet({
   title = "How much?",
   cta = "Add",
   restaurant = false,
+  accuracy,
   onDone,
   onClose,
 }: {
@@ -48,18 +56,28 @@ export default function QuantitySheet({
   cta?: string;
   /** Open with "Restaurant portion" already on. */
   restaurant?: boolean;
+  /** v2.15: where the item came from, for "Correct the numbers" (defaults to a manual entry). */
+  accuracy?: AccuracyContext;
   /** `servingLabel` is the one-piece unit the stepper counted in ("1 roti"), or null when entered by weight. */
   onDone: (item: MealItem, q: Quantity, servingLabel?: string | null) => void;
   onClose: () => void;
 }) {
   return (
     <BottomSheet open={!!food} title={food ? food.name : title} subtitle={food ? <span className="block truncate">{food.name_hi ? food.name_hi : title}</span> : null} onClose={onClose}>
-      {food ? <Body key={food.name + food.food_id} food={food} initial={initial} cta={cta} restaurantStart={restaurant} onDone={onDone} /> : null}
+      {food ? <Body key={food.name + food.food_id} food={food} initial={initial} cta={cta} restaurantStart={restaurant} accuracy={accuracy ?? { inputKind: "manual" }} onDone={onDone} /> : null}
     </BottomSheet>
   );
 }
 
-function Body({ food, initial, cta, restaurantStart, onDone }: { food: QuantityFood; initial?: Quantity; cta: string; restaurantStart: boolean; onDone: (item: MealItem, q: Quantity, servingLabel?: string | null) => void }) {
+/** A typed number, or null when empty / not a number. */
+function parseNum(t: string): number | null {
+  if (!t.trim()) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+const cleanNum = (v: string) => v.replace(/[^\d.]/g, "").slice(0, 7);
+
+function Body({ food, initial, cta, restaurantStart, accuracy, onDone }: { food: QuantityFood; initial?: Quantity; cta: string; restaurantStart: boolean; accuracy: AccuracyContext; onDone: (item: MealItem, q: Quantity, servingLabel?: string | null) => void }) {
   const supplement = isSupplement(food);
   const liquid = isLiquid(food);
   const gUnit = liquid ? "ml" : "g";
@@ -85,13 +103,49 @@ function Body({ food, initial, cta, restaurantStart, onDone }: { food: QuantityF
   const allowRestaurant = canBeRestaurant(food) && !supplement;
   const [restaurant, setRestaurant] = useState(restaurantStart && allowRestaurant);
   const oily = restaurantOil(food.name, food.category);
+  // v2.15: per-unit / per-100 g calories and "Correct the numbers". "" = not edited.
+  const [unitText, setUnitText] = useState("");
+  const [per100Text, setPer100Text] = useState("");
+  const [fixOpen, setFixOpen] = useState(false);
+  const [my, setMy] = useState({ kcal: "", p: "", c: "", f: "", source: "", note: "" });
+  const [before] = useState(() => priceItem(food, initial ?? { unit: gUnit, value: 100 }));
 
   const counting = mode === "count" && counted !== null && cu !== null;
   const priceFood = counting && counted ? counted : food;
   const q: Quantity = counting ? { unit: "serving", value: count } : { unit: gUnit, value: Number(gramText) || 0 };
   const base = priceItem(priceFood, q);
-  const item = restaurant ? applyRestaurant(base, oily) : base;
+  const priced = restaurant ? applyRestaurant(base, oily) : base;
   const grams = toGrams(priceFood, q);
+  // Per-unit ("Calories per roti") only for a plain noun unit, not a "1 × 5-6 pieces" label.
+  const unitWord = counting && cu && !cu.label ? cu.noun : null;
+  const unitKcal = counting ? parseNum(unitText) : null;
+  const per100 = !counting ? parseNum(per100Text) : null;
+  const shaped: MealItem = counting && unitKcal != null ? rescalePerUnit(priced, count, unitKcal) : per100 != null && priced.grams > 0 ? rescalePer100(priced, per100) : priced;
+  const myKcal = fixOpen ? parseNum(my.kcal) : null;
+  const item: MealItem = myKcal != null ? { ...applyCorrection(shaped, { calories: myKcal, protein_g: parseNum(my.p), carbs_g: parseNum(my.c), fat_g: parseNum(my.f) }), source_info: userSourceInfo(my.source) } : shaped;
+  const derivedUnit = counting && count > 0 ? Math.round(priced.calories / count) : null;
+  const derived100 = priced.grams > 0 ? Math.round((priced.calories / priced.grams) * 100) : null;
+  const fixBlocked = fixOpen && myKcal == null;
+
+  function perOne(v: number | null): number | null {
+    return v != null && count > 0 ? Math.round((v / count) * 10) / 10 : null;
+  }
+  function done() {
+    const servingLabel = counting && serving && !restaurant ? serving.label : null;
+    if (myKcal != null) {
+      postCorrection(accuracy, shaped, { calories: myKcal, protein_g: parseNum(my.p), carbs_g: parseNum(my.c), fat_g: parseNum(my.f) }, { unit: unitWord, count: counting ? count : null, source: my.source.trim(), note: my.note.trim() });
+      // A corrected count food is remembered per unit ("my roti is 95 kcal").
+      if (unitWord && count > 0) putOverride(food.name, unitWord, myKcal / count, { protein_g: perOne(parseNum(my.p)), carbs_g: perOne(parseNum(my.c)), fat_g: perOne(parseNum(my.f)) });
+      if (my.note.trim()) logEvent("note", { item_name: food.name, payload: { where: "correction", text: my.note.trim() } });
+    } else if (unitWord && unitKcal != null) putOverride(food.name, unitWord, unitKcal);
+    else if (!counting && per100 != null) putOverride(food.name, "100g", per100);
+    logEvent("edit", {
+      meal_id: accuracy.mealId ?? null,
+      item_name: food.name,
+      payload: { before: nums(before), after: nums(item), field: myKcal != null ? "correct" : unitKcal != null ? "per_unit" : per100 != null ? "per_100g" : counting ? "count" : "grams", input_kind: accuracy.inputKind },
+    });
+    onDone(item, q, servingLabel);
+  }
   const chips = looseChips(food).slice(0, 3);
 
   function bump(d: number) {
@@ -126,9 +180,25 @@ function Body({ food, initial, cta, restaurantStart, onDone }: { food: QuantityF
               <StepGlyph plus />
             </StepButton>
           </div>
+          <div className="mt-2.5 flex justify-center gap-2" role="group" aria-label="Quick count">
+            {[1, 2, 3].map((n) => (
+              <button key={n} type="button" aria-pressed={count === n} className="chip press num" style={{ height: 38, minWidth: 52, fontSize: 16, fontWeight: 800 }} onClick={() => setCount(snapCount(cu, n))}>
+                {n}
+              </button>
+            ))}
+          </div>
           <p className="mt-2.5 text-center text-[14px] muted">
             ≈ {fmt(Math.round(item.grams))} {liquid ? "ml" : "g"} · <span className="font-bold" style={{ color: "var(--ink)" }}>{Math.round(item.calories)} kcal</span>
           </p>
+          {unitWord ? (
+            <KcalField
+              label={`Calories per ${unitWord}`}
+              value={unitText}
+              placeholder={derivedUnit}
+              onChange={setUnitText}
+              hint={unitKcal != null ? `${countText(count)} × ${Math.round(unitKcal)} = ${Math.round(shaped.calories)} kcal · remembered for next time` : null}
+            />
+          ) : null}
         </>
       ) : (
         <>
@@ -160,6 +230,13 @@ function Body({ food, initial, cta, restaurantStart, onDone }: { food: QuantityF
             <span className="font-bold" style={{ color: "var(--ink)" }}>{Math.round(item.calories)} kcal</span>
             {restaurant ? ` · ${fmt(Math.round(item.grams))} g restaurant` : ""}
           </p>
+          <KcalField
+            label="Calories per 100 g"
+            value={per100Text}
+            placeholder={derived100}
+            onChange={setPer100Text}
+            hint={per100 != null ? `${fmt(Math.round(grams))} g at ${Math.round(per100)} per 100 g = ${Math.round(shaped.calories)} kcal · remembered for next time` : null}
+          />
         </>
       )}
 
@@ -203,9 +280,46 @@ function Body({ food, initial, cta, restaurantStart, onDone }: { food: QuantityF
         </div>
       ) : null}
 
+      {!fixOpen ? (
+        <button type="button" className="hit press mt-3 self-center text-[13px] font-semibold underline underline-offset-2" style={{ color: "var(--ink)" }} onClick={() => setFixOpen(true)}>
+          Correct the numbers
+        </button>
+      ) : (
+        <div className="mt-3 flex flex-col gap-2 rounded-2xl px-3.5 py-3" style={{ border: "1.5px solid var(--hair)" }}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[14px] font-bold">Correct the numbers</span>
+            <button type="button" className="hit press text-[12px] font-semibold muted" onClick={() => setFixOpen(false)}>
+              Cancel
+            </button>
+          </div>
+          <p className="text-[12px] muted">Checked it somewhere else? Enter the real numbers for this whole amount. They replace ours and help us fix the estimate.</p>
+          <label className="flex items-center gap-2">
+            <span className="w-24 shrink-0 text-[13px] font-semibold">My calories</span>
+            <input className="numfield num min-w-0 flex-1" style={{ width: "auto", height: 42, fontSize: 18 }} inputMode="decimal" autoFocus aria-label="My calories" placeholder={String(Math.round(shaped.calories))} value={my.kcal} onChange={(e) => setMy({ ...my, kcal: cleanNum(e.target.value) })} />
+            <span className="text-[13px] muted">kcal</span>
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ["p", "Protein", shaped.protein_g],
+                ["c", "Carbs", shaped.carbs_g],
+                ["f", "Fat", shaped.fat_g],
+              ] as const
+            ).map(([k, label, ph]) => (
+              <label key={k} className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-[11px] font-semibold muted">{label} g</span>
+                <input className="numfield num w-full" style={{ height: 38, fontSize: 15 }} inputMode="decimal" aria-label={`My ${label.toLowerCase()} in grams`} placeholder={fmt(ph)} value={my[k]} onChange={(e) => setMy({ ...my, [k]: cleanNum(e.target.value) })} />
+              </label>
+            ))}
+          </div>
+          <input className="field" aria-label="Source" maxLength={300} placeholder="Source (optional): Pintola pack, HealthifyMe, a link" value={my.source} onChange={(e) => setMy({ ...my, source: e.target.value })} />
+          <input className="field" aria-label="Note" maxLength={1000} placeholder="Note (optional)" value={my.note} onChange={(e) => setMy({ ...my, note: e.target.value })} />
+        </div>
+      )}
+
       <div className="mt-4">
-        <PillButton disabled={!(grams > 0)} onClick={() => onDone(item, q, counting && serving && !restaurant ? serving.label : null)}>
-          {cta} · {Math.round(item.calories)} kcal
+        <PillButton disabled={!(grams > 0) || fixBlocked} onClick={done}>
+          {fixBlocked ? "Enter your calories" : `${cta} · ${Math.round(item.calories)} kcal`}
         </PillButton>
       </div>
     </div>
@@ -233,5 +347,19 @@ function StepGlyph({ plus }: { plus: boolean }) {
       <path d="M5 12h14" />
       {plus ? <path d="M12 5v14" /> : null}
     </svg>
+  );
+}
+
+/** "Calories per roti" / "Calories per 100 g": empty shows the current value as a placeholder. */
+function KcalField({ label, value, placeholder, onChange, hint }: { label: string; value: string; placeholder: number | null; onChange: (v: string) => void; hint: string | null }) {
+  return (
+    <div className="mt-3">
+      <label className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 text-[14px] font-semibold">{label}</span>
+        <input className="numfield num" style={{ width: 92, height: 42, fontSize: 18 }} inputMode="decimal" aria-label={label} placeholder={placeholder != null ? String(placeholder) : ""} value={value} onChange={(e) => onChange(cleanNum(e.target.value))} />
+        <span className="text-[13px] muted">kcal</span>
+      </label>
+      {hint ? <p className="mt-1 text-right text-[11px] muted">{hint}</p> : null}
+    </div>
   );
 }

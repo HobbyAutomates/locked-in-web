@@ -236,7 +236,9 @@ export function mentionsRestaurant(text: string): boolean {
 }
 
 /** A plate-photo item as a meal item (the confidence word becomes a number, like the Android app). */
-export function mealItemFromPlate(i: { food_id: string | null; name: string; grams: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; source: "table" | "estimated"; confidence: "high" | "medium" | "low"; micros: ItemMicros; cooked_in?: string | null; variants?: MealItem["variants"]; source_info?: MealItem["source_info"] }): MealItem {
+export function mealItemFromPlate(i: { food_id: string | null; name: string; grams: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; source: "table" | "estimated"; confidence: "high" | "medium" | "low"; micros: ItemMicros; cooked_in?: string | null; variants?: MealItem["variants"]; source_info?: MealItem["source_info"]; user_verified?: boolean | null; per_unit_kcal?: number | null; source_urls?: string[] | null }): MealItem {
+  // v2.15: a photo roti / idli / egg arrives counted ("2 roti"), so the plate opens the stepper on it.
+  const piece = i.cooked_in === "restaurant" ? null : pieceUnitOf(i.name, i.grams);
   return {
     food_id: i.food_id,
     name: i.name,
@@ -248,9 +250,13 @@ export function mealItemFromPlate(i: { food_id: string | null; name: string; gra
     source: i.source,
     confidence: i.confidence === "high" ? 0.9 : i.confidence === "medium" ? 0.6 : 0.3,
     micros: i.micros,
-    unit: "g",
-    servings: null,
+    unit: piece ? "serving" : "g",
+    servings: piece ? Math.round(i.grams / piece.grams) : null,
+    ...(piece ? { serving_unit: piece } : {}),
     cooked_in: i.cooked_in ?? null,
+    ...(i.user_verified ? { user_verified: true } : {}),
+    ...(i.per_unit_kcal ? { per_unit_kcal: i.per_unit_kcal } : {}),
+    ...(i.source_urls?.length ? { source_urls: i.source_urls } : {}),
     // v2.9: display-only provenance rides along to the plate (never written to meal_items).
     ...(i.variants?.length ? { variants: i.variants } : {}),
     ...(i.source_info ? { source_info: i.source_info } : {}),
@@ -421,4 +427,29 @@ export function itemQtyLabel(item: MealItem, servingLabel?: string | null): stri
   const count = Math.round(n * 100) / 100;
   if (Math.abs(count * 2 - Math.round(count * 2)) > 0.02) return grams;
   return countLabel(cu, Math.round(count * 2) / 2);
+}
+
+// ---- v2.15: count units for items that arrive in grams (photo items) ----
+
+/** Typical grams of one piece, by the head noun of a dish name (the parser's glossary uses the same). */
+const PIECE_GRAMS: Record<string, number> = {
+  roti: 40, chapati: 40, chapatti: 40, phulka: 30, paratha: 80, parantha: 80, naan: 90, kulcha: 80, puri: 25, poori: 25, bhatura: 70,
+  idli: 40, dosa: 100, uttapam: 120, vada: 50, appam: 60, dhokla: 30, samosa: 60, kachori: 50, momo: 25, egg: 50,
+  slice: 30, toast: 30, ladoo: 40, laddu: 40, cookie: 12, biscuit: 10, banana: 120, apple: 180, orange: 130,
+};
+
+/**
+ * The one-piece serving a gram-weighed item can be counted in, when its name ends in a countable
+ * noun ("roti", "masala dosa", "boiled eggs"): grams per piece chosen so the item's own grams are a
+ * whole count (90 g of roti → 2 × 45 g), so the stepper opens on it exactly. null otherwise.
+ */
+export function pieceUnitOf(name: string, grams: number): PresetServing | null {
+  if (!(grams > 0)) return null;
+  const words = name.toLowerCase().replace(/\(.*?\)/g, " ").split(/[^a-z]+/).filter(Boolean);
+  const last = words[words.length - 1];
+  if (!last) return null;
+  const noun = PIECE_GRAMS[last] ? last : PIECE_GRAMS[singularNoun(last)] ? singularNoun(last) : null;
+  if (!noun) return null;
+  const n = Math.max(1, Math.round(grams / PIECE_GRAMS[noun]));
+  return { label: `1 ${noun}`, grams: Math.round((grams / n) * 10) / 10 };
 }
