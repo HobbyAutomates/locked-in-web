@@ -8,8 +8,14 @@
  * missing (read receipts and unread badges just don't show).
  */
 
-/** The six reactions, in bar order. ❤️ is U+2764 U+FE0F, exactly as the database check stores it. */
-export const REACTIONS = ["❤️", "🔥", "👍", "😂", "😮", "💪"] as const;
+/**
+ * The reactions, in bar order. ❤️ is U+2764 U+FE0F and 🏋️ is U+1F3CB U+FE0F, exactly as the database
+ * check stores them. v2.18 (schema_v44) appended the last seven; before v44 the server rejects them
+ * (the save fails quietly and the chip rolls back), and older apps simply don't count them.
+ */
+export const REACTIONS = ["❤️", "🔥", "👍", "😂", "😮", "💪", "🥗", "🍗", "🏋️", "🙌", "💯", "😤", "🫡"] as const;
+/** The v2.11 six (the first row of the picker). */
+export const CORE_REACTIONS = REACTIONS.slice(0, 6);
 export type Reaction = (typeof REACTIONS)[number];
 
 /** A post's reaction state: counts per emoji and the viewer's own emoji (at most one). */

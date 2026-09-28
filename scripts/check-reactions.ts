@@ -15,7 +15,7 @@ function check(why: string, got: unknown, expect: unknown) {
 }
 
 // The six, in bar order, with ❤️ carrying its variation selector (the DB check stores it that way).
-check("six reactions", REACTIONS.length, 6);
+check("thirteen reactions (v2.18 appended seven)", REACTIONS.length, 13);
 check("heart is U+2764 U+FE0F", [...REACTIONS[0]].map((c) => c.codePointAt(0)!.toString(16)), ["2764", "fe0f"]);
 check("bare heart normalizes", normalizeReaction("❤"), "❤️");
 check("unknown emoji is null", normalizeReaction("🍕"), null);
