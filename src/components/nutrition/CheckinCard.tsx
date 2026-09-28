@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { applyCheckin } from "@/lib/nutrition-actions";
 import { dismiss, useDismissed } from "@/lib/dismiss";
@@ -71,6 +72,10 @@ export function CheckinCard({ row, compact = false, hideNumbers = false }: { row
       <p className="text-[13px] leading-[19px]" style={{ color: "var(--ink)" }}>
         {row.reason}
       </p>
+      {/* v2.18 B3: the plain English / Hindi "why it changed" card lives in the coach hub. */}
+      <Link href="/coach/hub" className="press self-start text-[12px] font-semibold underline muted">
+        Why? Explain in plain English / हिंदी
+      </Link>
       <ErrorNote text={error} />
       {kept ? (
         <p className="text-[12px] muted">You kept your current target this week.</p>

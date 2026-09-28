@@ -28,6 +28,7 @@ import BuddyCard from "./home/BuddyCard";
 import DayGlow, { warmth } from "./home/DayGlow";
 import MilestoneFlood from "./home/MilestoneFlood";
 import GuidedTour from "./GuidedTour";
+import CoachDaily from "./v218/CoachDaily"; // v2.18 coach stream
 import BadgeUnlock from "./BadgeUnlock";
 import type { BadgeProgress } from "@/lib/badges";
 
@@ -65,9 +66,11 @@ type Props = {
   createdAt?: string | null;
   /** v2.16: badge progress, for the unlock moment when one is newly earned. */
   badges?: BadgeProgress | null;
+  /** v2.18 (schema_v43): kcal added to today's target by the check-in / festival mode. */
+  todayBump?: number;
 };
 
-export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [], checkin = null, fast = null, onboardedV2 = null, milestonesSeen = null, tourSeen = false, createdAt = null, badges = null }: Props) {
+export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [], checkin = null, fast = null, onboardedV2 = null, milestonesSeen = null, tourSeen = false, createdAt = null, badges = null, todayBump = 0 }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(today);
   const { pending, savedCount, error } = usePendingMeals();
@@ -109,7 +112,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   const carbTarget = Math.max(1, carbTargetG(profile));
   const fatTarget = Math.max(1, fatTargetG(profile));
   // v2.3 Preferences: "Add burned calories to daily goal" and "Rollover calories" (up to 200).
-  const budget = calorieBudget(profile, meals, exercises, selected);
+  const budget = calorieBudget(isToday && todayBump > 0 ? { ...profile, calorie_target: profile.calorie_target + todayBump } : profile, meals, exercises, selected);
   const burnedKcal = budget.burned;
   // v2.10: every calorie / macro card shows "left" or "eaten"; tapping any one flips them all.
   const { mode, showHint } = useMacroMode();
@@ -182,6 +185,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
         <TodayNote />
       </div>
       <BuddyCard />
+      <CoachDaily /> {/* v2.18: check-in, recovery, supplements, festival mode */}
 
       <HomeBanner /> {/* v2.13 platform */}
 

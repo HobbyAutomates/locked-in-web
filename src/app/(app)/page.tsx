@@ -6,6 +6,7 @@ import { activityDayStreak, thisWeekCount, trainingDates, workoutWeekStreak } fr
 import { computeWrap, wrapWindow } from "@/lib/wrap";
 import HomeScreen from "@/components/HomeScreen";
 import { createClient } from "@/lib/supabase/server";
+import { getV218Home } from "@/lib/v218/homeData"; // v2.18 coach stream
 
 /** v2.14 (schema_v37) Home extras in their own query, so a database without v37 still renders Home. */
 async function getV214Home(): Promise<{ onboardedV2: boolean | null; milestonesSeen: string[] | null }> {
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TodayPage({ searchParams }: { searchParams: Promise<{ celebrate?: string }> }) {
   const t = todayIso();
+  const v218Home = getV218Home(); // v2.18, in parallel with the rest
   const [{ today, profile, workouts, meals, exercises }, nudges, sp, water, settings, v214] = await Promise.all([getDashboard(), getMyNudges(), searchParams, getWater(addDays(t, -7), t), getNutritionSettings(), getV214Home()]);
   // v2.13: the Monday check-in (computed once a week when adaptive targets are on) and a running fast.
   const teen = isTeen(ageYears(profile.dob));
@@ -30,6 +32,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
     getBadgeProgress(profile, workouts, meals).catch(() => null),
     getV217Profile().catch(() => ({ memberNo: null, isFounder: null, createdAt: null })),
   ]);
+  // v2.18: today's check-in / festival calorie bump, and festival dates protect the day streak.
+  const v218 = await v218Home;
   const workoutDates = workouts.map((w) => w.date);
   // v2.5: cardio / sport / yoga on the exercise log count toward the week streak too.
   const trainedDates = trainingDates(workouts, exercises);
@@ -43,7 +47,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       meals={meals}
       exercises={exercises}
       weekStreak={workoutWeekStreak(trainedDates, profile.weekly_workout_target)}
-      dayStreak={activityDayStreak(workoutDates, exercises.map((e) => e.date), meals.map((m) => m.date))}
+      dayStreak={activityDayStreak(workoutDates, exercises.map((e) => e.date), [...meals.map((m) => m.date), ...v218.protectedDates])}
       thisWeek={thisWeekCount(trainedDates)}
       celebrate={sp.celebrate === "1"}
       wrap={wrap}
@@ -56,6 +60,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       tourSeen={v216.tourSeen}
       createdAt={v217.createdAt}
       badges={badges}
+      todayBump={v218.bump}
     />
   );
 }

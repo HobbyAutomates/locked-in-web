@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+
+const noopSub = () => () => {};
 import { useRouter } from "next/navigation";
 import { toJpegBase64 } from "@/lib/image";
 import { useDictation } from "@/lib/speech";
@@ -11,6 +13,8 @@ import type { CoachCard, CoachMessage } from "@/lib/coach";
 import { CoachAvatar, OnbIcon } from "@/components/onboarding/kit";
 import { ErrorNote } from "@/components/ui";
 import { COMING_SOON } from "@/lib/v36";
+import VoiceCoach from "@/components/v218/VoiceCoach"; // v2.18 B1
+import { MicGlyph } from "@/components/v218/CoachDaily";
 
 /**
  * v2.14 coach chat (canvas "Coach · chat with memory"). Iris is the coach's voice: its bubbles, its
@@ -20,7 +24,7 @@ import { COMING_SOON } from "@/lib/v36";
 
 type Loaded = { available: boolean; style?: string; remember?: boolean; messages: CoachMessage[] };
 
-export default function CoachChat({ prompt }: { prompt?: string }) {
+export default function CoachChat({ prompt, voice = false }: { prompt?: string; voice?: boolean }) {
   const router = useRouter();
   const [data, setData] = useState<Loaded | null>(null);
   const [msgs, setMsgs] = useState<CoachMessage[]>([]);
@@ -32,6 +36,11 @@ export default function CoachChat({ prompt }: { prompt?: string }) {
   const end = useRef<HTMLDivElement>(null);
   const seq = useRef(0);
   const dictation = useDictation((t) => setText((v) => (v ? `${v} ${t}` : t)));
+  // v2.18 B1: hands-free voice coach (opened by the header button or /coach?voice=1, after mount).
+  const mounted = useSyncExternalStore(noopSub, () => true, () => false);
+  const [voiceTap, setVoiceTap] = useState<boolean | null>(null);
+  const voiceOpen = mounted && (voiceTap ?? voice);
+  const setVoiceOpen = (v: boolean) => setVoiceTap(v);
 
   useEffect(() => {
     let live = true;
@@ -97,6 +106,11 @@ export default function CoachChat({ prompt }: { prompt?: string }) {
           <div style={{ fontSize: 16, fontWeight: 700 }}>Your coach</div>
           <div style={{ fontSize: 12, color: data?.remember === false ? "var(--mute)" : "var(--iris)", fontWeight: 600 }}>{data?.remember === false ? "memory is off" : "● remembers what you tell it"}</div>
         </div>
+        {data?.available ? (
+          <button type="button" aria-label="Talk to your coach" className="press grid h-10 w-10 place-items-center rounded-full" style={{ background: "var(--iris-bg)", border: "1px solid var(--iris-line)", color: "var(--iris)" }} onClick={() => setVoiceOpen(true)}>
+            <MicGlyph size={17} />
+          </button>
+        ) : null}
         <Link href="/coach/memory" aria-label="What your coach knows" className="press grid h-10 w-10 place-items-center rounded-full" style={{ background: "var(--surf)", color: "var(--ink)" }}>
           <OnbIcon name="brain" size={18} />
         </Link>
@@ -196,6 +210,15 @@ export default function CoachChat({ prompt }: { prompt?: string }) {
             </button>
           </form>
         </div>
+      ) : null}
+      {voiceOpen && data?.available ? (
+        <VoiceCoach
+          onClose={() => setVoiceOpen(false)}
+          onExchange={(u, r) => {
+            setMsgs((x) => [...x, u, r]);
+            if (r.tool?.cards?.some((c) => c.type === "meal_logged" || c.type === "water_logged" || c.type === "fast_started")) router.refresh();
+          }}
+        />
       ) : null}
     </main>
   );

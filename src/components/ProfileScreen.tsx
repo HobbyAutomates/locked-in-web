@@ -13,6 +13,7 @@ import { APP_VERSION, CHANGELOG, compareVersions } from "@/lib/version";
 import { displayName, weightText } from "@/lib/display";
 import { AvatarPicker } from "./Avatar";
 import TrophyWall from "./TrophyWall";
+import ConsistencyCard from "./v218/ConsistencyCard"; // v2.18 coach stream
 import { COVER_STORAGE_KEY, DEFAULT_COVER, isCoverId } from "@/lib/covers";
 import { saveCoverPreset } from "@/lib/v216Actions";
 import type { MemberPlate } from "@/lib/memberPlate";
@@ -256,6 +257,11 @@ export default function ProfileScreen({
         <MRise delay={850}>
           <TrophyWall progress={badges} delay={850} />
         </MRise>
+
+        {/* ---- v2.18 B11: consistency score (shareable) ---- */}
+        <div className="mt-3.5 empty:hidden">
+          <ConsistencyCard />
+        </div>
 
         {/* ---- goal ---- */}
         <MRise delay={1020}>
