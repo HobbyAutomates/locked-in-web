@@ -9,6 +9,7 @@ import type { MealItem, PlateItem } from "@/lib/types";
 import { BottomSheet, ErrorNote, Hair, PillButton } from "../ui";
 import { Close, Spinner } from "../icons";
 import { HoldMic, LangToggle, useVoiceNote } from "./VoiceHold";
+import { refreshFoodHome } from "./FoodHome";
 import sc from "../scan/scan.module.css";
 
 /**
@@ -75,6 +76,8 @@ export function PlateVoice({ items, plateNote, onApply }: { items: PlateItem[]; 
 
   const listening = voice.dictation.listening;
   const said = voice.value;
+  // Words not sent yet: what was typed, else what the mic heard (a late result lands here too).
+  const pending = typed || said;
   // Let go of the mic: wait for the last words, then send them.
   const onStop = () => void voice.settle().then(() => send(voice.current()));
 
@@ -90,17 +93,20 @@ export function PlateVoice({ items, plateNote, onApply }: { items: PlateItem[]; 
         <input
           className="field min-w-0 flex-1"
           style={{ height: 40, fontSize: 14 }}
-          value={listening ? said || "Listening…" : typed}
+          value={listening ? said || "Listening…" : pending}
           readOnly={listening}
           aria-label="Details about the plate"
           placeholder={supported ? "Hold the mic: “2 roti, less oil”" : "Details: “2 roti, less oil, extra dal”"}
-          onChange={(e) => setTyped(e.target.value)}
+          onChange={(e) => {
+            setTyped(e.target.value);
+            if (said) voice.clear();
+          }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") void send(typed);
+            if (e.key === "Enter") void send(pending);
           }}
         />
-        {typed.trim() ? (
-          <button type="button" className="chip press shrink-0" style={{ height: 40, padding: "0 14px", fontWeight: 700 }} disabled={busy} onClick={() => void send(typed)}>
+        {pending.trim() && !listening ? (
+          <button type="button" className="chip press shrink-0" style={{ height: 40, padding: "0 14px", fontWeight: 700 }} disabled={busy} onClick={() => void send(pending)}>
             {busy ? <Spinner size={14} /> : "Add"}
           </button>
         ) : busy ? (
@@ -171,6 +177,7 @@ export function SplitSheet({ open, onClose, dish, items, mealType, photoPath, on
       setError(r.error);
       return;
     }
+    refreshFoodHome();
     onDone(r.sent);
   }
 

@@ -34,6 +34,7 @@ import { LabelReality } from "./food/LabelReality";
 import { plusMinusLabel } from "@/lib/food/honesty";
 import { splitEaten } from "@/lib/food/foodBits";
 import { saveLeftover } from "@/lib/food/foodActions";
+import { refreshFoodHome } from "./food/FoodHome";
 
 const LENSES: { key: Lens; label: string }[] = [
   { key: "protein", label: "Protein" },
@@ -1367,6 +1368,7 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
                     meal_type: slot,
                   });
                   if (cut.left.length) await saveLeftover({ name: plate.plate_note || items.map((i) => i.name).join(", "), items: cut.left, fraction_left: cut.leftFraction, meal_id: saved.id }).catch(() => null);
+                  refreshFoodHome();
                   track("meal_logged", { method: "photo", items: items.length, from: "scan" });
                   accept("log");
                   logEvent("log", { payload: { method: "photo", scan_id: plate.id ?? null, items: items.map(nums), total_kcal: items.reduce((a, i) => a + i.calories, 0), raw_text: plate.plate_note } });

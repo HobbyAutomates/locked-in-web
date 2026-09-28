@@ -40,6 +40,17 @@ export function useDictation(onText: (finalText: string) => void) {
   useEffect(() => {
     cb.current = onText;
   });
+  // v2.18: "the recogniser has really ended" (onend / onerror), so a caller can wait for the last result.
+  const active = useRef(false);
+  const endWaiters = useRef<(() => void)[]>([]);
+  const ended = useCallback(() => {
+    active.current = false;
+    const w = endWaiters.current;
+    endWaiters.current = [];
+    w.forEach((f) => f());
+  }, []);
+  /** Resolves once the current session has ended (right away when none is running). */
+  const waitEnded = useCallback(() => (active.current ? new Promise<void>((resolve) => endWaiters.current.push(resolve)) : Promise.resolve()), []);
 
   const stop = useCallback(() => {
     try {
@@ -74,17 +85,23 @@ export function useDictation(onText: (finalText: string) => void) {
         if (code === "not-allowed" || code === "service-not-allowed") setError("Microphone access was blocked. Allow it in the browser's site settings and try again.");
         else if (code !== "aborted" && code !== "no-speech") setError("Voice input stopped — try again.");
         setListening(false);
+        ended();
       };
-      r.onend = () => setListening(false);
+      r.onend = () => {
+        setListening(false);
+        ended();
+      };
       rec.current = r;
       setError(null);
+      active.current = true;
       r.start();
       setListening(true);
     } catch {
       setError("Voice input isn't available in this browser — use your keyboard's mic instead.");
       setListening(false);
+      ended();
     }
-  }, [lang]);
+  }, [lang, ended]);
 
   useEffect(() => () => void rec.current?.abort?.(), []);
 
@@ -94,5 +111,5 @@ export function useDictation(onText: (finalText: string) => void) {
     setLang((l) => (l === "en-IN" ? "hi-IN" : "en-IN"));
   }, [stop]);
 
-  return { supported, listening, lang, error, toggle, toggleLang, stop };
+  return { supported, listening, lang, error, toggle, toggleLang, stop, waitEnded };
 }

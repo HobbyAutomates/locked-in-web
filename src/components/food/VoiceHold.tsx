@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useDictation } from "@/lib/speech";
 import { Mic } from "../icons";
 
@@ -20,26 +20,18 @@ export function useVoiceNote() {
     latest.current = v;
     setState(v);
   }, []);
-  const settleWaiters = useRef<(() => void)[]>([]);
   const dictation = useDictation((chunk) => setValue((latest.current ? `${latest.current}, ${chunk}` : chunk).slice(0, 400)));
-  const listening = dictation.listening;
-  useEffect(() => {
-    if (listening) return;
-    const w = settleWaiters.current;
-    settleWaiters.current = [];
-    w.forEach((f) => f());
-  }, [listening]);
-  /** Stop listening (if we are) and wait for the recogniser's last result, at most 1.5 s. */
+  const { stop, waitEnded } = dictation;
+  /**
+   * Stop listening (if we are) and wait until the recogniser has really ended (Chrome delivers the
+   * final result just before `onend`, after `stop()` returns), at most 2 s.
+   */
   const settle = useCallback(async () => {
-    if (!dictation.listening) return;
-    dictation.stop();
-    await new Promise<void>((resolve) => {
-      settleWaiters.current.push(resolve);
-      setTimeout(resolve, 1500);
-    });
-    // One more tick for a result that lands right after `onend`.
-    await new Promise((r) => setTimeout(r, 150));
-  }, [dictation]);
+    stop();
+    await Promise.race([waitEnded(), new Promise((r) => setTimeout(r, 2000))]);
+    // One more tick so the state update from the last result has landed.
+    await new Promise((r) => setTimeout(r, 50));
+  }, [stop, waitEnded]);
   const current = useCallback(() => latest.current, []);
   const clear = useCallback(() => setValue(""), [setValue]);
   return { value, setValue, clear, settle, current, dictation };
@@ -52,6 +44,8 @@ const HOLD_MS = 350;
 /** The round mic: hold to talk, tap to toggle. `tone` "dark" sits on the camera; "light" on a card. */
 export function HoldMic({ dictation, label = "Hold to add details", tone = "light", size = 44, onStop }: { dictation: Dictation; label?: string; tone?: "light" | "dark"; size?: number; /** Called right after the person stops talking (release, or the second tap). */ onStop?: () => void }) {
   const downAt = useRef(0);
+  // Whether the mic was already on when this press began (a tap then means "stop").
+  const wasOn = useRef(false);
   const on = dictation.listening;
   const bg = on ? "var(--danger)" : tone === "dark" ? "rgba(28, 28, 30, 0.72)" : "var(--card2)";
   const fg = on ? "#fff" : tone === "dark" ? "#f5f5f7" : "var(--ink)";
@@ -67,13 +61,15 @@ export function HoldMic({ dictation, label = "Hold to add details", tone = "ligh
         if (e.button !== 0) return;
         e.preventDefault();
         downAt.current = Date.now();
+        wasOn.current = dictation.listening;
         if (!dictation.listening) dictation.toggle();
       }}
       onPointerUp={() => {
-        // A long press is push-to-talk (release stops); a quick tap leaves it listening until the next tap.
+        // A long press is push-to-talk (release stops); a quick tap on an idle mic leaves it listening
+        // until the next tap; a tap on a listening mic stops it.
+        if (!downAt.current) return;
         const held = Date.now() - downAt.current;
-        const stopping = (downAt.current && held >= HOLD_MS && dictation.listening) || (downAt.current && held < HOLD_MS && on);
-        if (stopping) {
+        if (held >= HOLD_MS || wasOn.current) {
           dictation.stop();
           onStop?.();
         }

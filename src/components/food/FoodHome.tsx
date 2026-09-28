@@ -47,8 +47,9 @@ export function refreshFoodHome() {
 }
 export function useFoodHome(): FoodHome | null {
   const h = useSyncExternalStore(subscribe, () => home, () => null);
+  // Every mount re-reads (Home after a scan, a pre-log or a new sign-in); the old value shows meanwhile.
   useEffect(() => {
-    if (!home) refreshFoodHome();
+    refreshFoodHome();
   }, []);
   return h;
 }

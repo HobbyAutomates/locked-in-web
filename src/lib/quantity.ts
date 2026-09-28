@@ -397,6 +397,8 @@ export function rescaleItem(item: MealItem, grams: number, servings?: number | n
     fat_g: Math.round(Number(item.fat_g) * k * 10) / 10,
     micros,
     servings: servings !== undefined ? servings : counted ? Math.round(Number(item.servings) * k * 100) / 100 : (item.servings ?? null),
+    // v2.18: a stored ± range scales with the amount (never left stale).
+    ...(item.kcal_low != null && item.kcal_high != null ? { kcal_low: Math.round(Number(item.kcal_low) * k), kcal_high: Math.round(Number(item.kcal_high) * k) } : {}),
   };
 }
 

@@ -13,6 +13,7 @@ import { orderPlan, parseOrderText, planItems, type OrderDish } from "../src/lib
 import { cleanScaleRef, fractionLabel, labelRealityGaps, leftoverActive, leftoverLine, normalizeShares, pickSwap, realityLine, scaleMealItem, sizedUsingLabel, splitEaten, splitShares, waterFromMeals, waterMl } from "../src/lib/food/foodBits";
 import { groceryList, groceryText, inPantry, pantryCategory } from "../src/lib/food/grocery";
 import type { MealItem, PlateItem } from "../src/lib/types";
+import { rescaleItem } from "../src/lib/quantity";
 
 const plate = (name: string, grams: number, kcal: number, over: Partial<PlateItem> = {}): PlateItem => ({ name, grams, confidence: "medium", calories: kcal, protein_g: kcal / 20, carbs_g: kcal / 8, fat_g: kcal / 30, micros: {}, source: "estimated", food_id: null, ...over });
 const meal = (name: string, grams: number, kcal: number, over: Partial<MealItem> = {}): MealItem => ({ food_id: null, name, grams, calories: kcal, protein_g: 5, carbs_g: 20, fat_g: 5, source: "table", confidence: 1, micros: {}, unit: "g", servings: null, ...over });
@@ -260,4 +261,27 @@ console.log("check-v218-food: all good");
   if (dv.items[0].grams !== 80 || dv.items[1].grams !== 100) throw new Error("Devanagari split");
   if (labelRealityGaps({ calories: null, protein_g: 20 }, { calories: 400, protein_g: 20 }).length !== 0) throw new Error("null label field");
   console.log("check-v218-food: parity good");
+}
+
+// ---- review fixes (v2.18): no phantom ghee from dish names, "not much", "half roti", servings, stale ranges
+{
+  const bc = mergeVoice([plate("butter chicken", 150, 330), plate("butter naan", 90, 290)], "butter chicken and butter naan");
+  assert.equal(bc.items[0].calories, 330);
+  assert.equal(bc.items[1].calories, 290);
+  assert.deepEqual(parseVoice("fried rice").oil, []);
+  assert.deepEqual(parseVoice("dal tadka").oil, []);
+  assert.equal(mergeVoice([plate("dal tadka", 150, 170), plate("rice", 150, 195)], "extra dal tadka").items[0].grams, 225);
+  assert.deepEqual(parseVoice("oil kam").oil, [{ level: "less", food: null }]);
+  assert.deepEqual(parseVoice("without any oil").oil, [{ level: "none", food: null }]);
+  assert.equal(mergeVoice([plate("rice", 200, 260)], "not much rice").items[0].grams, 140); // less, not removed
+  assert.equal(mergeVoice([plate("rice", 200, 260)], "no rice").items.length, 0);
+  assert.equal(mergeVoice([plate("roti", 120, 330)], "half roti").items[0].grams, 20); // half of ONE roti
+  assert.equal(parseVoiceRecipe("Mom's dal: 1 katori toor dal, coriander for garnish, serves 4").servings, 4);
+}
+{
+
+  const r = rescaleItem(meal("Biryani", 300, 600, { kcal_low: 500, kcal_high: 700 }), 150);
+  assert.equal(r.kcal_low, 250);
+  assert.equal(r.kcal_high, 350);
+  console.log("check-v218-food: review fixes good");
 }

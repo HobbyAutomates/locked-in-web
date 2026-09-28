@@ -151,6 +151,42 @@ function splitSegments(text: string): string[] {
     .filter(Boolean);
 }
 
+/** "not much", "no more": the negation softens to "less". */
+const DEGREE = new Set(["much", "many", "more", "too", "enough", "so", "very", "zyada", "jyada"]);
+/** Filler words allowed between a direction and its oil word ("without any oil", "a little bit of ghee"). */
+const OIL_FILLER = new Set(["any", "some", "a", "bit", "of", "the", "much", "little", "mein", "me", "se"]);
+const OIL_DIRECTION = (t: string | undefined) => !!t && (OIL_LESS.has(t) || OIL_NONE.has(t) || OIL_EXTRA.has(t));
+
+/**
+ * The oil cue in a segment: an oil word with a direction word right before it (fillers allowed:
+ * "without any oil") or right after it ("oil kam", "ghee nahi", "oil free"), or "oily" / "greasy".
+ * `used` = the token indexes that belong to the cue. null when the oil word is just part of a name.
+ */
+function findOilCue(toks: string[], raw: string): { level: OilCue["level"]; used: Set<number> } | null {
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (!OIL_WORDS.has(t)) continue;
+    const used = new Set<number>([i]);
+    let dir: string | undefined;
+    let j = i - 1;
+    while (j >= 0 && OIL_FILLER.has(toks[j]) && !OIL_DIRECTION(toks[j])) j--;
+    if (j >= 0 && OIL_DIRECTION(toks[j])) {
+      dir = toks[j];
+      for (let k = j; k < i; k++) used.add(k);
+    } else if (OIL_DIRECTION(toks[i + 1])) {
+      dir = toks[i + 1];
+      used.add(i + 1);
+    }
+    if (!dir) {
+      if (t === "oily" || t === "greasy") return { level: "extra", used };
+      continue;
+    }
+    const level: OilCue["level"] = OIL_NONE.has(dir) || /oil[- ]?free/.test(raw) ? "none" : OIL_LESS.has(dir) ? "less" : "extra";
+    return { level, used };
+  }
+  return null;
+}
+
 /** One segment → an oil cue (if any) and a food amount (if any). */
 function parseSegment(raw: string): { seg: VoiceSeg | null; oil: OilCue | null } {
   // "20g" / "150ml" → "20 g"; "2x" → "2"
@@ -161,18 +197,18 @@ function parseSegment(raw: string): { seg: VoiceSeg | null; oil: OilCue | null }
     .split(/[^\p{L}\p{M}0-9./½¼¾']+/u)
     .filter(Boolean);
 
-  // Oil cue: an oil word plus its direction anywhere in the segment.
+  // Oil cue: an oil word WITH a direction right next to it ("less oil", "bina ghee", "oil kam", "with
+  // butter", "extra ghee"), or "oily" / "greasy". A bare oil word is part of a dish's name ("butter
+  // chicken", "butter naan", "fried rice", "dal tadka") and stays in the food words.
   let oil: OilCue | null = null;
-  const oilAt = toks.findIndex((t) => OIL_WORDS.has(t));
   const rest: string[] = [];
-  if (oilAt >= 0) {
-    let level: OilCue["level"] = "extra";
-    if (toks.some((t) => OIL_NONE.has(t)) || /oil[- ]?free/.test(raw)) level = "none";
-    else if (toks.some((t) => OIL_LESS.has(t))) level = "less";
-    else if (toks.some((t) => OIL_EXTRA.has(t))) level = "extra";
-    else if (toks[oilAt] === "fried" || toks[oilAt] === "oily" || toks[oilAt] === "greasy") level = "extra";
+  const cue = findOilCue(toks, raw);
+  if (cue) {
+    const { level, used } = cue;
     // Everything that isn't the oil phrase may still name a food ("dal with extra ghee" → dal).
-    for (const t of toks) if (!OIL_WORDS.has(t) && !OIL_LESS.has(t) && !OIL_NONE.has(t) && !OIL_EXTRA.has(t)) rest.push(t);
+    toks.forEach((t, i) => {
+      if (!used.has(i)) rest.push(t);
+    });
     const foodWords = rest.filter((t) => !STOP.has(t) && parseNumber(t) === null && !UNITS[t] && !GRAM_WORDS.has(t) && !MOD_WORDS[t]);
     oil = { level, food: foodWords.length ? foodWords.map((t) => SYNONYMS[t] ?? t).join(" ") : null };
     // "2 roti with ghee": the amount part still counts. A bare "less oil" has no food part.
@@ -206,7 +242,12 @@ function parseSegment(raw: string): { seg: VoiceSeg | null; oil: OilCue | null }
       continue;
     }
     if (MOD_WORDS[t]) {
-      const m = MOD_WORDS[t];
+      let m = MOD_WORDS[t];
+      // "not much rice", "no more than half": a negation before a degree word means less, not none.
+      if (m === "none" && next && DEGREE.has(next)) {
+        m = "less";
+        i++;
+      }
       // "half" with a count ("1 and a half") is rare; "half" alone is a modifier.
       if (m === "half" && count !== null && mod === "set") count += 0.5;
       else mod = m === "none" || mod === "set" ? m : mod;
@@ -218,6 +259,11 @@ function parseSegment(raw: string): { seg: VoiceSeg | null; oil: OilCue | null }
   if (!food.length) return { seg: null, oil };
   // "didn't eat the papad" / "no papad": a count means nothing then.
   if (mod === "none") count = null;
+  // "half roti", "aadha paratha": half of ONE piece, not half of every roti on the plate.
+  if (mod === "half" && count === null && unitGrams === null && pieceNoun(food.join(" "))) {
+    count = 0.5;
+    mod = "set";
+  }
   // Synonyms folded for the name ("chawal" → "rice"), plurals kept as said ("oats" stays "oats").
   const name = food.map((t) => SYNONYMS[t] ?? t).join(" ");
   return { seg: { raw, food: name, count, unitGrams, unitLabel, mod }, oil };

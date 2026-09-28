@@ -614,8 +614,8 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
     if (r?.usage) webUsage.push(...r.usage);
     return r;
   };
-  const items: PlateItem[] = await Promise.all(lookupItems.slice(0, 8).map((it) => webCheckPlateItem(it, { web }, context)));
-  if (lookupItems.length > 8) items.push(...lookupItems.slice(8).map((it) => ({ ...it, source_info: null })));
+  // The first 8 items, plus every voice-added one (it has no numbers of its own until the web prices it).
+  const items: PlateItem[] = await Promise.all(lookupItems.map((it, i) => (i < 8 || it.from_voice ? webCheckPlateItem(it, { web }, context) : Promise.resolve({ ...it, source_info: null }))));
   usage.push(...webUsage);
 
   // 2b. Eaten out? v2.15: a PHOTO already shows the real portion, so the ×1.4 restaurant multiplier

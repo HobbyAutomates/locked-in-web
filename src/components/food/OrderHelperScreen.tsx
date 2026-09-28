@@ -12,6 +12,7 @@ import { fractionLabel, scaleMealItem } from "@/lib/food/foodBits";
 import { orderPlan, planItems, type OrderDish, type OrderPlan } from "@/lib/food/orderHelper";
 import type { OrderResult } from "@/lib/food/orderFlow";
 import { saveLeftover } from "@/lib/food/foodActions";
+import { refreshFoodHome } from "./FoodHome";
 import type { MealItem } from "@/lib/types";
 import SubPage from "../SubPage";
 import { LineIcon } from "../lineIcons";
@@ -92,6 +93,7 @@ export default function OrderHelperScreen({ hideNumbers = false }: { hideNumbers
       const restKcal = rest.reduce((a, x) => a + x.calories, 0);
       const leftFraction = Math.min(0.95, Math.max(0.05, Math.round((restKcal / orderKcal) * 100) / 100));
       if (rest.length) await saveLeftover({ name: `${res.restaurant ? `${res.restaurant} ` : ""}order leftovers`, items: rest, fraction_left: leftFraction, meal_id: saved.id }).catch(() => null);
+      refreshFoodHome();
       setSaved(`Pre-logged ${planKcal} kcal to ${mealTypeLabel(slot)}${rest.length ? ". The rest waits as leftovers" : ""}.`);
       router.refresh();
     } catch (e) {

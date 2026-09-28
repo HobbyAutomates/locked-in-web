@@ -97,15 +97,17 @@ export async function saveLeftover(input: { name: string; items: MealItem[]; fra
 export async function logLeftover(id: string, mealType?: MealType | null): Promise<FoodResult> {
   const { supabase, user } = await me();
   if (!user) return { ok: false, error: "Not signed in" };
-  const { data, error } = await supabase.from("leftovers").select("id, name, items, used_at").eq("id", id).maybeSingle();
+  // Claim it first (only an unused row flips), so a double tap or a second device can't log it twice.
+  const { data, error } = await supabase.from("leftovers").update({ used_at: new Date().toISOString() }).eq("id", id).is("used_at", null).select("id, name, items");
   if (error) return fail(error, "Could not load the leftovers");
-  if (!data || data.used_at) return { ok: false, error: "Already logged" };
+  const row = (data ?? [])[0] as { name: string; items: MealItem[] } | undefined;
+  if (!row) return { ok: false, error: "Already logged" };
   try {
-    await saveMeal({ date: todayIso(), raw_text: `${data.name} (leftovers)`, items: data.items as MealItem[], meal_type: isMealType(mealType) ? mealType : defaultMealType() });
+    await saveMeal({ date: todayIso(), raw_text: `${row.name} (leftovers)`, items: row.items, meal_type: isMealType(mealType) ? mealType : defaultMealType() });
   } catch (e) {
+    await supabase.from("leftovers").update({ used_at: null }).eq("id", id);
     return { ok: false, error: e instanceof Error ? e.message : "Could not log that" };
   }
-  await supabase.from("leftovers").update({ used_at: new Date().toISOString() }).eq("id", id);
   revalidatePath("/", "layout");
   return { ok: true };
 }
@@ -177,19 +179,27 @@ export async function logSplit(input: { dish: string; items: MealItem[]; shares:
 export async function decideSplit(id: string, accept: boolean, mealType?: MealType | null): Promise<FoodResult> {
   const { supabase, user } = await me();
   if (!user) return { ok: false, error: "Not signed in" };
-  const { data, error } = await supabase.from("meal_splits").select("id, dish, items, date, meal_type, status, from_name").eq("id", id).eq("to_user", user.id).maybeSingle();
-  if (error) return fail(error, "Could not load that");
-  if (!data || data.status !== "pending") return { ok: false, error: "Already done" };
+  // Claim it first: only a pending row flips, so Accept can't log the same share twice.
+  const { data, error } = await supabase
+    .from("meal_splits")
+    .update({ status: accept ? "accepted" : "declined", decided_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("to_user", user.id)
+    .eq("status", "pending")
+    .select("id, dish, items, date, meal_type, from_name");
+  if (error) return fail(error, "Could not update that");
+  const row = (data ?? [])[0] as { dish: string; items: MealItem[]; date: string; meal_type: string | null; from_name: string | null } | undefined;
+  if (!row) return { ok: false, error: "Already done" };
   if (accept) {
     try {
-      const slot = isMealType(mealType) ? mealType : isMealType(data.meal_type) ? data.meal_type : defaultMealType();
-      await saveMeal({ date: safeDate(data.date as string), raw_text: `${data.dish} (shared${data.from_name ? ` by ${data.from_name}` : ""})`, items: data.items as MealItem[], meal_type: slot });
+      const slot = isMealType(mealType) ? mealType : isMealType(row.meal_type) ? row.meal_type : defaultMealType();
+      await saveMeal({ date: safeDate(row.date), raw_text: `${row.dish} (shared${row.from_name ? ` by ${row.from_name}` : ""})`, items: row.items, meal_type: slot });
     } catch (e) {
+      // Put it back so it can be accepted again (schema_v42's guard allows accepted → pending for this).
+      await supabase.from("meal_splits").update({ status: "pending", decided_at: null }).eq("id", id);
       return { ok: false, error: e instanceof Error ? e.message : "Could not log that" };
     }
   }
-  const { error: e2 } = await supabase.from("meal_splits").update({ status: accept ? "accepted" : "declined", decided_at: new Date().toISOString() }).eq("id", id);
-  if (e2) return fail(e2, "Could not update that");
   revalidatePath("/", "layout");
   return { ok: true };
 }

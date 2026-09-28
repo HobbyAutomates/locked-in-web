@@ -136,13 +136,19 @@ export type VoiceRecipe = { name: string; ingredients: string; servings: number 
 export function parseVoiceRecipe(text: string): VoiceRecipe {
   let t = String(text ?? "").replace(/\s+/g, " ").trim();
   let servings: number | null = null;
-  const serve = t.match(/[,.]?\s*\b(?:serves|for|makes|feeds)\s+(\d+|[a-z]+)(?:\s+(?:people|persons|log|servings?|portions?|plates?))?\b[.,]?/i) ?? t.match(/[,.]?\s*\b(\d+|[a-z]+)\s+(?:servings?|portions?|people)\b[.,]?/i);
-  if (serve) {
+  // Every "serves 4" / "for 4 people" / "4 servings" in the text, in order; the first with a real number
+  // wins ("for garnish … serves 4" → 4).
+  const patterns = [/[,.]?\s*\b(?:serves|for|makes|feeds)\s+(\d+|[a-z]+)(?:\s+(?:people|persons|log|servings?|portions?|plates?))?\b[.,]?/gi, /[,.]?\s*\b(\d+|[a-z]+)\s+(?:servings?|portions?|people)\b[.,]?/gi];
+  const found: RegExpMatchArray[] = [];
+  for (const re of patterns) for (const m of t.matchAll(re)) found.push(m);
+  found.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  for (const serve of found) {
     const w = serve[1].toLowerCase();
     const n = /^\d+$/.test(w) ? Number(w) : SERVE_WORDS[w];
     if (n && n > 0 && n <= 50) {
       servings = n;
       t = (t.slice(0, serve.index) + t.slice((serve.index ?? 0) + serve[0].length)).replace(/\s+/g, " ").trim();
+      break;
     }
   }
   let name = "";

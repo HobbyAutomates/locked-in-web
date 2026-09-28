@@ -111,7 +111,12 @@ begin
     new.from_user := old.from_user; new.to_user := old.to_user; new.from_name := old.from_name;
     new.dish := old.dish; new.items := old.items; new.kcal := old.kcal; new.share := old.share;
     new.date := old.date; new.meal_type := old.meal_type; new.created_at := old.created_at;
-    if old.status <> 'pending' then new.status := old.status; end if;
+    -- A decided row stays decided, except accepted → pending with decided_at cleared: the client
+    -- claims the row (pending → accepted) BEFORE saving the meal, and puts it back if that save fails.
+    if old.status <> 'pending' and not (old.status = 'accepted' and new.status = 'pending' and new.decided_at is null) then
+      new.status := old.status;
+      new.decided_at := old.decided_at;
+    end if;
   end if;
   return new;
 end $$;
