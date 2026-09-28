@@ -3,12 +3,30 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.15";
+export const APP_VERSION = "2.16";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.16",
+    date: "2026-09-29",
+    lines: [
+      "A quick 5-step tour on first open (replay it from Preferences), and Scan is now the first item in the + menu.",
+      "Squads look premium: richer squad cards and a glass podium leaderboard with a crown for #1. Progress is recoloured in ember, and the BMI now shows the right number.",
+      "Profile gets liquid-glass stats, 34 covers to pick from, and badges are now jewellery: metal frames with a glowing gem, and a big reveal when you earn one.",
+    ],
+  },
+  {
+    version: "2.15",
+    date: "2026-09-29",
+    lines: [
+      "More ember on Home: the calorie and macro rings glow orange, and the coach is one tap away. You can skip onboarding during the beta.",
+      "Much more accurate food: unknown foods and photos are checked on the web, bowls are split into their parts, and you can set your own calories per roti (or any unit).",
+      "Buddy up with a squadmate in one tap.",
+    ],
+  },
   {
     version: "2.14",
     date: "2026-09-26",
