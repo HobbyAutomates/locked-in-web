@@ -74,3 +74,21 @@ or "does not exist" / "could not find") hide the feature or show "Coming with th
 - Offline: `MAX_TRIES` 5, `QUEUE_LIMIT` 200; queue only when offline or on a network error.
 - Delete confirm word `DELETE`; user buckets `avatars`, `progress-photos`, `meal-photos`, `scan-photos`, `group-photos`.
 - Report reasons: `spam`, `abuse`, `nudity`, `self_harm`, `other`. Device block-list key `li-blocked`.
+
+## Added during the build
+
+- **D10 story** pure module: `src/lib/social/story.ts` (Android `util/Story.kt`): photos oldest → newest,
+  at most 24 (evenly thinned, first and last kept), weight from the photo or the nearest weight_log
+  entry within 7 days, delta vs the first frame (1 decimal), captions "Day N" / "−4.2 kg". Opt-in key
+  `li-story-optin`. Web reel: 720 × 1280 canvas + MediaRecorder (mp4 where supported, else webm).
+- **Freeze chip** on Home reads the count the daily sync stored (`li-freeze-tokens`), so it costs no request.
+- **Web routes**: `/social` (hub, one row on Profile), `/streak`, `/invite`, `/r/<code>`, `/wrapped/<week|month|year>`,
+  `/pledges`, `/events`, `/coach-access`, `/clients`, `/clients/<id>`, `/story`, `/packs`, `/leagues` (404 while
+  the flags are off), `/squad/<id>/verify`, `/profile/export`, `/profile/delete`, `/forgot`, `/reset`,
+  `/admin/social`, `GET /api/export?kind=all|meals|workouts|activities|weights|water`,
+  `POST /api/account/delete` `{ "confirm": "DELETE" }` (cookie or bearer).
+- **Before shipping** (owner): apply `schema_v44.sql` then `schema_v45.sql`; add `<site>/reset` to Supabase
+  Auth → URL configuration → Redirect URLs so the reset email can open it; `SUPABASE_SERVICE_ROLE_KEY` must be
+  set on the server for export and account deletion (it already is for admin).
+- **Google sign-in**: not built. No Google OAuth client is configured in Supabase; `GOOGLE_SIGN_IN_ENABLED`
+  (web `lib/social/safety.ts`) stays false and the login page has a TODO where the button goes.
