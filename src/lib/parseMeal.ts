@@ -129,6 +129,11 @@ const MAX_WEB_LOOKUPS = 6;
 /** v2.15: an item the food table didn't know, priced from the web lookup's per-100 g at the parser's grams. */
 function webPriced(it: HaikuItem, w: WebNutrition): ParsedItem {
   const base = priced(it, null);
+  // A brand the parser dropped ("Akshayakalpa slim milk" read as "Milk (skimmed)") keeps the product's own name.
+  const said = foodKey(it.input ?? "").split(" ");
+  const named = new Set(foodKey(it.food ?? "").split(" "));
+  const brand = said.some((x) => x.length > 3 && !named.has(x)) && w.matched_name && w.matched_name.length <= 60;
+  if (brand) base.name = w.matched_name;
   const k = base.grams / 100;
   const r1 = (v: number) => Math.round(v * k * 10) / 10;
   const micros: ParsedItem["micros"] = {};
@@ -336,7 +341,9 @@ export async function parseMealText(opts: { admin: AdminClient; userId: string |
   const webHits = new Map<HaikuItem, WebNutrition>();
   await Promise.all(
     misses.map(async ({ it }) => {
-      const w = await (opts.web ?? webLookup)(it.food || it.input, { context: `Typed by the person: "${String(it.input ?? "").slice(0, 160)}"` }).catch(() => null);
+      // Search the person's own words (brand and all, quantities stripped), not the parser's generic name.
+      const query = foodKey(it.input ?? "").length > 2 && !hasDevanagari(it.input ?? "") ? foodKey(it.input ?? "") : it.food || it.input;
+      const w = await (opts.web ?? webLookup)(query, { context: `Typed by the person: "${String(it.input ?? "").slice(0, 160)}" (read as: ${String(it.food ?? "").slice(0, 80)})` }).catch(() => null);
       if (w) webHits.set(it, w);
     }),
   );
