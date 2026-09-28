@@ -92,7 +92,11 @@ export default function FormCheck() {
         const pts = res.landmarks?.[0];
         draw(pts ?? null);
         if (!pts) return;
-        const next = step(st.current, measure(st.current.ex, pts), t);
+        // Angles need square pixels: landmarks are normalised per axis, so scale back to the frame.
+        const w = v.videoWidth || 640;
+        const h = v.videoHeight || 480;
+        const px = pts.map((q) => ({ x: q.x * w, y: q.y * h, visibility: q.visibility }));
+        const next = step(st.current, measure(st.current.ex, px), t);
         if (next.reps !== st.current.reps || next.phase !== st.current.phase) setState(next);
         st.current = next;
       };
