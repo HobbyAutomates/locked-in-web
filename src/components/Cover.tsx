@@ -3,6 +3,7 @@
 import { useId, useMemo } from "react";
 import { COVER_ART } from "@/lib/coverArt";
 import { coverPreset } from "@/lib/covers";
+import { goldCover, goldifySvg } from "@/lib/social/packs";
 import { md } from "./motion";
 
 /**
@@ -10,14 +11,20 @@ import { md } from "./motion";
  * are the CoverPresets board's vector art (lib/coverArt.ts), each with its own gradient ids.
  */
 export function Cover({ id, animate = true, align = "bottom" }: { id: string | null | undefined; animate?: boolean; align?: "bottom" | "middle" }) {
+  // v2.18 D11: "<motif>-gold" = the motif's dark art recoloured in dark gold (lib/social/packs.ts).
+  const gold = goldCover(id);
+  if (gold) return <ArtCover index={gold.darkIndex} align={align} gold />;
   const preset = coverPreset(id);
   if (preset.n === 1) return <PlatesCover animate={animate} />;
   return <ArtCover index={preset.n - 1} align={align} />;
 }
 
-function ArtCover({ index, align }: { index: number; align: "bottom" | "middle" }) {
+function ArtCover({ index, align, gold = false }: { index: number; align: "bottom" | "middle"; gold?: boolean }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const html = useMemo(() => (COVER_ART[index] ?? "").replaceAll("__U", uid), [index, uid]);
+  const html = useMemo(() => {
+    const svg = (COVER_ART[index] ?? "").replaceAll("__U", uid);
+    return gold ? goldifySvg(svg) : svg;
+  }, [index, uid, gold]);
   return <svg viewBox="0 0 390 250" preserveAspectRatio={align === "bottom" ? "xMidYMax slice" : "xMidYMid slice"} aria-hidden="true" className="block h-full w-full" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 

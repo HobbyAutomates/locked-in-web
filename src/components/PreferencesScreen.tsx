@@ -1,5 +1,6 @@
 "use client";
 
+import LanguagePicker from "./social/LanguagePicker";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveProfile, signOut } from "@/lib/actions";
@@ -20,7 +21,6 @@ import { BottomSheet, Card, Chevron, ErrorNote, Hair, PillSwitch, Rise, SettingR
 
 
 const TITLES: Record<PrefSection, string> = { appearance: "Appearance", tracking: "Tracking", notifications: "Notifications", privacy: "Privacy", account: "Account" };
-const DELETE_MAIL = "mailto:sohumai.team@gmail.com?subject=Delete%20my%20Locked%20In%20data&body=Please%20delete%20my%20Locked%20In%20account%20and%20all%20my%20data.%20Account%20email%3A%20";
 
 /**
  * v2.4 Preferences: one list of categories (Appearance, Tracking, Reminders, Privacy, Account),
@@ -91,6 +91,10 @@ function PreferencesIndex({ profile }: { profile: Profile }) {
             </SettingRow>
           </div>
         </Card>
+      </Rise>
+      {/* v2.18 E2: English / Hinglish / Hindi. */}
+      <Rise index={1}>
+        <LanguagePicker />
       </Rise>
     </SubPage>
   );
@@ -422,7 +426,12 @@ function Account({ profile, email }: { profile: Profile; email: string }) {
               <Chevron />
             </SettingRow>
             <Hair />
-            <SettingRow icon={<Trash size={20} />} tint="var(--danger)" label="Delete my data" subtitle="Emails Sohum a request to erase your account" href={`${DELETE_MAIL}${encodeURIComponent(email)}`}>
+            {/* v2.18 E5: export in-app, and delete in-app (the old email request stays as the fallback on that page). */}
+            <SettingRow icon={<Share size={20} />} label="Export my data" subtitle="CSV, or a printable PDF" href="/profile/export">
+              <Chevron />
+            </SettingRow>
+            <Hair />
+            <SettingRow icon={<Trash size={20} />} tint="var(--danger)" label="Delete account" subtitle="Wipes your account and data for good" href="/profile/delete">
               <Chevron />
             </SettingRow>
           </div>

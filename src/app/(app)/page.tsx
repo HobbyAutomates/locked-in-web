@@ -7,6 +7,7 @@ import { computeWrap, wrapWindow } from "@/lib/wrap";
 import HomeScreen from "@/components/HomeScreen";
 import { createClient } from "@/lib/supabase/server";
 import { getV218Home } from "@/lib/v218/homeData"; // v2.18 coach stream
+import { getFrozenDays } from "@/lib/social/data";
 
 /** v2.14 (schema_v37) Home extras in their own query, so a database without v37 still renders Home. */
 async function getV214Home(): Promise<{ onboardedV2: boolean | null; milestonesSeen: string[] | null }> {
@@ -25,12 +26,14 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const [{ today, profile, workouts, meals, exercises }, nudges, sp, water, settings, v214] = await Promise.all([getDashboard(), getMyNudges(), searchParams, getWater(addDays(t, -7), t), getNutritionSettings(), getV214Home()]);
   // v2.13: the Monday check-in (computed once a week when adaptive targets are on) and a running fast.
   const teen = isTeen(ageYears(profile.dob));
-  const [checkin, fasting, v216, badges, v217] = await Promise.all([
+  const [checkin, fasting, v216, badges, v217, frozen] = await Promise.all([
     getWeeklyCheckin(profile, settings, meals),
     teen || !settings.available ? Promise.resolve(null) : getFasting(),
     getV216Profile(),
     getBadgeProgress(profile, workouts, meals).catch(() => null),
     getV217Profile().catch(() => ({ memberNo: null, isFounder: null, createdAt: null })),
+    // v2.18 D5: days a streak freeze covered count toward the day streak ([] without schema_v44).
+    getFrozenDays(),
   ]);
   // v2.18: today's check-in / festival calorie bump, and festival dates protect the day streak.
   const v218 = await v218Home;
@@ -47,7 +50,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       meals={meals}
       exercises={exercises}
       weekStreak={workoutWeekStreak(trainedDates, profile.weekly_workout_target)}
-      dayStreak={activityDayStreak(workoutDates, exercises.map((e) => e.date), [...meals.map((m) => m.date), ...v218.protectedDates])}
+      dayStreak={activityDayStreak(workoutDates, exercises.map((e) => e.date), [...meals.map((m) => m.date), ...v218.protectedDates], frozen)}
       thisWeek={thisWeekCount(trainedDates)}
       celebrate={sp.celebrate === "1"}
       wrap={wrap}

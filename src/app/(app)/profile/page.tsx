@@ -8,13 +8,15 @@ import ProfileScreen from "@/components/ProfileScreen";
 import { memberPlate } from "@/lib/memberPlate";
 import { getPro } from "@/lib/platform-data";
 import { priceText } from "@/lib/pro";
+import { getFrozenDays } from "@/lib/social/data";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
   const [{ today, profile, workouts, meals, exercises }, { user }] = await Promise.all([getDashboard(), requireUser()]);
-  const [weights, badges, squads, pro, v216, v217] = await Promise.all([getWeights(), getBadgeProgress(profile, workouts, meals), getMySquads().catch(() => []), getPro(), getV216Profile(), getV217Profile().catch(() => ({ memberNo: null, isFounder: null, createdAt: null }))]);
-  const activity = [workouts.map((w) => w.date), exercises.map((e) => e.date), meals.map((m) => m.date)];
+  const [weights, badges, squads, pro, v216, v217, frozen] = await Promise.all([getWeights(), getBadgeProgress(profile, workouts, meals), getMySquads().catch(() => []), getPro(), getV216Profile(), getV217Profile().catch(() => ({ memberNo: null, isFounder: null, createdAt: null })), getFrozenDays()]);
+  // v2.18 D5: frozen days keep the streak alive (they're empty without schema_v44).
+  const activity = [workouts.map((w) => w.date), exercises.map((e) => e.date), meals.map((m) => m.date), frozen];
   const streak = activityDayStreak(...activity);
   return (
     <ProfileScreen

@@ -15,7 +15,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           Locked In · Admin
         </h1>
         <p className="text-xs muted">
-          {user.email} · beta analytics {ANALYTICS_ON ? "on" : "off"}
+          {user.email} · beta analytics {ANALYTICS_ON ? "on" : "off"} ·{" "}
+          {/* v2.18: squad verification requests + reports */}
+          <a href="/admin/social" className="font-semibold underline">
+            Moderation
+          </a>
         </p>
       </header>
       {children}

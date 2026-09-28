@@ -3,6 +3,8 @@
 import { useId } from "react";
 import { CATEGORY_SHAPE, GEM, METAL, type JewelCategory, type JewelShape, type JewelTier } from "@/lib/jewels";
 import { md } from "./motion";
+import { useBadgeSkin } from "./social/useBadgeSkin";
+import { SKIN_METAL } from "@/lib/social/packs";
 
 /**
  * v2.16 jewellery badge (board RefJewellery; mini version from SquadLeaderboard): a bevelled metal
@@ -64,6 +66,9 @@ export function Jewel({
   progress = 0,
   delay = null,
   label,
+  metal,
+  gem,
+  shape: shapeOverride,
 }: {
   category: JewelCategory;
   tier: JewelTier;
@@ -75,12 +80,17 @@ export function Jewel({
   delay?: number | null;
   /** Accessible name; omitted = decorative. */
   label?: string;
+  /** v2.18: limited-edition event jewels and badge skins override the frame metal / gem / shape. */
+  metal?: [string, string, string];
+  gem?: [string, string, string];
+  shape?: JewelShape;
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const shape = CATEGORY_SHAPE[category];
+  const skin = useBadgeSkin();
+  const shape = shapeOverride ?? CATEGORY_SHAPE[category];
   const frame = SHAPE_PATH[shape];
-  const [mHi, mMid, mLo] = locked ? LOCKED_METAL : METAL[tier];
-  const [gHi, gMid, gLo] = locked ? LOCKED_GEM : GEM[category];
+  const [mHi, mMid, mLo] = locked ? LOCKED_METAL : (metal ?? (skin !== "classic" ? SKIN_METAL[skin] : METAL[tier]));
+  const [gHi, gMid, gLo] = locked ? LOCKED_GEM : (gem ?? GEM[category]);
   const cy = shape === "shield" ? 47 : 50;
   const gr = shape === "diamond" ? 18 : 21;
   const facets = gemFacets(50, cy, gr);

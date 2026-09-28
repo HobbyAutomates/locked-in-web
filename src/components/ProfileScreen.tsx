@@ -16,6 +16,7 @@ import TrophyWall from "./TrophyWall";
 import ConsistencyCard from "./v218/ConsistencyCard"; // v2.18 coach stream
 import { COVER_STORAGE_KEY, DEFAULT_COVER, isCoverId } from "@/lib/covers";
 import { saveCoverPreset } from "@/lib/v216Actions";
+import { isGoldCover } from "@/lib/social/packs";
 import type { MemberPlate } from "@/lib/memberPlate";
 import { Cover } from "./Cover";
 import CoverPicker from "./CoverPicker";
@@ -92,7 +93,8 @@ export default function ProfileScreen({
   const reminders = onCount(profile.reminders);
   const joinedText = monthYear(joined);
   const place = [squadName, joinedText ? `since ${joinedText}` : null].filter(Boolean).join(" · ");
-  const [coverId, setCoverId] = useState<string>(isCoverId(cover.preset) ? cover.preset : DEFAULT_COVER);
+  // v2.18 D11: a gold cover (Packs) counts as a valid saved cover too.
+  const [coverId, setCoverId] = useState<string>(isCoverId(cover.preset) || isGoldCover(cover.preset) ? (cover.preset as string) : DEFAULT_COVER);
   const [picker, setPicker] = useState(false);
   // Until schema_v40 is applied the cover lives in this browser; once it is, a local pick moves up.
   useEffect(() => {
@@ -102,7 +104,7 @@ export default function ProfileScreen({
     } catch {
       local = null;
     }
-    if (!isCoverId(local)) return;
+    if (!isCoverId(local) && !isGoldCover(local)) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the local cover (pre-v40) is read after mount
     if (!cover.available || cover.preset == null) setCoverId(local);
     if (cover.available && cover.preset == null && local !== DEFAULT_COVER) void saveCoverPreset(local);
@@ -326,6 +328,8 @@ export default function ProfileScreen({
             {/* v2.14: the AI coach (chat, memory, style) and buddy streaks. */}
             <ListRow icon="spark" label="Coach" sub="Chat, style, what it knows" value="" href="/coach" />
             <ListRow icon="users" label="Buddy streak" sub="Log together, nudge each other" value="" href="/buddy" />
+            {/* v2.18 social stream: freezes, invites, wrapped, pledges, events, coach access, packs, export */}
+            <ListRow icon="award" label="Social and rewards" sub="Streak freezes, invites, wrapped, pledges and more" value="" href="/social" />
             <ListRow icon="user" label="Personal details" value={[age != null ? `${age}` : null, profile.height_cm ? `${Math.round(profile.height_cm)} cm` : null].filter(Boolean).join(" · ")} href="/profile/details" />
             <ListRow icon="target" label="Nutrition goals" value={profile.hide_numbers ? "Set" : `${profile.calorie_target.toLocaleString("en-IN")} kcal`} href="/profile/goals" />
             <ListRow icon="flame" label="Goal weight" value={goal != null ? weightText(goal, profile.units) : profile.goal_type.charAt(0).toUpperCase() + profile.goal_type.slice(1)} href="/profile/goal" />

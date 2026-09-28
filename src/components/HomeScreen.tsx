@@ -1,5 +1,7 @@
 "use client";
 
+import FreezeChip from "./social/FreezeChip";
+import { withQueue } from "@/lib/social/offlineStore";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -180,6 +182,8 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
 
       <Rise index={1}>
         <DayStreakPill days={dayStreak} loggedToday={loggedToday} />
+        {/* v2.18 D5: streak freezes (hidden until the first daily sync). */}
+        <FreezeChip />
       </Rise>
 
       {/* v2.14: the coach's note, buddy streaks, and "Tune your plan" for existing users. */}
@@ -359,7 +363,8 @@ function WaterCard({ date, isToday, ml, goal, glassMl, foodMl = 0 }: { date: str
     setError(null);
     setExtra((x) => x + glass);
     try {
-      await logWater(glass, date, "glass");
+      // v2.18 E1: offline → queued; the chip shows it and it syncs later.
+      await withQueue("water", { ml: glass, date, vessel: "glass" as const }, (p) => logWater(p.ml, p.date, p.vessel));
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not log that");

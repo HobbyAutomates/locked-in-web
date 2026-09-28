@@ -1,5 +1,6 @@
 "use client";
 
+import { withQueue } from "@/lib/social/offlineStore";
 import { useRef, useState } from "react";
 import { deleteWorkout, saveWorkout } from "@/lib/actions";
 import { DURATIONS } from "@/lib/burn";
@@ -92,7 +93,8 @@ export default function WorkoutForm({
     setBusy(true);
     setError(null);
     try {
-      const res = await saveWorkout(payload);
+      // v2.18 E1: offline → queued (null) and treated as saved; it syncs when the phone is back online.
+      const res: Awaited<ReturnType<typeof saveWorkout>> = (await withQueue("workout", payload, saveWorkout)) ?? { ok: true };
       if (!res.ok) {
         console.error("[WorkoutForm] save failed:", res.error);
         setError(res.error);
