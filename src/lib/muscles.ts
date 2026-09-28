@@ -159,6 +159,17 @@ export const EXERCISE_MUSCLES: Record<string, MuscleSplit> = {
   "Clean and press": { primary: ["front_delts", "glutes", "quads"], secondary: ["traps", "triceps", "hamstrings", "upper_back"] },
   "Farmer's walk": { primary: ["forearms", "traps"], secondary: ["abs", "obliques", "glutes"] },
   "Jumping jacks": { primary: ["calves"], secondary: ["glutes", "side_delts"] },
+  // v2.18 home & hostel plans
+  "Band row": { primary: ["lats", "upper_back"], secondary: ["biceps", "rear_delts"] },
+  "Band pull-apart": { primary: ["rear_delts"], secondary: ["upper_back", "traps"] },
+  "Band chest press": { primary: ["chest"], secondary: ["front_delts", "triceps"] },
+  "Band overhead press": { primary: ["front_delts"], secondary: ["side_delts", "triceps"] },
+  "Band curl": { primary: ["biceps"], secondary: ["forearms"] },
+  "Band tricep extension": { primary: ["triceps"], secondary: [] },
+  "Band squat": { primary: ["quads", "glutes"], secondary: ["adductors"] },
+  "Band lateral walk": { primary: ["glutes"], secondary: ["adductors"] },
+  "Glute bridge": { primary: ["glutes"], secondary: ["hamstrings"] },
+  Superman: { primary: ["lower_back"], secondary: ["glutes", "upper_back"] },
 };
 
 /** The older coarse muscle groups (workouts.muscles) → map regions, for exercises not in the table. */

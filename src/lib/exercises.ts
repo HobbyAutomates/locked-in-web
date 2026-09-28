@@ -80,6 +80,17 @@ export const EXERCISES: ExerciseDef[] = [
   { name: "Clean and press", muscles: ["Shoulders", "Back", "Quads"] },
   { name: "Farmer's walk", muscles: ["Forearms", "Back", "Core"], aliases: ["farmers carry"] },
   { name: "Jumping jacks", muscles: ["Other"], bw: true },
+  // v2.18 home & hostel plans: resistance-band and no-equipment moves
+  { name: "Band row", muscles: ["Back", "Biceps"], aliases: ["resistance band row"] },
+  { name: "Band pull-apart", muscles: ["Shoulders", "Back"], aliases: ["pull apart"] },
+  { name: "Band chest press", muscles: ["Chest", "Triceps"], aliases: ["band press"] },
+  { name: "Band overhead press", muscles: ["Shoulders", "Triceps"] },
+  { name: "Band curl", muscles: ["Biceps"], aliases: ["band bicep curl"] },
+  { name: "Band tricep extension", muscles: ["Triceps"] },
+  { name: "Band squat", muscles: ["Quads", "Glutes"] },
+  { name: "Band lateral walk", muscles: ["Glutes"], aliases: ["monster walk"] },
+  { name: "Glute bridge", muscles: ["Glutes", "Hamstrings"], bw: true, aliases: ["bridge"] },
+  { name: "Superman", muscles: ["Back", "Glutes"], bw: true },
 ];
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
