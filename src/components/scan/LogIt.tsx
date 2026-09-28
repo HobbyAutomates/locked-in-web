@@ -72,7 +72,7 @@ export function LogItCard({ food, slot, onSlot, busy, onLog, onAdjust }: { food:
         </button>
       </div>
       <MealSlotChips value={slot} onChange={onSlot} />
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {serving ? (
           <div role="tablist" aria-label="Amount in" className="grid shrink-0 grid-cols-2 gap-1 rounded-[12px] p-1" style={{ background: "var(--track)" }}>
             {(["serving", "g"] as const).map((m) => (
@@ -83,14 +83,15 @@ export function LogItCard({ food, slot, onSlot, busy, onLog, onAdjust }: { food:
           </div>
         ) : null}
         {mode === "serving" ? (
-          <div className="flex flex-1 items-center justify-end gap-2">
-            <button type="button" aria-label="Less" className="press grid h-10 w-10 place-items-center rounded-full text-[20px] font-semibold" style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }} onClick={() => step(-0.5)}>
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
+            <button type="button" aria-label="Less" className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-[20px] font-semibold" style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }} onClick={() => step(-0.5)}>
               −
             </button>
-            <span className="num min-w-[64px] text-center text-[17px] font-bold" aria-live="polite">
-              {fmt(count)} <span className="text-[12px] font-semibold muted">× {Math.round(serving?.grams ?? 100)} g</span>
+            <span className="num flex min-w-[52px] flex-col items-center leading-tight" aria-live="polite">
+              <span className="text-[17px] font-bold">{fmt(count)}</span>
+              <span className="text-[11px] font-semibold muted">× {Math.round(serving?.grams ?? 100)} g</span>
             </span>
-            <button type="button" aria-label="More" className="press grid h-10 w-10 place-items-center rounded-full text-[20px] font-semibold" style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }} onClick={() => step(0.5)}>
+            <button type="button" aria-label="More" className="press grid h-9 w-9 shrink-0 place-items-center rounded-full text-[20px] font-semibold" style={{ background: "var(--card2)", border: 0, color: "var(--ink)" }} onClick={() => step(0.5)}>
               +
             </button>
           </div>
