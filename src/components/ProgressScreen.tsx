@@ -25,7 +25,7 @@ import BadgeUnlock from "./BadgeUnlock";
 import { CountUp, MRise, STAGGER, drawLen, md } from "./motion";
 import { LineIcon } from "./lineIcons";
 import { Camera, ChevronDown, Close, Plus, Spinner, Trash } from "./icons";
-import { BodyCard, RecapsCard, ShareRow, TrainingCard } from "./platform/ProgressExtras";
+import { BodyCard, MusclesWeekCard, RecapsCard, ShareRow } from "./platform/ProgressExtras";
 import type { Measurement } from "@/lib/body";
 import { BreathingFlame, Card, Chevron, ErrorNote, Hair, MacroDot, Rise, SPRING, Segmented, fmt } from "./ui";
 
@@ -127,6 +127,10 @@ export default function ProgressScreen({
       <MRise delay={card(0)}>
         <WeightCard profile={profile} weights={weights} today={t} days={R.days} tag={R.tag} b={card(0)} />
       </MRise>
+      {/* v2.17: the muscle map, moved up from the bottom so people see it. */}
+      <MRise delay={card(0) + STAGGER}>
+        <MusclesWeekCard workouts={workouts} today={t} b={card(0) + STAGGER} />
+      </MRise>
 
       {flags.length && !safetyClosed ? (
         <Rise index={1}>
@@ -156,10 +160,7 @@ export default function ProgressScreen({
         <MealTimesCard meals={meals} today={t} days={range === 2 ? 90 : 30} b={card(5)} />
       </MRise>
 
-      {/* v2.13: training, body (measurements + photos) and recaps. */}
-      <MRise delay={card(6)}>
-        <TrainingCard workouts={workouts} today={t} b={card(6)} />
-      </MRise>
+      {/* v2.13: body (measurements + photos) and recaps. v2.17: training moved up as Muscles this week. */}
 
       <MRise delay={card(7)}>
         <BodyCard measurements={measurements} photos={photos} b={card(7)} />

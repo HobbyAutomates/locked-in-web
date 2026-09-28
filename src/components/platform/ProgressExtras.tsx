@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { REGIONS } from "@/lib/muscles";
-import { heat, regionSets, WEEKLY_SETS_LOW } from "@/lib/training";
+import { REGIONS, REGION_LABEL } from "@/lib/muscles";
+import { musclesWeekLine, trainedRegions } from "@/lib/musclesWeek";
+import { heat, regionSets } from "@/lib/training";
 import { addDays, longDate, weekStart } from "@/lib/dates";
 import { totalsFor } from "@/lib/totals";
 import { MEASURES, type Measurement } from "@/lib/body";
@@ -14,37 +15,35 @@ import ShareButton from "./ShareButton";
 import { CardLabel, PCard, ProChip } from "./kit";
 
 /**
- * v2.13 additions to Progress (spec §11–13): Training (this week's muscle map → /train), Body
+ * v2.13 additions to Progress (spec §11–13): Muscles this week (v2.17, the muscle map → /train), Body
  * (measurements + photos → their managers), Recaps, and the share row for streak / today.
  */
 
-export function TrainingCard({ workouts, today, b }: { workouts: Workout[]; today: string; b: number }) {
+/**
+ * v2.17 "Muscles this week" (moved up from the bottom of Progress to right after the weight card):
+ * a small front and back figure with this week's trained muscles in ember and one line, "Chest, back,
+ * legs · 4 sessions". Tapping opens the full muscle map (/train).
+ */
+export function MusclesWeekCard({ workouts, today, b }: { workouts: Workout[]; today: string; b: number }) {
   const ws = weekStart(today);
-  const sets = regionSets(workouts, ws, addDays(ws, 6));
-  const trained = REGIONS.filter((r) => sets[r] > 0);
-  const inRange = trained.filter((r) => sets[r] >= WEEKLY_SETS_LOW).length;
-  const total = Math.round(REGIONS.reduce((a, r) => a + sets[r], 0));
+  const we = addDays(ws, 6);
+  const sets = regionSets(workouts, ws, we);
+  const sessions = workouts.filter((w) => w.date >= ws && w.date <= we).length;
+  const trained = trainedRegions(sets);
+  const line = musclesWeekLine(sets, sessions);
   return (
-    <Link href="/train" className="press block" style={{ color: "var(--ink)" }} aria-label="Training: routines, muscle map and PR charts">
-      <PCard label="Training">
-        <CardLabel pro right={<LineIcon name="chev" size={16} style={{ color: "var(--muted)" }} />}>
-          Training · this week
-        </CardLabel>
-        <div className="flex items-center gap-4">
-          <div className="w-[46%] shrink-0">
-            <MuscleMap mode={{ kind: "heat", heat: Object.fromEntries(REGIONS.map((r) => [r, heat(sets[r])])) }} delay={b + 200} />
+    <Link href="/train" className="press block" style={{ color: "var(--ink)" }} aria-label={`Muscles this week: ${line}. Open the muscle map`}>
+      <PCard label="Muscles this week" style={{ padding: 16 }}>
+        <div className="flex items-center gap-3.5">
+          <div className="w-[104px] shrink-0">
+            <MuscleMap mode={{ kind: "heat", heat: Object.fromEntries(REGIONS.map((r) => [r, sets[r] > 0 ? Math.max(0.45, heat(sets[r])) : 0])) }} delay={b + 200} label={`Trained this week: ${trained.map((r) => REGION_LABEL[r]).join(", ") || "none yet"}`} compact />
           </div>
-          <div className="flex min-w-0 flex-col gap-1">
-            <p className="num text-[30px] font-extrabold leading-none" style={{ letterSpacing: "-1px" }}>
-              {trained.length}
-              <span className="text-[14px] font-semibold muted"> / 18 muscles</span>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <CardLabel right={<LineIcon name="chev" size={16} style={{ color: "var(--muted)" }} />}>Muscles this week</CardLabel>
+            <p className="text-[16px] font-semibold leading-snug" style={{ letterSpacing: "-0.01em" }}>
+              {line}
             </p>
-            <p className="text-[13px] muted">
-              {total ? `${total} sets · ${inRange} muscle${inRange === 1 ? "" : "s"} at 10+ sets` : "Nothing trained yet this week"}
-            </p>
-            <p className="mt-1 text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
-              Routines, planner & PR charts
-            </p>
+            <p className="text-[12.5px] muted">{trained.length ? `${trained.length} of 18 muscles · tap for the full map` : "Log a workout to light it up"}</p>
           </div>
         </div>
       </PCard>

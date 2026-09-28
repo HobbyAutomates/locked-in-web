@@ -88,10 +88,10 @@ function fillFor(region: Region, mode: MapMode): { fill: string; opacity: number
   return { fill: "var(--accent)", opacity: 0.22 + 0.78 * Math.min(1, h) };
 }
 
-function View({ shapes, mode, label, delay }: { shapes: Shape[]; mode: MapMode; label: string; delay: number }) {
+function View({ shapes, mode, label, delay, compact }: { shapes: Shape[]; mode: MapMode; label: string; delay: number; compact?: boolean }) {
   return (
     <figure className="m-0 flex flex-1 flex-col items-center gap-1">
-      <svg viewBox="30 4 140 386" className="block w-full" style={{ maxHeight: 260 }} aria-hidden="true">
+      <svg viewBox="30 4 140 386" className="block w-full" style={{ maxHeight: compact ? 120 : 260 }} aria-hidden="true">
         <Silhouette />
         {shapes.flatMap((s, i) => {
           const { fill, opacity } = fillFor(s.region, mode);
@@ -109,12 +109,13 @@ function View({ shapes, mode, label, delay }: { shapes: Shape[]; mode: MapMode; 
           return s.mirror ? [one(`${s.region}-l-${i}`, false), one(`${s.region}-r-${i}`, true)] : [one(`${s.region}-${i}`, false)];
         })}
       </svg>
-      <figcaption className="text-[11px] font-semibold muted">{label}</figcaption>
+      {compact ? null : <figcaption className="text-[11px] font-semibold muted">{label}</figcaption>}
     </figure>
   );
 }
 
-export default function MuscleMap({ mode, delay = 200, label }: { mode: MapMode; delay?: number; label?: string }) {
+/** `compact` (v2.17 Progress card, workout summary): a small pair without the Front / Back captions. */
+export default function MuscleMap({ mode, delay = 200, label, compact = false }: { mode: MapMode; delay?: number; label?: string; compact?: boolean }) {
   const described =
     label ??
     (mode.kind === "split"
@@ -124,9 +125,9 @@ export default function MuscleMap({ mode, delay = 200, label }: { mode: MapMode;
           .map(([r]) => REGION_LABEL[r as Region])
           .join(", ") || "none yet"}.`);
   return (
-    <div role="img" aria-label={described} className="flex gap-3">
-      <View shapes={FRONT} mode={mode} label="Front" delay={delay} />
-      <View shapes={BACK} mode={mode} label="Back" delay={delay + 300} />
+    <div role="img" aria-label={described} className={`flex ${compact ? "gap-1.5" : "gap-3"}`}>
+      <View shapes={FRONT} mode={mode} label="Front" delay={delay} compact={compact} />
+      <View shapes={BACK} mode={mode} label="Back" delay={delay + 300} compact={compact} />
     </div>
   );
 }

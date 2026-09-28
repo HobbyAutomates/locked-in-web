@@ -6,13 +6,15 @@ import { saveWorkout } from "@/lib/actions";
 import { exerciseDef, exercisesText, lastSets, musclesOf } from "@/lib/exercises";
 import { MUSCLES } from "@/lib/muscles";
 import { isNewPr } from "@/lib/e1rm";
-import { DEFAULT_REST_S, type RoutineDay } from "@/lib/training";
+import { DEFAULT_REST_S, regionsFor, type RoutineDay } from "@/lib/training";
+import { REGION_LABEL, type Region } from "@/lib/muscles";
 import { localNotify } from "@/lib/pushClient";
 import type { Workout, WorkoutExercise } from "@/lib/types";
 import SubPage from "../SubPage";
 import { MRise, STAGGER, md } from "../motion";
 import { LineIcon } from "../lineIcons";
-import { ErrorNote } from "../ui";
+import { BottomSheet, ErrorNote } from "../ui";
+import MuscleMap from "./MuscleMap";
 import { ProChip } from "./kit";
 
 type LiveSet = { kg: string; reps: string; done: boolean };
@@ -136,6 +138,10 @@ export default function LiveWorkout({ routineId, routineName, dayIndex, day, his
   const total = list.reduce((a, x) => a + x.sets.length, 0);
   const elapsed = startedAt != null && now != null ? (now - startedAt) / 1000 : 0;
 
+  // v2.17: after saving, a short summary with the trained-muscles mini map, then Home.
+  const [summary, setSummary] = useState<null | { primary: Region[]; secondary: Region[]; sets: number; minutes: number; exercises: number }>(null);
+  const goHome = () => router.replace("/?celebrate=1");
+
   async function finish() {
     const exercises: WorkoutExercise[] = list
       .map((x) => ({ name: x.name, sets: x.sets.filter((s) => s.done && Number(s.reps) > 0).map((s) => ({ kg: s.kg.trim() === "" ? null : Number(s.kg), reps: Math.round(Number(s.reps)) })) }))
@@ -168,7 +174,21 @@ export default function LiveWorkout({ routineId, routineName, dayIndex, day, his
     } catch {
       // ignore
     }
-    router.replace("/?celebrate=1");
+    const primary = new Set<Region>();
+    const secondary = new Set<Region>();
+    for (const x of exercises) {
+      const split = regionsFor(x.name);
+      split.primary.forEach((r) => primary.add(r));
+      split.secondary.forEach((r) => secondary.add(r));
+    }
+    setBusy(false);
+    setSummary({
+      primary: [...primary],
+      secondary: [...secondary].filter((r) => !primary.has(r)),
+      sets: exercises.reduce((a, x) => a + x.sets.length, 0),
+      minutes: Math.max(1, Math.round(elapsed / 60)),
+      exercises: exercises.length,
+    });
   }
 
   return (
@@ -253,6 +273,25 @@ export default function LiveWorkout({ routineId, routineName, dayIndex, day, his
           </button>
         </div>
       ) : null}
+      <BottomSheet open={!!summary} title="Workout saved" subtitle={summary ? `${summary.exercises} exercise${summary.exercises === 1 ? "" : "s"} · ${summary.sets} sets · ${summary.minutes} min` : null} onClose={goHome}>
+        {summary ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-[120px] shrink-0">
+                <MuscleMap mode={{ kind: "split", primary: summary.primary, secondary: summary.secondary }} delay={150} compact />
+              </div>
+              <div className="flex min-w-0 flex-col gap-1">
+                <p className="text-[13px] font-semibold muted">Trained today</p>
+                <p className="text-[15px] font-semibold leading-snug">{summary.primary.map((r) => REGION_LABEL[r]).join(", ") || "Nothing mapped"}</p>
+                {summary.secondary.length ? <p className="text-[12.5px] muted">Also: {summary.secondary.map((r) => REGION_LABEL[r]).join(", ")}</p> : null}
+              </div>
+            </div>
+            <button type="button" className="press h-[52px] w-full rounded-2xl text-[16px] font-semibold" style={{ background: "var(--accent)", color: "var(--accent-ink)", border: 0 }} onClick={goHome}>
+              Done
+            </button>
+          </div>
+        ) : null}
+      </BottomSheet>
     </SubPage>
   );
 }
