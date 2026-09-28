@@ -27,6 +27,12 @@ import PhotoStage from "./scan/PhotoStage";
 import sc from "./scan/scan.module.css";
 import MenuResult from "./nutrition/MenuResult";
 import type { MenuScanResult } from "@/lib/menuScan";
+import { CameraVoiceRow, useVoiceNote } from "./food/VoiceHold";
+import { EatenChips, PlateVoice, SizedUsing, SplitButton, SplitSheet, VoiceChanges } from "./food/PlateTools";
+import { LabelReality } from "./food/LabelReality";
+import { plusMinusLabel } from "@/lib/food/honesty";
+import { splitEaten } from "@/lib/food/foodBits";
+import { saveLeftover } from "@/lib/food/foodActions";
 
 const LENSES: { key: Lens; label: string }[] = [
   { key: "protein", label: "Protein" },
@@ -96,6 +102,8 @@ export default function ScanScreen({ history, profile, recent = [] }: { history:
   const [recentSlot, setRecentSlot] = useState<MealType>(() => defaultMealType());
   const [recentState, setRecentState] = useState<Record<string, "busy" | "ok">>({});
   const [recentAdjust, setRecentAdjust] = useState<RecentFood | null>(null);
+  // v2.18 A1: what the person says with a plate photo ("2 roti, less oil, extra dal").
+  const voice = useVoiceNote();
 
   async function logRecent(r: RecentFood, item: MealItem) {
     setRecentState((s) => ({ ...s, [r.key]: "busy" }));
@@ -150,7 +158,8 @@ export default function ScanScreen({ history, profile, recent = [] }: { history:
     setOpened(null);
     setStage(extra.kind === "plate" ? "Looking at the plate, then checking sources for each item… 20–40 s" : extra.barcode ? "Looking it up and writing your report… 15–30 s" : "Working out what it is, then reading it… 15–45 s");
     try {
-      const r = await postJson<Record<string, unknown>>("/api/scan", { image: pl?.base64, media_type: pl?.media_type, thumb: pl?.thumb ?? undefined, lens, note: note.trim() || undefined, ...extra });
+      const said = voice.current().trim();
+      const r = await postJson<Record<string, unknown>>("/api/scan", { image: pl?.base64, media_type: pl?.media_type, thumb: pl?.thumb ?? undefined, lens, note: note.trim() || undefined, ...(said ? { voice: said } : {}), ...extra });
       if (typeof r.barcode === "string" && r.barcode) setDigits(r.barcode);
       setRes(toResult(r));
       track("scan_done", { kind: String(r.kind ?? "label"), found: r.found !== false, forced: extra.kind ?? null });
@@ -179,6 +188,8 @@ export default function ScanScreen({ history, profile, recent = [] }: { history:
         return;
       }
       setBusy(true);
+      // v2.18: the mic may still be open (said while shooting): wait for the last words.
+      await voice.settle();
       setStage("Reading the bars…");
       const code = await decodeBarcode(out.preview);
       if (code) setDigits(code);
@@ -212,6 +223,7 @@ export default function ScanScreen({ history, profile, recent = [] }: { history:
     reset();
     setPreview(null);
     setPayload(null);
+    voice.clear();
   }
 
   const onCamera = !preview && !res && !opened && !menu;
@@ -255,6 +267,7 @@ export default function ScanScreen({ history, profile, recent = [] }: { history:
           onGallery={() => galleryRef.current?.click()}
           onClose={() => router.push("/")}
           onTypeDigits={() => setShowDigits(true)}
+          voice={mode === "food" ? <CameraVoiceRow voice={voice} /> : undefined}
         />
       ) : preview && !plateSheet ? (
         <PhotoStage src={preview} title={resultTitle} onClose={toCamera} busy={busy} stage={stage} mode={mode} short={(!!res || !!menu) && !busy} />
@@ -587,6 +600,7 @@ export function ReportView({ report: r, initialLens, defaultOpen = false }: { re
           ) : null}
         </Card>
       </Rise>
+      <LabelReality report={r} />
 
       <ValidationBanner flags={r.validation} />
       <SummaryGrid r={r} />
@@ -1139,6 +1153,9 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
   const [editIdx, setEditIdx] = useState<number | null>(null);
   // v2.17: which meal this plate goes into; the hour rule picks, one tap changes it.
   const [slot, setSlot] = useState<MealType>(() => defaultMealType());
+  // v2.18: "Ate part of it" (A6) and the split sheet (A7).
+  const [eaten, setEaten] = useState(1);
+  const [splitOpen, setSplitOpen] = useState(false);
   // v2.15 beta log: a result closed without "Log" / "Add to plate" is a scan_dismiss.
   const accepted = useRef(false);
   useEffect(() => {
@@ -1210,7 +1227,13 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
             Restaurant · hidden oil added
           </p>
         ) : null}
+        {plate.sized_using ? (
+          <div className="mt-2">
+            <SizedUsing value={plate.sized_using} />
+          </div>
+        ) : null}
       </div>
+      <VoiceChanges voice={plate.voice} changes={plate.voice_changes} />
       {plate.follow_up && plate.follow_up.options.length ? (
         <div className={sc.followUp}>
           <span className="mr-auto text-[13px] font-semibold">{plate.follow_up.question}</span>
@@ -1246,7 +1269,7 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
                 <span className={sc.confDot} style={{ background: low ? "var(--danger)" : c.color }} aria-hidden="true" />
                 <span className="shrink-0 text-[11px] muted">{it.confidence}</span>
                 <span className="num ml-auto shrink-0 text-[15px] font-extrabold">
-                  {it.calories} <span className="text-[11px] font-semibold muted">kcal</span>
+                  {it.calories} <span className="text-[11px] font-semibold muted">kcal{plusMinusLabel(mealItemFromPlate(it)) ? ` ${plusMinusLabel(mealItemFromPlate(it))}` : ""}</span>
                 </span>
                 <InfoButton name={it.name} check={!confirmed.has(idx) && needsCheck(it)} onClick={() => setInfoIdx(idx)} />
               </div>
@@ -1306,19 +1329,32 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
       <ErrorNote text={error} />
       {!readOnly ? (
         <div className="flex flex-col gap-2.5">
+          <PlateVoice
+            items={items}
+            plateNote={plate.plate_note}
+            onApply={(next) => {
+              setItems(next);
+              setOriginals(next);
+              setConfirmed(new Set());
+            }}
+          />
+          <EatenChips value={eaten} onChange={setEaten} leftKcal={Math.round(items.reduce((a, i) => a + i.calories, 0) * (1 - eaten))} />
           <MealSlotChips value={slot} onChange={setSlot} />
           <PillButton
             disabled={saving || !items.length}
             onClick={() =>
               startSave(async () => {
                 try {
-                  await saveMeal({
+                  // v2.18 A6: log what was eaten; the rest waits as leftovers (quietly skipped before schema_v42).
+                  const cut = splitEaten(items.map(mealItemFromPlate), eaten);
+                  const saved = await saveMeal({
                     date: today(),
                     raw_text: plate.plate_note || items.map((i) => i.name).join(", "),
                     photo_path: plate.photo_path ?? null,
-                    items: items.map(mealItemFromPlate),
+                    items: cut.eaten,
                     meal_type: slot,
                   });
+                  if (cut.left.length) await saveLeftover({ name: plate.plate_note || items.map((i) => i.name).join(", "), items: cut.left, fraction_left: cut.leftFraction, meal_id: saved.id }).catch(() => null);
                   track("meal_logged", { method: "photo", items: items.length, from: "scan" });
                   accept("log");
                   logEvent("log", { payload: { method: "photo", scan_id: plate.id ?? null, items: items.map(nums), total_kcal: items.reduce((a, i) => a + i.calories, 0), raw_text: plate.plate_note } });
@@ -1332,6 +1368,21 @@ export function PlateReview({ plate, onSaved, readOnly, photo, onClose, extra }:
           >
             {saving ? <Spinner size={18} /> : `Log to ${mealTypeLabel(slot)}`}
           </PillButton>
+          <SplitButton disabled={saving || !items.length} onClick={() => setSplitOpen(true)} />
+          <SplitSheet
+            open={splitOpen}
+            onClose={() => setSplitOpen(false)}
+            dish={plate.plate_note || items.map((i) => i.name).join(", ")}
+            items={items.map(mealItemFromPlate)}
+            mealType={slot}
+            photoPath={plate.photo_path ?? null}
+            onDone={() => {
+              setSplitOpen(false);
+              accept("log");
+              onSaved?.();
+              router.push("/");
+            }}
+          />
           <button
             type="button"
             className="hit press mt-1 w-full py-2 text-center text-[13px] font-semibold muted"

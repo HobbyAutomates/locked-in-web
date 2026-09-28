@@ -30,6 +30,7 @@ import MilestoneFlood from "./home/MilestoneFlood";
 import GuidedTour from "./GuidedTour";
 import BadgeUnlock from "./BadgeUnlock";
 import type { BadgeProgress } from "@/lib/badges";
+import FoodHomeExtras, { useFoodWaterMl } from "./food/FoodHome"; // v2.18 food
 
 /** Background saves already pulled in by a refresh (see PendingMeals); survives remounts of Home. */
 let handledSaves = 0;
@@ -98,6 +99,8 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   const totals = totalsFor(meals, selected);
   const dayWorkouts = workouts.filter((w) => w.date === selected);
   const dayMeals = meals.filter((m) => m.date === selected);
+  // v2.18 A10: water in food (dal, chaas, fruit…) when the setting is on; 0 otherwise.
+  const foodWaterMl = useFoodWaterMl(dayMeals);
   // Band-workout burns ride on the workout row itself; everything else gets a row of its own.
   const dayExercises = exercises.filter((e) => e.date === selected && e.source !== "workout");
   const workoutBurn = new Map(exercises.filter((e) => e.date === selected && e.source === "workout").map((e) => [e.note, e.kcal]));
@@ -248,6 +251,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
           <HomeNutritionLinks date={selected} />
         </Rise>
       ) : null}
+      <FoodHomeExtras meals={dayMeals} isToday={isToday} /> {/* v2.18 food */}
       {checkin && !checkin.applied ? <HomeCheckin row={checkin} hideNumbers={hideNumbers} /> : null}
       {fast ? (
         <Rise index={3}>
@@ -294,7 +298,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       </Rise>
 
       <Rise index={4}>
-        <WaterCard date={selected} isToday={isToday} ml={water.filter((w) => w.date === selected).reduce((a, w) => a + w.ml, 0)} goal={profile.water_goal_ml} glassMl={profile.water_glass_ml} />
+        <WaterCard date={selected} isToday={isToday} ml={water.filter((w) => w.date === selected).reduce((a, w) => a + w.ml, 0) + foodWaterMl} foodMl={foodWaterMl} goal={profile.water_goal_ml} glassMl={profile.water_glass_ml} />
       </Rise>
 
       <TodaySessionCard /> {/* v2.13 platform */}
@@ -338,7 +342,7 @@ function HomeCheckin({ row, hideNumbers }: { row: CheckinRow; hideNumbers: boole
 }
 
 /** v2.6 water tile: "Water · 1.75 L / 2.5 L" with a mini bottle and + Glass; the tile opens the Water page. */
-function WaterCard({ date, isToday, ml, goal, glassMl }: { date: string; isToday: boolean; ml: number; goal: number; glassMl: number }) {
+function WaterCard({ date, isToday, ml, goal, glassMl, foodMl = 0 }: { date: string; isToday: boolean; ml: number; goal: number; glassMl: number; foodMl?: number }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [extra, setExtra] = useState(0);
@@ -377,7 +381,7 @@ function WaterCard({ date, isToday, ml, goal, glassMl }: { date: string; isToday
           <span className="num text-xl font-extrabold leading-tight">
             {litres(shown)} <span className="text-[13px] font-semibold muted">/ {litres(target)}</span>
           </span>
-          <span className="truncate text-xs muted">{error ?? (shown >= target ? "Water goal hit" : `${Math.max(0, Math.ceil((target - shown) / glass))} glasses to go`)}</span>
+          <span className="truncate text-xs muted">{error ?? `${shown >= target ? "Water goal hit" : `${Math.max(0, Math.ceil((target - shown) / glass))} glasses to go`}${foodMl > 0 ? ` · ${foodMl} mL from food` : ""}`}</span>
         </span>
       </button>
       <button type="button" className="chip press shrink-0 gap-1 whitespace-nowrap" style={{ height: 36, padding: "0 12px", fontWeight: 700 }} disabled={adding} onClick={() => void addGlass()} aria-label={`Add a ${glass} mL glass`}>

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { formatTime } from "@/lib/display";
 import { MEAL_TYPES, groupMeals, mealTypeLabel, mealTypeOf, type MealType } from "@/lib/mealType";
 import { itemQtyLabel } from "@/lib/quantity";
+import { totalPlusMinus } from "@/lib/food/honesty";
 import { moveMeal } from "@/lib/nutrition-actions";
 import type { Meal } from "@/lib/types";
 import { Bowl, ChevronRight, MealTypeIcon, Plus } from "./icons";
@@ -298,7 +299,11 @@ function MealLine({
             {formatTime(meal.created_at) ? ` · ${formatTime(meal.created_at)}` : ""}
           </span>
         </span>
-        <span className="num shrink-0 text-[14px] font-bold">{Math.round(calories)} kcal</span>
+        <span className="num shrink-0 text-right text-[14px] font-bold leading-tight">
+          {Math.round(calories)} kcal
+          {/* v2.18 A3: the honest range of this meal's numbers */}
+          {totalPlusMinus(meal.items) >= 5 ? <span className="block text-[11px] font-semibold muted">±{totalPlusMinus(meal.items)}</span> : null}
+        </span>
         <span className="shrink-0" style={{ color: "var(--muted)", display: "inline-flex" }}>
           <ChevronRight size={18} />
         </span>

@@ -10,6 +10,7 @@ import { MEAL_TYPES, aiLogged, defaultMealType, mealTypeOf, type MealType } from
 import { applyRestaurant, countLabel, foodFromItem, itemQtyLabel, oneTap, priceItem, restaurantOil, savedUnitOf, snapCount, unitFor, wantsCookedIn, type Quantity, type QuantityFood } from "@/lib/quantity";
 import { today as todayIso } from "@/lib/dates";
 import { useDictation } from "@/lib/speech";
+import { plusMinusLabel } from "@/lib/food/honesty";
 import { PLATE_PREFILL_KEY, type PlatePrefill } from "@/lib/platePrefill";
 import type { FoodPreset, FoodSearchHit, Meal, MealItem, ParsedWater, ParseResult, PresetCategory, PresetServing, SavedMeal } from "@/lib/types";
 import { Close, Drop, Droplet, MealTypeIcon, Mic, Search, Spinner, ThumbDown, ThumbUp, Trash } from "./icons";
@@ -1225,7 +1226,9 @@ function PlateRow({
             <InfoButton name={item.name} check={!row.confirmed && needsCheck(item)} onClick={onInfo} />
           </span>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-xs muted">{Math.round(item.calories)} kcal</span>
+            <span className="text-xs muted">
+              {Math.round(item.calories)} kcal{plusMinusLabel(item) ? ` ${plusMinusLabel(item)}` : ""}
+            </span>
             <MacroDot value={`${fmt(item.protein_g)}g`} color="var(--red)" />
             <MacroDot value={`${fmt(item.carbs_g)}g`} color="var(--orange)" />
             <MacroDot value={`${fmt(item.fat_g)}g`} color="var(--blue)" />

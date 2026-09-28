@@ -206,6 +206,7 @@ export default function CameraStage({
   onGallery,
   onClose,
   onTypeDigits,
+  voice,
 }: {
   mode: ScanMode;
   onMode: (m: ScanMode) => void;
@@ -218,6 +219,8 @@ export default function CameraStage({
   onGallery: () => void;
   onClose: () => void;
   onTypeDigits: () => void;
+  /** v2.18 A1: the hold-to-talk row (Scan food mode), shown above the shutter. */
+  voice?: React.ReactNode;
 }) {
   const { videoRef, on, starting, failed, supported, start, stop, grab, peek, torchOk, torch, toggleTorch } = useCamera();
   const [help, setHelp] = useState(false);
@@ -335,6 +338,7 @@ export default function CameraStage({
               </button>
             ))}
           </div>
+          {voice}
           <div className={sc.shutterRow}>
             <button type="button" className={sc.side} onClick={onGallery}>
               <span className={sc.round}>

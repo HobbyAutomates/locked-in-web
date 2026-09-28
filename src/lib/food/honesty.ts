@@ -41,7 +41,8 @@ export function kcalRange(it: RangeItem): Range {
   const kcal = Math.max(0, Number(it.calories) || 0);
   const lo = it.kcal_low != null ? Number(it.kcal_low) : NaN;
   const hi = it.kcal_high != null ? Number(it.kcal_high) : NaN;
-  if (Number.isFinite(lo) && Number.isFinite(hi) && hi >= lo && lo >= 0 && hi > 0) {
+  // A stored range only counts while it still brackets the calories (an edited amount falls back).
+  if (Number.isFinite(lo) && Number.isFinite(hi) && hi >= lo && lo >= 0 && hi > 0 && kcal >= lo - 1 && kcal <= hi + 1) {
     const pm = Math.round((hi - lo) / 2);
     return { low: Math.round(lo), high: Math.round(hi), plusMinus: pm, rel: kcal > 0 ? pm / kcal : 0 };
   }

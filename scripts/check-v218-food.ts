@@ -118,6 +118,7 @@ assert.equal(relUncertainty(meal("x", 100, 200, { source: "estimated", confidenc
 assert.equal(relUncertainty(meal("x", 100, 200, { source: "estimated", confidence: 0.3 })), 0.4);
 assert.deepEqual(kcalRange(meal("x", 100, 200, { source: "table" })), { low: 176, high: 224, plusMinus: 24, rel: 0.12 });
 assert.deepEqual(kcalRange(meal("x", 100, 200, { kcal_low: 150, kcal_high: 260 })), { low: 150, high: 260, plusMinus: 55, rel: 0.275 });
+assert.equal(kcalRange(meal("x", 100, 400, { kcal_low: 150, kcal_high: 260, source: "table" })).plusMinus, 48); // edited amount: the stale range is ignored
 assert.equal(plusMinusLabel(meal("x", 10, 20)), ""); // ±2 isn't worth showing
 assert.equal(totalPlusMinus([meal("a", 100, 300), meal("b", 100, 400)]), 60); // sqrt(36² + 48²)
 assert.deepEqual(rangeFromGrams({ calories: 200, grams: 100, grams_low: 80, grams_high: 130 }), { kcal_low: 160, kcal_high: 260 });
