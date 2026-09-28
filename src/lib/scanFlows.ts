@@ -24,6 +24,8 @@ import {
 import { extractBarcode, parseNutritionLabel, reportNutritionTrusted, roundPer100, sanityCheckPer100 } from "@/lib/labelParse";
 import { webCheckPlateItem } from "@/lib/plateMatch";
 import { webLookup, WEB_LOOKUP_TIMEOUT_MS } from "@/lib/webFood";
+import { applyVoiceAmounts, applyVoiceOil, dropUnpriced, parseVoice } from "@/lib/food/voicePlate";
+import { cleanScaleRef } from "@/lib/food/foodBits";
 import { reportSourceInfo } from "@/lib/sourceInfo";
 import { RESTAURANT_OIL_G, mentionsRestaurant, restaurantOil } from "@/lib/quantity";
 import { scanName } from "@/lib/scanNames";
@@ -413,6 +415,11 @@ const PLATE_TOOL: Anthropic.Tool = {
       plate_note: { type: "string", description: "One sentence: what this meal is" },
       is_food: { type: "boolean" },
       follow_up: FOLLOW_UP_SCHEMA,
+      scale_ref: {
+        type: "string",
+        enum: ["katori", "plate", "spoon", "hand", "roti", "glass", "cup", "bowl", "none"],
+        description: "The object in the photo you used to size the portions (a steel katori, the plate, a spoon, a hand, a roti, a glass), or none",
+      },
     },
     required: ["items", "notes", "plate_note", "is_food"],
   },
@@ -422,7 +429,7 @@ const PLATE_SYSTEM = `You estimate the food on a plate from one photo for a 17-y
 
 Identify each distinct food and call it by its real name — Indian dishes by their actual names ("dal tadka", "jeera rice", "aloo gobi", "roti", "curd", "paneer bhurji", "rajma", "sambar", "idli", "poha"), Western ones plainly ("grilled chicken breast", "scrambled eggs", "toast"). Never invent a dish you cannot see; combine what is clearly one dish into one item. If a pack, brand or restaurant is visible, put it in the name ("Pintola high protein muesli", "Amul masti dahi") so the app can look that exact product up. Your job is to identify the food and its portion as a gram range — the app then looks each item up on the web and uses those per-100 g numbers when they fit what the photo shows, and it always does the actual per-gram arithmetic.
 
-Portion in grams. Use these as scale: a dinner plate is ~27 cm across, a roti ~18 cm, a katori (small steel bowl) holds ~150 ml, a tablespoon ~15 g, a hand's palm ~100 g of meat. Typical portions: roti 40 g each, paratha 80 g, idli 40 g, dosa 100 g, egg 50 g, a katori of dal or sabzi 150 g, a heap of rice on a plate 150–200 g, a piece of paneer 30 g. Count items you can count (3 rotis = 120 g). Alongside your best-estimate grams, give a plausible grams_low/grams_high range — wider when the angle, occlusion or portion size is unclear, tight (or omitted) when it's obvious.
+Portion in grams. Use these as scale: a dinner plate is ~27 cm across, a roti ~18 cm, a katori (small steel bowl) holds ~150 ml, a tablespoon ~15 g, a hand's palm ~100 g of meat. Typical portions: roti 40 g each, paratha 80 g, idli 40 g, dosa 100 g, egg 50 g, a katori of dal or sabzi 150 g, a heap of rice on a plate 150–200 g, a piece of paneer 30 g. Count items you can count (3 rotis = 120 g). Look for a reference object first — a hand, a spoon, a steel katori, the plate rim, a glass — size everything against it, and name it in scale_ref ("none" when there is nothing to size against). Alongside your best-estimate grams, give a plausible grams_low/grams_high range — wider when the angle, occlusion or portion size is unclear, tight (or omitted) when it's obvious.
 
 Nutrition per 100 g from your knowledge of the dish as cooked at home (with oil / ghee). Give macros and the micros you can estimate — the app checks these against web sources, and uses them when the web lookup fails or when the web numbers don't fit what the photo shows (so make them match the food as it actually looks: soaked, with gravy, with milk).
 
@@ -448,8 +455,17 @@ function n(v: unknown, fallback = 0) {
  *   3. The JPEG goes to Storage (meal-photos/<user>/<uuid>.jpg) and the estimate to label_scans
  *      kind='photo', so the History list can show it and "Save as meal" can reuse the photo.
  */
-export type PlateInput = { admin: AdminClient; userId: string; image: string; mediaType?: string | null; note?: string | null; thumb?: string | null };
-type PlateRaw = { items?: Record<string, unknown>[]; notes?: string[]; plate_note?: string; is_food?: boolean; follow_up?: { question?: string; options?: { label?: string; effect?: string }[] } };
+export type PlateInput = {
+  admin: AdminClient;
+  userId: string;
+  image: string;
+  mediaType?: string | null;
+  note?: string | null;
+  thumb?: string | null;
+  /** v2.18 A1: what the person said with the photo ("2 roti, less oil, extra dal"), merged deterministically. */
+  voice?: string | null;
+};
+type PlateRaw = { items?: Record<string, unknown>[]; notes?: string[]; plate_note?: string; is_food?: boolean; follow_up?: { question?: string; options?: { label?: string; effect?: string }[] }; scale_ref?: string };
 
 /** A well-formed `follow_up`: a non-empty question and 2+ options with a label and a recognised effect. */
 const KNOWN_EFFECTS = new Set(["restaurant", "homemade", "add_ghee", "no_oil", "smaller", "bigger"]);
@@ -583,21 +599,29 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
   //    webFood.ts) — NEVER bandlog.foods for a photo. The model's grams stay; the web's per-100 g wins
   //    unless it fails the density guard (plateMatch.webCheckPlateItem), in which case — or on a
   //    timeout — the photo's own numbers stand, labelled "AI estimate". Up to ~30 s in total.
-  const context = `Seen on a meal photo (usually home-cooked Indian food in Bengaluru).${raw.plate_note ? ` The plate: ${String(raw.plate_note).slice(0, 160)}.` : ""}${note ? ` The person says: "${String(note).slice(0, 200)}".` : ""}`;
+  // v2.18 A1: the spoken details. Amounts (counts, katoris, extra / less / none, foods the photo
+  // missed) apply now, so every item — including the voice-added ones — is looked up on the web below;
+  // oil cues apply after the lookup (the web's per-100 g would overwrite them).
+  const voice = String(input.voice ?? "").trim().slice(0, 400);
+  const spoken = voice ? parseVoice(voice) : null;
+  const voiceAmounts = spoken ? applyVoiceAmounts(rawItems, spoken) : null;
+  const lookupItems = voiceAmounts ? voiceAmounts.items : rawItems;
+  const said = [note, voice].filter(Boolean).join(" · ");
+  const context = `Seen on a meal photo (usually home-cooked Indian food in Bengaluru).${raw.plate_note ? ` The plate: ${String(raw.plate_note).slice(0, 160)}.` : ""}${said ? ` The person says: "${said.slice(0, 260)}".` : ""}`;
   const webUsage: UsageEntry[] = [];
   const web = async (name: string, ctx: string) => {
     const r = await webLookup(name, { context: ctx, timeoutMs: WEB_LOOKUP_TIMEOUT_MS });
     if (r?.usage) webUsage.push(...r.usage);
     return r;
   };
-  const items: PlateItem[] = await Promise.all(rawItems.slice(0, 8).map((it) => webCheckPlateItem(it, { web }, context)));
-  if (rawItems.length > 8) items.push(...rawItems.slice(8).map((it) => ({ ...it, source_info: null })));
+  const items: PlateItem[] = await Promise.all(lookupItems.slice(0, 8).map((it) => webCheckPlateItem(it, { web }, context)));
+  if (lookupItems.length > 8) items.push(...lookupItems.slice(8).map((it) => ({ ...it, source_info: null })));
   usage.push(...webUsage);
 
   // 2b. Eaten out? v2.15: a PHOTO already shows the real portion, so the ×1.4 restaurant multiplier
   //     (meant for typed meals like "1 plate biryani") no longer scales photo grams — it double-counted
   //     (a 754 kcal sandwich became 923+). Only the hidden teaspoon of oil on curries / dal / sabzi stays.
-  const noteText = String(note ?? "");
+  const noteText = `${String(note ?? "")} ${voice}`;
   const restaurant = mentionsRestaurant(`${noteText} ${String(raw.plate_note ?? "")}`);
   const scaledItems: PlateItem[] = restaurant
     ? items.map((it) => {
@@ -609,7 +633,10 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
 
   // 2c. v2.15: no enrichItems here — its "Which one?" variants come from bandlog.foods, and a photo
   //     never reads the database. Every item already carries its source_info from step 2.
-  const finalItems: PlateItem[] = scaledItems;
+  const oiled = spoken ? applyVoiceOil(scaledItems, spoken) : null;
+  const priced = dropUnpriced(oiled ? oiled.items : scaledItems);
+  const finalItems: PlateItem[] = priced.items;
+  const voice_changes = [...(voiceAmounts?.changes ?? []), ...(oiled?.changes ?? [])];
 
   // 3. Store the photo and the estimate.
   let photo_path: string | null = null;
@@ -622,10 +649,13 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
   }
   const notes = (raw.notes ?? []).map(String);
   if (restaurant) notes.unshift("Restaurant food: portion as seen in the photo, plus 1 tsp hidden oil on curries, dal and sabzi.");
+  notes.push(...priced.notes);
   const plate_note = String(raw.plate_note ?? "");
   const portion_hint = restaurant ? ("restaurant" as const) : null;
   const follow_up = cleanFollowUp(raw.follow_up);
-  const report = { kind: "photo", items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, follow_up, usage };
+  const sized_using = cleanScaleRef(raw.scale_ref);
+  const v218 = { sized_using, ...(voice ? { voice, voice_changes } : {}) };
+  const report = { kind: "photo", items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, follow_up, usage, ...v218 };
   const id = await saveScan(admin, {
     userId: userId,
     kind: "photo",
@@ -636,7 +666,7 @@ export async function plateFromEstimate(input: PlateInput, raw: PlateRaw, usage:
     imagePath: photo_path,
   });
   const thumb_path = await attachThumb(admin, userId, id, input.thumb);
-  const result: PlateEstimate & { thumb_path: string | null } = { id, items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, follow_up, thumb_path };
+  const result: PlateEstimate & { thumb_path: string | null } = { id, items: finalItems, raw: { items: rawItems }, notes, plate_note, photo_path, portion_hint, follow_up, thumb_path, ...v218 };
   return result;
 }
 

@@ -336,12 +336,24 @@ function mealItemRows(mealId: string, userId: string, list: MealItem[]) {
       ...(i.user_verified ? { user_verified: true } : {}),
       ...(i.per_unit_kcal != null && i.per_unit_kcal > 0 ? { per_unit_kcal: i.per_unit_kcal } : {}),
       ...(i.source_urls?.length ? { source_urls: i.source_urls.slice(0, 3) } : {}),
+      // v2.18 (schema_v42) — the honest range, only when there is one.
+      ...(i.kcal_low != null && i.kcal_high != null && Number(i.kcal_high) >= Number(i.kcal_low) ? { kcal_low: Math.round(Number(i.kcal_low)), kcal_high: Math.round(Number(i.kcal_high)) } : {}),
     }));
 }
 
 /** Insert meal_items; while schema_v38 isn't applied, retry without its three optional columns. */
 async function insertMealItems(supabase: Awaited<ReturnType<typeof userOrThrow>>["supabase"], rows: ReturnType<typeof mealItemRows>) {
   let { error } = await supabase.from("meal_items").insert(rows);
+  // v2.18: schema_v42 not applied yet → the same rows without kcal_low / kcal_high.
+  if (error && /kcal_low|kcal_high/.test(error.message ?? "")) {
+    rows = rows.map((r) => {
+      const { kcal_low: _l, kcal_high: _h, ...rest } = r as typeof r & { kcal_low?: unknown; kcal_high?: unknown };
+      void _l;
+      void _h;
+      return rest;
+    });
+    ({ error } = await supabase.from("meal_items").insert(rows));
+  }
   if (error && /user_verified|per_unit_kcal|source_urls/.test(error.message ?? "")) {
     const stripped = rows.map((r) => {
       const { user_verified: _u, per_unit_kcal: _p, source_urls: _s, ...rest } = r as typeof r & { user_verified?: unknown; per_unit_kcal?: unknown; source_urls?: unknown };

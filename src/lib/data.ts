@@ -183,9 +183,15 @@ const MEAL_ITEM_COLS = "id, food_id, name, grams, calories, protein_g, carbs_g, 
 /** v2.15 (schema_v38): optional item columns — dropped from the select once the DB says they're missing. */
 const V38_ITEM_COLS = ", user_verified, per_unit_kcal, source_urls";
 let itemV38 = true;
-const itemCols = () => MEAL_ITEM_COLS + (itemV38 ? V38_ITEM_COLS : "");
+/** v2.18 (schema_v42): the honest kcal range stored with an item — dropped the same way while missing. */
+const V42_ITEM_COLS = ", kcal_low, kcal_high";
+let itemV42 = true;
+const itemCols = () => MEAL_ITEM_COLS + (itemV38 ? V38_ITEM_COLS : "") + (itemV42 ? V42_ITEM_COLS : "");
 function missingV38(e: { message?: string } | null): boolean {
   return !!e && /user_verified|per_unit_kcal|source_urls/.test(e.message ?? "");
+}
+function missingV42(e: { message?: string } | null): boolean {
+  return !!e && /kcal_low|kcal_high/.test(e.message ?? "");
 }
 
 type MealRowData = { id: unknown; date: unknown; raw_text: unknown; created_at: unknown; photo_path: unknown; meal_type?: unknown; meal_items: unknown };
@@ -224,6 +230,16 @@ export async function getMeals(from: string, to: string): Promise<(Meal & { phot
     res = await query(true);
     if (res.error && missingMealTypeColumn(res.error)) res = await query(false);
   }
+  if (res.error && missingV42(res.error)) {
+    itemV42 = false;
+    res = await query(true);
+    if (res.error && missingMealTypeColumn(res.error)) res = await query(false);
+    if (res.error && missingV38(res.error)) {
+      itemV38 = false;
+      res = await query(true);
+      if (res.error && missingMealTypeColumn(res.error)) res = await query(false);
+    }
+  }
   const meals = ((res.data ?? []) as unknown as MealRowData[]).map(mealFromRow);
   const paths = meals.filter((m) => m.photo_path).map((m) => m.photo_path as string);
   if (paths.length) {
@@ -250,6 +266,16 @@ export async function getMeal(id: string): Promise<Meal | null> {
     itemV38 = false;
     res = await query(true);
     if (res.error && missingMealTypeColumn(res.error)) res = await query(false);
+  }
+  if (res.error && missingV42(res.error)) {
+    itemV42 = false;
+    res = await query(true);
+    if (res.error && missingMealTypeColumn(res.error)) res = await query(false);
+    if (res.error && missingV38(res.error)) {
+      itemV38 = false;
+      res = await query(true);
+      if (res.error && missingMealTypeColumn(res.error)) res = await query(false);
+    }
   }
   if (res.error || !res.data) return null;
   const { photo_url, ...meal } = mealFromRow(res.data as unknown as MealRowData);

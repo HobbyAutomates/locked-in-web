@@ -70,8 +70,8 @@ const SCHEMA: JsonSchema = {
 type Raw = { is_menu?: boolean; restaurant?: string; note?: string; dishes?: unknown[] };
 const isRaw = (v: unknown): v is Raw => !!v && typeof v === "object" && Array.isArray((v as Raw).dishes);
 
-/** What's left today for this user (calorie target minus today's meals), for the best pick. */
-async function remainingToday(admin: AdminClient, userId: string, p: { calorie_target: number; protein_target_g: number; carb_target_g: number | null; fat_target_g: number | null }): Promise<Remaining> {
+/** What's left today for this user (calorie target minus today's meals), for the best pick. v2.18: also the order helper. */
+export async function remainingToday(admin: AdminClient, userId: string, p: { calorie_target: number; protein_target_g: number; carb_target_g: number | null; fat_target_g: number | null }): Promise<Remaining> {
   const { data } = await admin.from("meals").select("meal_items(calories, protein_g, carbs_g, fat_g)").eq("user_id", userId).eq("date", todayIso());
   const eaten = { k: 0, p: 0, c: 0, f: 0 };
   for (const m of (data ?? []) as { meal_items: { calories: unknown; protein_g: unknown; carbs_g: unknown; fat_g: unknown }[] | null }[])
