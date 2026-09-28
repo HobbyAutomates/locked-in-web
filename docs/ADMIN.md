@@ -60,3 +60,7 @@ To turn it off:
 - Web: set `BETA_ANALYTICS=false` on Railway and redeploy. It is read at build time, so a restart alone isn't enough.
 - Android: add `BETA_ANALYTICS=false` to `local.properties` and build a new APK. Installed APKs keep sending until they are updated.
 - Optionally run `supabase/revert_v33.sql` to delete the table and every recorded event. Both clients handle the table going missing.
+
+## v2.15: Corrections (beta)
+
+The overview has a **Corrections** card (src/lib/admin/corrections.ts): the latest 25 rows of `bandlog.food_corrections` (app vs user kcal, % error = (app - user) / user, item, input kind, source) and the median % error by input kind for the last 7 and 30 days, plus the count of AI items people skipped (`log_events` kind `skip`). Both tables come from docs/schema_v38.sql; until it is applied the card says so. The full entry log (`bandlog.log_events`) is readable with the service role; clients only write it while `BETA_ANALYTICS` is on.

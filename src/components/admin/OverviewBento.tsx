@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Overview } from "@/lib/admin/data";
+import type { CorrectionsSummary } from "@/lib/admin/corrections";
 import type { Dataset } from "@/lib/admin/insights/types";
 import { buildOverview, context, RISK_DAYS } from "@/lib/admin/insights/build";
 import { buildUserCards, type UserCard } from "@/lib/admin/insights/bento";
@@ -21,7 +22,7 @@ const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
 /** The /admin overview ("Admin C · bento"): KPI tiles, charts, and one card per user. */
-export function OverviewBento({ o, ds }: { o: Overview; ds: Dataset }) {
+export function OverviewBento({ o, ds, corrections }: { o: Overview; ds: Dataset; corrections?: CorrectionsSummary }) {
   const c = context(ds);
   const ins = buildOverview(ds, c);
   const cards = buildUserCards(ds, c);
@@ -270,6 +271,7 @@ export function OverviewBento({ o, ds }: { o: Overview; ds: Dataset }) {
             <Head right={<span className={s.note}>{o.eventsAvailable ? "last 30 days, by name" : "app_events table not found"}</span>}>App events</Head>
             <HRows rows={o.eventNames.map((e) => ({ label: e.name, value: e.count }))} color="var(--ink)" />
           </Tile>
+          {corrections ? <CorrectionsTile c={corrections} /> : null}
           <Tile span={6}>
             <Label>AI usage and cost</Label>
             <div className={s.note}>
@@ -380,6 +382,90 @@ function UserCardView({ u, d }: { u: UserCard; d: number }) {
       <Link href={`/admin/users/${u.id}`} className={s.link}>
         Open deep dive
       </Link>
+    </Tile>
+  );
+}
+
+/** "+12%" / "−8%" / "—". */
+function signed(v: number | null): string {
+  if (v == null) return "—";
+  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v)}%`;
+}
+
+/**
+ * v2.15 beta: "Correct the numbers" saves (bandlog.food_corrections). % error = (app − user) / user,
+ * so + means we over-estimated. Medians are per input kind; |median| is the typical miss either way.
+ */
+function CorrectionsTile({ c }: { c: CorrectionsSummary }) {
+  return (
+    <Tile span={6}>
+      <Head right={<span className={s.note}>{c.available ? `${num(c.total30)} in 30 days${c.skips30 != null ? ` · ${num(c.skips30)} AI items skipped` : ""}` : "food_corrections table not found (schema_v38)"}</span>}>Corrections</Head>
+      {c.available ? (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
+            {c.byKind.map((k) => (
+              <div key={k.kind} className={s.well}>
+                <div className={s.label}>{cap(k.kind)}</div>
+                <div className={s.mid} style={{ marginTop: 4 }} title="Median % error, last 7 days">
+                  {signed(k.median7)}
+                </div>
+                <div className={s.note}>
+                  7d: n {k.n7}, |med| {k.absMedian7 == null ? "—" : `${k.absMedian7}%`}
+                  <br />
+                  30d: {signed(k.median30)}, n {k.n30}, |med| {k.absMedian30 == null ? "—" : `${k.absMedian30}%`}
+                </div>
+              </div>
+            ))}
+          </div>
+          <TableWrap>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Item</th>
+                <th>Input</th>
+                <th className="text-right">App kcal</th>
+                <th className="text-right">User kcal</th>
+                <th className="text-right">% error</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {c.latest.map((r) => (
+                <tr key={r.id}>
+                  <td className="muted">{new Date(r.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}</td>
+                  <td>
+                    {r.item_name}
+                    {r.count && r.unit ? <span className="muted"> · {r.count} {r.unit}</span> : r.grams ? <span className="muted"> · {Math.round(r.grams)} g</span> : null}
+                    {r.note ? <div className="muted text-xs">{r.note}</div> : null}
+                  </td>
+                  <td className="muted">{r.input_kind}</td>
+                  <td className="num text-right">{r.app_kcal == null ? "—" : num(Math.round(r.app_kcal))}</td>
+                  <td className="num text-right">{num(Math.round(r.user_kcal))}</td>
+                  <td className="num text-right" style={{ color: r.error_pct != null && Math.abs(r.error_pct) >= 25 ? "var(--red)" : undefined }}>
+                    {signed(r.error_pct)}
+                  </td>
+                  <td className="muted" style={{ maxWidth: 220, overflowWrap: "anywhere" }}>
+                    {r.source && /^https?:\/\//.test(r.source) ? (
+                      <a href={r.source} target="_blank" rel="noreferrer noopener" className="underline">
+                        link
+                      </a>
+                    ) : (
+                      r.source ?? "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {!c.latest.length ? (
+                <tr>
+                  <td colSpan={7} className="muted">
+                    No corrections yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </TableWrap>
+        </>
+      ) : null}
     </Tile>
   );
 }
