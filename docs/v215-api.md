@@ -172,5 +172,6 @@ keep the v2.14 buddy page.
   instead." when you share no squad. Show "Sent" in the row on success.
 - `buddy_accept` / `buddy_invite_info` keep their signatures; a used code now still works for
   anyone its owner sent it to as a request.
-- Push: the web sends the push right away; from Android the notification row is pushed by the next
-  cron tick (same as a nudge sent without the web).
+- Push: after a non-null result, Android calls `POST /api/push/dispatch` `{ "userId": "<other>" }`
+  (the squadmate check there already passes) to push it right away, like a squad nudge. The web
+  does this itself.
