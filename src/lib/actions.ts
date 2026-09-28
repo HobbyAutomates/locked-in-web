@@ -332,7 +332,27 @@ function mealItemRows(mealId: string, userId: string, list: MealItem[]) {
       unit: i.unit ?? null,
       servings: i.servings ?? null,
       cooked_in: i.cooked_in ?? null,
+      // v2.15 (schema_v38) — only sent when set, so older rows never touch the new columns.
+      ...(i.user_verified ? { user_verified: true } : {}),
+      ...(i.per_unit_kcal != null && i.per_unit_kcal > 0 ? { per_unit_kcal: i.per_unit_kcal } : {}),
+      ...(i.source_urls?.length ? { source_urls: i.source_urls.slice(0, 3) } : {}),
     }));
+}
+
+/** Insert meal_items; while schema_v38 isn't applied, retry without its three optional columns. */
+async function insertMealItems(supabase: Awaited<ReturnType<typeof userOrThrow>>["supabase"], rows: ReturnType<typeof mealItemRows>) {
+  let { error } = await supabase.from("meal_items").insert(rows);
+  if (error && /user_verified|per_unit_kcal|source_urls/.test(error.message ?? "")) {
+    const stripped = rows.map((r) => {
+      const { user_verified: _u, per_unit_kcal: _p, source_urls: _s, ...rest } = r as typeof r & { user_verified?: unknown; per_unit_kcal?: unknown; source_urls?: unknown };
+      void _u;
+      void _p;
+      void _s;
+      return rest;
+    });
+    ({ error } = await supabase.from("meal_items").insert(stripped));
+  }
+  return { error };
 }
 
 /**
@@ -349,7 +369,7 @@ export async function saveMeal(input: { date: string; raw_text: string; items: M
   if (error || !meal) throw new Error(error?.message ?? "Could not save meal");
   const items = mealItemRows(meal.id as string, user.id, input.items);
   if (items.length) {
-    const { error: e2 } = await supabase.from("meal_items").insert(items);
+    const { error: e2 } = await insertMealItems(supabase, items);
     if (e2) throw new Error(e2.message);
   }
   await rollupQuietly(supabase, user.id, [input.date]);
@@ -379,7 +399,7 @@ export async function updateMeal(input: { id: string; date: string; meal_type: M
   if (res.error) throw new Error(res.error.message);
   const { error: e2 } = await supabase.from("meal_items").delete().eq("meal_id", input.id).eq("user_id", user.id);
   if (e2) throw new Error(e2.message);
-  const { error: e3 } = await supabase.from("meal_items").insert(mealItemRows(input.id, user.id, items));
+  const { error: e3 } = await insertMealItems(supabase, mealItemRows(input.id, user.id, items));
   if (e3) throw new Error(e3.message);
   await rollupQuietly(supabase, user.id, [old.date as string, input.date]);
   await repostEdited(supabase, user.id, input.id, [{ kind: "meal", body: mealPostBody(mealItemRows(input.id, user.id, items), input.raw_text ?? "") }]);
