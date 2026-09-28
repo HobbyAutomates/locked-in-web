@@ -9,6 +9,7 @@ import { LENS_DEFAULTS, type LensDefault, type Profile, type Units } from "@/lib
 import { AUTO_SHARE_KINDS, AUTO_SHARE_LABELS, withAutoShareKind, type AutoShareKind } from "@/lib/squadSharing";
 import { displayName } from "@/lib/display";
 import type { PrefSection } from "@/lib/preferences";
+import { TOUR_REPLAY_KEY } from "@/lib/tour";
 import { ANALYTICS_ON } from "@/lib/analytics";
 import { Bell, Bowl, Check, Dumbbell, Exit, Flame, Glass, Lock, Mail, Medal, Moon, Person, Refresh, Scale, Scan, Share, Steps, Target, Trash } from "./icons";
 import { NameField } from "./ProfileScreen";
@@ -36,6 +37,15 @@ export default function PreferencesScreen({ profile, email, section, notificatio
 
 function PreferencesIndex({ profile }: { profile: Profile }) {
   const theme = useThemeMode();
+  const router = useRouter();
+  function replayTour() {
+    try {
+      window.localStorage.setItem(TOUR_REPLAY_KEY, "1");
+    } catch {
+      // No storage: the tour can't be flagged; Home just opens.
+    }
+    router.push("/");
+  }
   const remindersOn = onCount(profile.reminders);
   return (
     <SubPage title="Preferences" back="/profile">
@@ -72,6 +82,11 @@ function PreferencesIndex({ profile }: { profile: Profile }) {
             </SettingRow>
             <Hair />
             <SettingRow icon={<Person size={20} />} label="Account" subtitle="Email, name, sign out" href="/profile/preferences/account">
+              <Chevron />
+            </SettingRow>
+            <Hair />
+            {/* v2.16: the first-run tour again, next time Home opens. */}
+            <SettingRow icon={<Refresh size={20} />} label="Replay the tour" subtitle="The five-stop tour of Home" onClick={replayTour}>
               <Chevron />
             </SettingRow>
           </div>

@@ -14,12 +14,14 @@ import { MUSCLE_COLOR, type Muscle } from "@/lib/muscles";
 import type { ExerciseEntry, Meal, Profile, ProgressPhoto, WeightEntry, Workout } from "@/lib/types";
 import { weightText } from "@/lib/display";
 import { ageYears, calorieWords, edFlags, isTeen, screenInput } from "@/lib/goals";
-import { bmi, bmiCategoryIndia, healthyRange, waistToHeight, whtrWords } from "@/lib/bmi";
+import { bmiReading, healthyRange, waistToHeight, whtrWords } from "@/lib/bmi";
 import { bestDayRun, clockText, energyDays, goalEta, goalFraction, istMinutes, macroAverages, macroTargets, mealTimes, monthDay, proteinPicks, slopePerDay, weekFlames, weightTrend, type FlameDay } from "@/lib/progressStats";
 import { mealTypeLabel } from "@/lib/mealType";
 import { smoothPath } from "@/lib/svgPath";
 import { BmiCard, SafetyNote, ScienceSheet, TeenGoalMigration, WaistRow } from "./Science";
-import { LockedMedal, MetalMedal, TROPHY_ICON, medalShelf } from "./Medal";
+import { topJewel } from "@/lib/jewels";
+import { Jewel } from "./Jewel";
+import BadgeUnlock from "./BadgeUnlock";
 import { CountUp, MRise, STAGGER, drawLen, md } from "./motion";
 import { LineIcon } from "./lineIcons";
 import { Camera, ChevronDown, Close, Plus, Spinner, Trash } from "./icons";
@@ -109,6 +111,7 @@ export default function ProgressScreen({
 
   return (
     <div className="flex flex-col gap-3.5">
+      <BadgeUnlock progress={badges} />
       <MRise delay={0}>
         <h1 className="screen-title" style={{ padding: "8px 4px 2px" }}>
           Progress
@@ -325,6 +328,9 @@ function WeightCard({ profile, weights, today, days, tag, b }: { profile: Profil
   const line = smoothPath(xy);
   const area = xy.length >= 2 ? `${line} L${xy[xy.length - 1][0]},${H} L${xy[0][0]},${H} Z` : "";
   const end = xy[xy.length - 1];
+  // v2.16: the goal as a gold dashed line when it sits inside the chart's range.
+  const gy = goal != null ? y(goal) : null;
+  const goalY = gy != null && gy >= 4 && gy <= H - 4 ? gy : null;
 
   const last = weights[0]?.date ?? null;
   const due = last ? Math.max(0, 7 - daysBetween(last, today)) : 0;
@@ -350,9 +356,16 @@ function WeightCard({ profile, weights, today, days, tag, b }: { profile: Profil
 
       {xy.length >= 2 ? (
         <svg viewBox={`0 0 ${CW} ${H}`} className="block w-full" role="img" aria-label={`Weight, 7-day average: ${change == null ? "no trend yet" : `${change < 0 ? "down" : "up"} ${fmt(Math.round(Math.abs(conv(change)) * 10) / 10)} ${unit}`} over ${days} days`}>
-          <path d={area} fill={TONE[tone].mark} fillOpacity={0.16} className="m-fade" style={md(b + 1500)} />
-          <path d={line} fill="none" stroke={TONE[tone].mark} strokeWidth={2.4} strokeLinecap="round" pathLength={1} className="m-draw" style={drawLen(1, b + 300)} />
-          <circle cx={end[0]} cy={end[1]} r={5} fill={TONE[tone].mark} stroke="var(--card)" strokeWidth={2} className="m-pop" style={md(b + 2100)} />
+          <defs>
+            <linearGradient id="wt-area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#FF5B1F" stopOpacity=".25" />
+              <stop offset="1" stopColor="#FF5B1F" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {goalY != null ? <line x1={0} y1={goalY} x2={CW} y2={goalY} stroke="var(--gold)" strokeWidth={1} strokeDasharray="3 5" opacity={0.7} className="m-growx" style={md(b + 200)} /> : null}
+          <path d={area} fill="url(#wt-area)" className="m-fade" style={md(b + 1500)} />
+          <path d={line} fill="none" stroke="var(--ember)" strokeWidth={2.4} strokeLinecap="round" pathLength={1} className="m-draw" style={drawLen(1, b + 300)} />
+          <circle cx={end[0]} cy={end[1]} r={5} fill="var(--ember)" stroke="var(--card)" strokeWidth={2} className="m-pop" style={md(b + 2100)} />
         </svg>
       ) : (
         <p className="text-[13px] muted">Log a few weigh-ins to see your trend.</p>
@@ -397,7 +410,7 @@ function StreakCard({ dayStreak, best, flames, b, children }: { dayStreak: numbe
       <Label>Streak</Label>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
-          <LineIcon name="flame" size={34} stroke={2} style={{ color: "var(--orange)" }} />
+          <LineIcon name="flame" size={34} stroke={2} style={{ color: "var(--ember)", filter: "drop-shadow(0 0 10px rgba(255,91,31,.45))" }} />
           <span className="num font-extrabold" style={{ fontSize: 44, letterSpacing: "-1.5px", lineHeight: 1 }}>
             <CountUp value={dayStreak} delay={b + 200} />
           </span>
@@ -409,7 +422,15 @@ function StreakCard({ dayStreak, best, flames, b, children }: { dayStreak: numbe
             {best}
           </b>
           <br />
-          {best === 0 ? "Log today to start" : dayStreak >= best ? "Personal best" : `${toBeat} to beat it`}
+          {best === 0 ? (
+            "Log today to start"
+          ) : dayStreak >= best ? (
+            <span className="mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-semibold" style={{ background: "rgba(168,130,58,.18)", color: "var(--gold-ink)" }}>
+              Best yet
+            </span>
+          ) : (
+            `${toBeat} to beat it`
+          )}
         </div>
       </div>
       <div role="img" aria-label={`This week: ${done} of 7 days logged`} className="grid grid-cols-7">
@@ -420,10 +441,11 @@ function StreakCard({ dayStreak, best, flames, b, children }: { dayStreak: numbe
               style={md(b + 520 + i * 120, {
                 width: 30,
                 height: 30,
-                background: f.state === "done" ? "var(--orange)" : f.state === "open" ? "transparent" : "var(--track)",
-                border: f.state === "open" ? "1.5px dashed var(--orange)" : 0,
+                background: f.state === "done" ? "linear-gradient(135deg, #FF8B5E, #FF5B1F)" : f.state === "open" ? "transparent" : "var(--track)",
+                border: f.state === "open" ? "1.5px dashed var(--ember)" : 0,
+                boxShadow: f.state === "done" ? "0 0 16px rgba(255,91,31,.4)" : "none",
                 opacity: f.state === "future" ? 0.55 : 1,
-                color: "var(--bg)",
+                color: "#fff",
               })}
             >
               {f.state === "done" ? <LineIcon name="flame" size={15} stroke={2} /> : null}
@@ -445,7 +467,8 @@ function StreakCard({ dayStreak, best, flames, b, children }: { dayStreak: numbe
 
 // ---------------------------------------------------------------- 3 · energy
 
-const STATUS_COLOR = { on: "var(--green)", over: "var(--orange)", under: "var(--blue)", none: "var(--muted)" } as const;
+/** v2.16 brand recolour: on target ember, over deep ember, under silver. */
+const STATUS_COLOR = { on: "var(--ember)", over: "var(--ember-deep)", under: "var(--silver)", none: "var(--muted)" } as const;
 
 function EnergyCard({ meals, profile, today, range, b }: { meals: Meal[]; profile: Profile; today: string; range: number; b: number }) {
   const target = Math.max(1, profile.calorie_target);
@@ -499,11 +522,17 @@ function EnergyCard({ meals, profile, today, range, b }: { meals: Meal[]; profil
       </div>
       {logged.length ? (
         <svg viewBox={`0 0 ${CW} ${H}`} className="block w-full" role="img" aria-label={`Calories eaten each day against a flat target${hide ? "" : ` of ${kcalText(target)}`}: ${on} of ${judged.length} days on target`}>
-          <line x1={0} y1={y(target)} x2={CW} y2={y(target)} stroke="var(--green)" strokeWidth={1.5} strokeDasharray="3 4" className="m-growx" style={md(b + 200)} />
-          <text x={CW} y={y(target) - 6} textAnchor="end" fontSize={10} fontWeight={600} fill="var(--green)">
-            target
+          <defs>
+            <linearGradient id="en-line" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stopColor="#FF8B5E" />
+              <stop offset="1" stopColor="#FF5B1F" />
+            </linearGradient>
+          </defs>
+          <line x1={0} y1={y(target)} x2={CW} y2={y(target)} stroke="var(--gold)" strokeWidth={1.2} strokeDasharray="4 4" opacity={0.85} className="m-growx" style={md(b + 200)} />
+          <text x={CW} y={y(target) - 6} textAnchor="end" fontSize={10} fontWeight={600} fill="var(--gold-ink)">
+            {hide ? "target" : `target ${kcalText(target)}`}
           </text>
-          {pts.length >= 2 ? <path d={line} fill="none" stroke="var(--ink)" strokeWidth={2.2} strokeLinecap="round" pathLength={1} className="m-draw" style={drawLen(1, b + 500)} /> : null}
+          {pts.length >= 2 ? <path d={line} fill="none" stroke="url(#en-line)" strokeWidth={2.4} strokeLinecap="round" pathLength={1} className="m-draw" style={drawLen(1, b + 500)} /> : null}
           {pts.map((p, k) => {
             const pending = p.date === today && p.status !== "on" && p.status !== "over";
             return <circle key={p.date} cx={p.x} cy={p.y} r={r} fill={pending ? "var(--card)" : STATUS_COLOR[p.status]} stroke={pending ? "var(--muted)" : "var(--card)"} strokeWidth={r > 3 ? 2 : 1.2} className="m-pop" style={md(b + 700 + (k + 1) * step)} />;
@@ -519,13 +548,13 @@ function EnergyCard({ meals, profile, today, range, b }: { meals: Meal[]; profil
       )}
       <div className="flex flex-wrap gap-3.5 text-[11px] font-semibold muted">
         <span className="inline-flex items-center gap-1.5">
-          <Dot color="var(--green)" /> On target
+          <Dot color={STATUS_COLOR.on} /> On target
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <Dot color="var(--orange)" /> Over
+          <Dot color={STATUS_COLOR.over} /> Over
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <Dot color="var(--blue)" /> Under
+          <Dot color={STATUS_COLOR.under} /> Under
         </span>
       </div>
     </PCard>
@@ -543,9 +572,9 @@ function MacrosCard({ meals, profile, today, days, range, b }: { meals: Meal[]; 
   const avg = macroAverages(meals, from, today, today);
   const tg = macroTargets(profile);
   const rings = [
-    { key: "Protein", value: avg.protein, target: tg.protein, color: "var(--blue)" },
-    { key: "Carbs", value: avg.carbs, target: tg.carbs, color: "var(--orange)" },
-    { key: "Fat", value: avg.fat, target: tg.fat, color: "var(--purple)" },
+    { key: "Protein", value: avg.protein, target: tg.protein, color: "url(#mc-protein)" },
+    { key: "Carbs", value: avg.carbs, target: tg.carbs, color: "var(--silver)" },
+    { key: "Fat", value: avg.fat, target: tg.fat, color: "var(--ember-deep)" },
   ].map((m) => ({ ...m, pct: m.target > 0 ? m.value / m.target : 0 }));
   const todayProtein = totalsFor(meals, today).protein;
   const toGo = Math.round(tg.protein - todayProtein);
@@ -560,6 +589,14 @@ function MacrosCard({ meals, profile, today, days, range, b }: { meals: Meal[]; 
           return (
             <div key={m.key} className="flex flex-col items-center gap-1.5">
               <svg width={78} height={78} viewBox="0 0 78 78" aria-hidden="true">
+                {k === 0 ? (
+                  <defs>
+                    <linearGradient id="mc-protein" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0" stopColor="#FF8B5E" />
+                      <stop offset="1" stopColor="#FF5B1F" />
+                    </linearGradient>
+                  </defs>
+                ) : null}
                 <circle cx={39} cy={39} r={32} fill="none" stroke="var(--track)" strokeWidth={8} />
                 {m.pct > 0.005 ? <circle cx={39} cy={39} r={32} fill="none" stroke={m.color} strokeWidth={8} strokeLinecap="round" pathLength={1} transform="rotate(-90 39 39)" className="m-draw" style={drawLen(Math.min(1, m.pct), b + 200 + (k + 1) * 260)} /> : null}
                 <text x={39} y={44} textAnchor="middle" fontSize={15} fontWeight={800} fill="var(--ink)">
@@ -577,7 +614,7 @@ function MacrosCard({ meals, profile, today, days, range, b }: { meals: Meal[]; 
       <div className="flex items-baseline gap-1.5 border-t pt-3" style={{ borderColor: "var(--hair)" }}>
         {toGo > 3 ? (
           <>
-            <span className="num text-[20px] font-extrabold" style={{ color: "var(--blue)" }}>
+            <span className="num text-[20px] font-extrabold" style={{ color: "var(--ember)" }}>
               {toGo} g
             </span>
             <span className="text-[14px] font-semibold">protein to go today. Quick picks:</span>
@@ -607,17 +644,18 @@ function MacrosCard({ meals, profile, today, days, range, b }: { meals: Meal[]; 
 
 const BMI_LO = 15;
 const BMI_HI = 32;
+/** v2.16: colour-graded bands (silver · mint · gold · ember) with the Indian cut-offs in the labels. */
 const BANDS = [
-  { from: BMI_LO, to: 18.5, label: "Under", color: "var(--blue)" },
-  { from: 18.5, to: 23, label: "Healthy", color: "var(--green)" },
-  { from: 23, to: 25, label: "Over", color: "var(--orange)" },
-  { from: 25, to: BMI_HI, label: "Obese", color: "var(--red)" },
+  { from: BMI_LO, to: 18.5, label: "Under", color: "var(--silver)" },
+  { from: 18.5, to: 23, label: "Healthy 18.5–23", color: "#59E3A7" },
+  { from: 23, to: 25, label: "Over", color: "var(--gold)" },
+  { from: 25, to: BMI_HI, label: "Obese 25+", color: "var(--ember)" },
 ];
-const BMI_WORDS = {
-  Underweight: { text: "Below healthy", color: "var(--blue-ink)" },
-  Normal: { text: "Healthy", color: "var(--green-ink)" },
-  Overweight: { text: "A little above healthy", color: "var(--orange-ink)" },
-  Obese: { text: "Above healthy", color: "var(--red-ink)" },
+const BMI_TONE = {
+  Underweight: { bg: "rgba(185,190,198,.18)", ink: "var(--ink)" },
+  Normal: { bg: "var(--mint-bg)", ink: "var(--green-ink)" },
+  Overweight: { bg: "rgba(168,130,58,.18)", ink: "var(--gold-ink)" },
+  Obese: { bg: "var(--ember-bg)", ink: "var(--ember)" },
 } as const;
 
 /**
@@ -628,12 +666,13 @@ const BMI_WORDS = {
 function BmiScaleCard({ profile, weightKg, b }: { profile: Profile; weightKg: number | null; b: number }) {
   const [science, setScience] = useState(false);
   const [waistOpen, setWaistOpen] = useState(false);
-  const value = bmi(weightKg, profile.height_cm);
+  const reading = bmiReading(weightKg, profile.height_cm);
   const teen = isTeen(ageYears(profile.dob));
-  if (value == null || teen || !profile.height_cm) return <BmiCard profile={profile} weightKg={weightKg} waist />;
+  if (reading == null || teen || !profile.height_cm) return <BmiCard profile={profile} weightKg={weightKg} waist />;
 
-  const cat = bmiCategoryIndia(value);
-  const words = BMI_WORDS[cat];
+  // v2.16 fix: one rounded reading drives the number, the words and the marker, so they can't disagree.
+  const { value, category: cat, words: wordText } = reading;
+  const words = { text: wordText, ...BMI_TONE[cat] };
   const xOf = (v: number) => 1 + ((Math.max(BMI_LO, Math.min(BMI_HI, v)) - BMI_LO) / (BMI_HI - BMI_LO)) * (CW - 2);
   const mx = xOf(Math.max(BMI_LO + 0.3, Math.min(BMI_HI - 0.3, value)));
   const range = healthyRange(profile.height_cm);
@@ -653,30 +692,25 @@ function BmiScaleCard({ profile, weightKg, b }: { profile: Profile; weightKg: nu
       <ScienceSheet open={science} onClose={() => setScience(false)} />
       <div className="-mt-2 flex items-baseline gap-2.5">
         <span className="num font-extrabold" style={{ fontSize: 34, letterSpacing: "-1px" }}>
-          <CountUp value={Math.round(value * 10) / 10} decimals={1} delay={b + 200} />
+          <CountUp value={value} decimals={1} delay={b + 200} />
         </span>
-        <span className="text-[14px] font-semibold" style={{ color: words.color }}>
+        <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-semibold" style={{ background: words.bg, color: words.ink }}>
           {words.text}
         </span>
       </div>
-      <svg viewBox={`0 0 ${CW} 64`} className="block w-full" role="img" aria-label={`BMI ${value.toFixed(1)} on the Indian scale: ${cat.toLowerCase()}`}>
+      <svg viewBox={`0 0 ${CW} 54`} className="block w-full" role="img" aria-label={`BMI ${value.toFixed(1)} on the Indian scale: ${cat.toLowerCase()}`}>
         {BANDS.map((band, k) => {
           const x0 = xOf(band.from) + (k ? 1 : 0);
           const x1 = xOf(band.to) - (k < BANDS.length - 1 ? 1 : 0);
           return (
             <g key={band.label}>
               <rect x={x0} y={18} width={Math.max(0, x1 - x0)} height={12} rx={6} fill={band.color} className="m-growx" style={md(b + 150 + (k + 1) * 150)} />
-              <text x={(x0 + x1) / 2} y={48} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--muted)">
+              <text x={k === 0 ? x0 : k === BANDS.length - 1 ? x1 : (x0 + x1) / 2} y={48} textAnchor={k === 0 ? "start" : k === BANDS.length - 1 ? "end" : "middle"} fontSize={10.5} fontWeight={600} fill="var(--muted)">
                 {band.label}
               </text>
             </g>
           );
         })}
-        {[18.5, 23, 25].map((v) => (
-          <text key={v} x={xOf(v)} y={62} textAnchor="middle" fontSize={10} fontWeight={500} fill="var(--muted)">
-            {v}
-          </text>
-        ))}
         <g className="m-sweep" style={md(b + 900, { ["--a" as string]: `${-mx}px`, ["--b" as string]: `${CW - mx}px`, ["--c" as string]: `${-mx * 0.45}px` })}>
           <path d={`M${mx - 7},4 L${mx + 7},4 L${mx},14 Z`} fill="var(--ink)" />
           <rect x={mx - 1.5} y={14} width={3} height={20} rx={1.5} fill="var(--ink)" />
@@ -684,7 +718,7 @@ function BmiScaleCard({ profile, weightKg, b }: { profile: Profile; weightKg: nu
       </svg>
       <div className={`grid gap-2.5 ${whtr != null ? "grid-cols-2" : "grid-cols-1"}`}>
         <div className="rounded-[14px] p-3" style={{ background: "var(--card2)" }}>
-          <p className="text-[12px] font-semibold muted">Healthy weight</p>
+          <p className="text-[12px] font-semibold muted">Healthy weight for {Math.round(profile.height_cm)} cm</p>
           <p className="num mt-0.5 text-[17px] font-bold">
             {w(range.min)} – {w(range.max)} {profile.units === "imperial" ? "lb" : "kg"}
           </p>
@@ -1106,11 +1140,10 @@ function PhotosStrip({ photos }: { photos: ProgressPhoto[] }) {
 /** How many medals are unlocked; taps through to the full grid. */
 function BadgesCard({ progress }: { progress: BadgeProgress }) {
   const got = earnedCount(progress);
-  const { earned } = medalShelf(progress);
-  const top = earned[0];
+  const top = topJewel(progress);
   return (
     <Link href="/badges" className="card press flex w-full items-center gap-3.5" style={{ padding: 14 }} aria-label={`Badges: ${got} of ${ALL_BADGES.length} earned`}>
-      {top ? <MetalMedal tier={top.tier} icon={TROPHY_ICON} size={48} /> : <LockedMedal progress={got / ALL_BADGES.length} icon={TROPHY_ICON} size={48} />}
+      {top ? <Jewel category={top.category} tier={top.tier} size={48} /> : <Jewel category="special" tier="bronze" locked progress={got / ALL_BADGES.length} size={48} />}
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-base font-bold">Badges</span>
         <span className="text-xs muted">

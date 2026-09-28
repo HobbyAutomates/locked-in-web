@@ -8,6 +8,7 @@ import { scanName } from "./scanNames";
 import { isMealType, missingMealTypeColumn } from "./mealType";
 import { parseAutoPost, parseAutoShare } from "./squadSharing";
 import { normalizeReaction, parseCounts, type ReadRow } from "./reactions";
+import { friendsToday, squadCard, type CardPost, type FriendToday, type SquadCard } from "./squadCards";
 
 const PROFILE_COLS =
   "weekly_workout_target, protein_target_g, calorie_target, name, dob, gender, height_cm, weight_kg, goal_weight_kg, goal_type, goal_speed_kg_wk, step_goal, carb_target_g, fat_target_g, reminders, lens_default, share_stats, avatar_path, fiber_target, sugar_target, add_burned_to_goal, rollover_calories, water_goal_ml, units, username, water_glass_ml, water_reminder_from, water_reminder_to, water_reminder_every_min";
@@ -588,3 +589,39 @@ export async function getChallengeBoard(challengeId: string): Promise<ChallengeB
 }
 
 export { totalsFor } from "./totals";
+
+/**
+ * v2.16 (schema_v40): the profile cover and the tour flag, in their own query so a database without
+ * v40 still loads everything else. `available: false` = columns not there yet.
+ */
+export async function getV216Profile(): Promise<{ available: boolean; coverPreset: string | null; tourSeen: boolean }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("profiles").select("cover_preset, tour_seen_at").maybeSingle();
+  if (error || !data) return { available: !error, coverPreset: null, tourSeen: false };
+  const d = data as { cover_preset?: string | null; tour_seen_at?: string | null };
+  return { available: true, coverPreset: d.cover_preset ?? null, tourSeen: !!d.tour_seen_at };
+}
+
+/**
+ * v2.16 premium squad list: per squad, the leaderboard (avatars, best streak, am I #1) and the
+ * newest posts (latest activity line, friends who logged today). Photo URLs aren't signed here.
+ * Any squad that fails just gets an empty card.
+ */
+export async function getSquadCards(squadIds: string[], me: string): Promise<{ cards: Record<string, SquadCard>; friends: FriendToday[] }> {
+  const supabase = await createClient();
+  const now = Date.now();
+  const rows = await Promise.all(
+    squadIds.slice(0, 12).map(async (id) => {
+      const [board, feed] = await Promise.all([
+        supabase.rpc("group_leaderboard", { g: id }),
+        supabase.rpc("group_feed", { g: id, before: null, n: 20, kinds: null }),
+      ]);
+      const lb = board.error ? [] : ((board.data ?? []) as LeaderRow[]).map((r) => ({ ...r, rank: Number(r.rank), flames: Number(r.flames ?? 0), week_points: Number(r.week_points ?? 0) }));
+      const posts = feed.error ? [] : ((feed.data ?? []) as CardPost[]);
+      return { id, lb, posts };
+    }),
+  );
+  const cards: Record<string, SquadCard> = {};
+  for (const r of rows) cards[r.id] = squadCard(me, r.lb, r.posts, now);
+  return { cards, friends: friendsToday(me, today(), rows.map((r) => ({ squadId: r.id, posts: r.posts }))) };
+}

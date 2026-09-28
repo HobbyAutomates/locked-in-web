@@ -118,7 +118,7 @@ export function LockedMedal({ progress, icon, size = 76, delay = null }: { progr
 }
 
 /** Ribbon text under a medal: "GOLD" in the metal's colour, or "5 OF 7" in the accent. */
-export function TierLabel({ tier, locked }: { tier?: Tier; locked?: string }) {
+export function TierLabel({ tier, locked }: { tier?: Tier | "platinum"; locked?: string }) {
   return (
     <span className="text-[9.5px] font-semibold uppercase" style={{ letterSpacing: "1.4px", color: locked ? "var(--accent)" : `var(--tier-${tier})` }}>
       {locked ?? tier}

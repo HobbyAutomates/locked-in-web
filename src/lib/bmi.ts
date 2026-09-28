@@ -33,6 +33,27 @@ export function bmiCategoryIndia(b: number): IndiaCategory {
   return "Obese";
 }
 
+/** v2.16: the words on the Progress BMI chip for each Indian band. */
+export const BMI_WORDS: Record<IndiaCategory, string> = {
+  Underweight: "Below healthy",
+  Normal: "Healthy",
+  Overweight: "A little above healthy",
+  Obese: "Above healthy",
+};
+
+/**
+ * v2.16 BMI reading for the Progress card: one decimal, its Indian band and the chip words, all from
+ * the SAME rounded number (74.5 kg at 166 cm → 27.0, Obese, "Above healthy"). The v2.15 card showed
+ * an animated count that could stop short (19.0) next to the right band; the number is now final.
+ */
+export function bmiReading(weightKg: number | null | undefined, heightCm: number | null | undefined): { value: number; category: IndiaCategory; words: string } | null {
+  const b = bmi(weightKg, heightCm);
+  if (b == null || !Number.isFinite(b)) return null;
+  const value = Math.round(b * 10) / 10;
+  const category = bmiCategoryIndia(value);
+  return { value, category, words: BMI_WORDS[category] };
+}
+
 /** WHO global cut-offs (adults): 18.5 / 25 / 30. Shown second, for people comparing with other apps. */
 export function bmiCategoryWHO(b: number): WhoCategory {
   if (b < 18.5) return "Underweight";

@@ -19,14 +19,18 @@ const TABS = [
   { href: "/profile", label: "Profile", Icon: Person },
 ];
 
-type DialKey = "food" | "activity" | "water" | "weight";
+type DialKey = "food" | "activity" | "water" | "weight" | "scan";
 
-/** v2.8 speed-dial under the +, bottom-most first so Food sits closest to the thumb. */
-const DIAL: { key: DialKey; label: string; Icon: (p: { size?: number }) => React.ReactNode; tint: string }[] = [
-  { key: "food", label: "Food", Icon: Bowl, tint: "var(--ink)" },
+/**
+ * v2.8 speed-dial under the +, bottom-most first so Food sits closest to the thumb. v2.16 (board
+ * FabMenuScan): Scan on top as the one bright pill, "photo · label · barcode", ember icon.
+ */
+const DIAL: { key: DialKey; label: string; sub?: string; Icon: (p: { size?: number }) => React.ReactNode; tint: string }[] = [
+  { key: "food", label: "Food", sub: "type or talk", Icon: Bowl, tint: "var(--ink)" },
   { key: "activity", label: "Activity", Icon: Run, tint: "var(--ink)" },
   { key: "water", label: "Water +1 glass", Icon: Glass, tint: "var(--ink)" },
   { key: "weight", label: "Weight", Icon: Scale, tint: "var(--ink)" },
+  { key: "scan", label: "Scan", sub: "photo · label · barcode", Icon: ScanFilled, tint: "#fff" },
 ];
 
 /**
@@ -95,6 +99,7 @@ export default function BottomNav() {
     const d = today();
     if (key === "water") return void addGlass();
     if (key === "weight") return router.push("/profile/weight?log=1");
+    if (key === "scan") return router.push("/scan");
     router.push(key === "food" ? `/log?date=${d}&mode=meal` : `/log?date=${d}&mode=activity`);
   }
 
@@ -105,7 +110,7 @@ export default function BottomNav() {
           <motion.div
             key="dial-backdrop"
             className="fixed inset-0 z-40"
-            style={{ background: "rgba(0,0,0,0.38)" }}
+            style={{ background: "rgba(0,0,0,0.62)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -129,7 +134,7 @@ export default function BottomNav() {
                 exit="closed"
                 variants={{ open: { transition: { staggerChildren: 0.035 } }, closed: { transition: { staggerChildren: 0.02, staggerDirection: -1 } } }}
               >
-                {DIAL.map(({ key, label, Icon, tint }) => (
+                {DIAL.map(({ key, label, sub, Icon, tint }) => (
                   <motion.li
                     key={key}
                     variants={{ open: { opacity: 1, y: 0, scale: 1 }, closed: { opacity: 0, y: 14, scale: 0.9 } }}
@@ -144,8 +149,9 @@ export default function BottomNav() {
                       <button
                         type="button"
                         role="menuitem"
+                        aria-label={sub ? `${label}: ${sub}` : undefined}
                         className="press flex items-center gap-2.5 rounded-full py-1.5 pl-4 pr-1.5 text-[15px] font-bold"
-                        style={{ background: "var(--card)", color: "var(--ink)", boxShadow: "var(--shadow-lg)", border: 0, touchAction: "manipulation", WebkitTouchCallout: "none", userSelect: "none" }}
+                        style={{ background: key === "scan" ? "var(--btn)" : "var(--card)", color: key === "scan" ? "var(--btn-ink)" : "var(--ink)", boxShadow: "var(--shadow-lg)", border: 0, touchAction: "manipulation", WebkitTouchCallout: "none", userSelect: "none" }}
                         onPointerDown={() => {
                           if (key !== "water") return;
                           longPressed.current = false;
@@ -171,8 +177,17 @@ export default function BottomNav() {
                           go(key);
                         }}
                       >
-                        {label}
-                        <span className="grid h-10 w-10 place-items-center rounded-full" style={{ background: "var(--card2)", color: tint }}>
+                        {sub ? (
+                          <span className="flex flex-col items-start leading-tight">
+                            {label}
+                            <span className="text-[11px] font-medium" style={{ opacity: 0.6 }}>
+                              {sub}
+                            </span>
+                          </span>
+                        ) : (
+                          label
+                        )}
+                        <span className="grid h-10 w-10 place-items-center rounded-full" style={{ background: key === "scan" ? "var(--ember)" : "var(--card2)", color: tint }}>
                           <Icon size={20} />
                         </span>
                       </button>
@@ -184,9 +199,10 @@ export default function BottomNav() {
           </AnimatePresence>
           <button
             type="button"
-            aria-label={open ? "Close the log menu" : "Log food, activity, water or weight"}
+            aria-label={open ? "Close the log menu" : "Log food, activity, water or weight, or scan"}
             aria-expanded={open}
             aria-haspopup="menu"
+            data-tour="fab"
             className="fab press absolute right-5 z-50 grid place-items-center rounded-full"
             style={{ width: 60, height: 60, top: -30, background: "var(--ember)", color: "var(--ember-ink)", border: 0 }}
             onClick={() => setOpen((v) => !v)}
@@ -210,6 +226,7 @@ export default function BottomNav() {
                 <Link
                   key={href}
                   href={href}
+                  data-tour={href === "/scan" ? "tab-scan" : href === "/squad" ? "tab-squad" : undefined}
                   aria-current={active ? "page" : undefined}
                   className="press flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1 text-[11px] font-semibold"
                   style={{ color: active ? "var(--ink)" : "var(--muted)" }}

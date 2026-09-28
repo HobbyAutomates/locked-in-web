@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { requestJoin } from "@/lib/actions";
 import { unreadLabel } from "@/lib/reactions";
 import type { PublicSquad, Squad } from "@/lib/types";
-import { Check, ChevronRight, Close, Globe, Help, Key, Padlock, Plus, Spinner } from "./icons";
+import { namesLine, type FriendToday, type SquadCard } from "@/lib/squadCards";
+import { Avatar } from "./Avatar";
+import { Check, Close, Help, Key, Padlock, Plus, Spinner } from "./icons";
 import ProfileSetupSheet from "./ProfileSetupSheet";
 import { SquadIcon } from "./SquadIcon";
 import { BottomSheet, Card, ErrorNote, PillButton, Rise } from "./ui";
@@ -18,6 +20,9 @@ type Props = {
   /** v2.11: unread Chat posts per squad id (empty until schema_v35 is applied). */
   unread?: Record<string, number>;
   profile: { name: string; username: string | null; avatar_path: string | null };
+  /** v2.16: per-squad card data (avatars, latest activity, best streak, #1) and friends who logged today. */
+  cards?: Record<string, SquadCard>;
+  friends?: FriendToday[];
 };
 
 /**
@@ -25,7 +30,7 @@ type Props = {
  * menu (Create a squad → the 3-step flow, Join with code, How squads work). A squad opens its own
  * page with Chat · Feed · Leaderboard. No username yet → the one-time profile sheet first.
  */
-export default function SquadScreen({ me, squads, publicSquads, unread = {}, profile }: Props) {
+export default function SquadScreen({ me, squads, publicSquads, unread = {}, profile, cards = {}, friends = [] }: Props) {
   const router = useRouter();
   const [menu, setMenu] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -51,7 +56,10 @@ export default function SquadScreen({ me, squads, publicSquads, unread = {}, pro
     <div className="flex flex-col gap-3.5">
       <Rise index={0}>
         <div className="flex items-center justify-between">
-          <h1 className="screen-title">Squads</h1>
+          <div className="min-w-0">
+            <h1 className="screen-title">Squads</h1>
+            {profile.username ? <p className="text-[14px] font-medium muted">@{profile.username}</p> : null}
+          </div>
           <div className="relative" ref={menuRef}>
             <button
               type="button"
@@ -110,37 +118,39 @@ export default function SquadScreen({ me, squads, publicSquads, unread = {}, pro
         </Rise>
       ) : (
         <>
+          {friends.length ? (
+            <Rise index={1}>
+              <Link
+                href={`/squad/${friends[0].squadId}?tab=feed`}
+                className="press flex items-center gap-3 rounded-[22px] px-4 py-3.5"
+                style={{ background: "linear-gradient(120deg, rgba(255,91,31,.16), rgba(168,130,58,.10))", boxShadow: "inset 0 0 0 1px rgba(255,139,94,.18)", color: "var(--ink)" }}
+              >
+                <AvatarStack people={friends} size={30} ring="var(--bg)" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[14.5px] font-bold">
+                    {friends.length} friend{friends.length === 1 ? "" : "s"} logged today
+                  </span>
+                  <span className="truncate text-[12.5px] muted">{namesLine(friends.map((f) => f.name))} · tap to cheer</span>
+                </span>
+                <ArrowRight />
+              </Link>
+            </Rise>
+          ) : null}
           <Rise index={1}>
-            <p className="px-1 text-[13px] font-bold muted">Your squads</p>
+            <div className="flex items-baseline justify-between px-1">
+              <p className="text-[19px] font-bold" style={{ letterSpacing: "-0.02em" }}>
+                Your squads
+              </p>
+              <span className="num text-[13px] font-medium muted">{squads.length}</span>
+            </div>
           </Rise>
-          <Rise index={1}>
-            <Card padding={0}>
-              <div className="px-3.5">
-                {squads.map((g, i) => (
-                  <Link key={g.id} href={`/squad/${g.id}`} className="press flex items-center gap-3 py-3" style={{ borderTop: i > 0 ? "1px solid var(--hair)" : "none", color: "var(--ink)" }}>
-                    <SquadIcon icon={g.icon} cover={g.cover_url} size={52} />
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[15px] font-bold">{g.name}</span>
-                      <span className="flex items-center gap-1 text-xs font-semibold muted">
-                        {g.is_public ? <Globe size={12} /> : <Padlock size={12} />}
-                        {g.member_count ?? 1} member{(g.member_count ?? 1) === 1 ? "" : "s"}
-                        {g.owner_id === me ? " · Owner" : ""}
-                      </span>
-                      {g.description || g.tagline ? <span className="truncate text-xs muted">{g.description || g.tagline}</span> : null}
-                    </span>
-                    {unreadLabel(unread[g.id]) ? (
-                      <span className="num grid h-[22px] min-w-[22px] shrink-0 place-items-center rounded-full px-1.5 text-[11px] font-extrabold" style={{ background: "var(--btn)", color: "var(--btn-ink)" }} aria-label={`${unread[g.id]} unread`}>
-                        {unreadLabel(unread[g.id])}
-                      </span>
-                    ) : null}
-                    <span className="muted">
-                      <ChevronRight size={18} />
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </Card>
-          </Rise>
+          <div className="flex flex-col gap-2.5">
+            {squads.map((g, i) => (
+              <Rise key={g.id} index={Math.min(6, i + 2)}>
+                <PremiumSquadCard squad={g} me={me} card={cards[g.id]} unread={unread[g.id] ?? 0} />
+              </Rise>
+            ))}
+          </div>
         </>
       )}
 
@@ -165,6 +175,92 @@ export default function SquadScreen({ me, squads, publicSquads, unread = {}, pro
 
       <ProfileSetupSheet open={setup} onClose={() => setSetup(false)} userId={me} name={profile.name} username={profile.username} avatarPath={profile.avatar_path} />
     </div>
+  );
+}
+
+/** v2.16 (board PremiumSquad): icon tile (gold when you're #1), unread badge, avatars, latest line, streak and #1 chips. */
+function PremiumSquadCard({ squad: g, me, card, unread }: { squad: Squad; me: string; card: SquadCard | undefined; unread: number }) {
+  const gold = card?.first === true;
+  const members = card?.members ?? [];
+  const count = g.member_count ?? members.length ?? 1;
+  const badge = unreadLabel(unread);
+  return (
+    <Link
+      href={`/squad/${g.id}`}
+      className="press flex items-center gap-3.5 rounded-3xl p-3.5"
+      style={{ background: "var(--card)", boxShadow: "var(--pcard-ring), var(--shadow-sm)", color: "var(--ink)" }}
+      aria-label={`${g.name}${badge ? `, ${unread} unread` : ""}${gold ? ", you're number 1" : ""}`}
+    >
+      <span
+        className="relative grid shrink-0 place-items-center rounded-[18px]"
+        style={{ width: 56, height: 56, background: gold ? "linear-gradient(135deg, #D9B872, #A8823A 55%, #5E4518)" : "linear-gradient(135deg, var(--card2), var(--card))", boxShadow: gold ? "0 6px 16px rgba(168,130,58,.3)" : "inset 0 0 0 1px var(--hair)" }}
+      >
+        <SquadIcon icon={g.icon} cover={g.cover_url} size={42} />
+        {badge ? (
+          <span className="num absolute grid h-5 min-w-5 place-items-center rounded-full px-[5px] text-[11px] font-bold" style={{ top: -5, right: -5, background: "var(--ember)", color: "#fff", boxShadow: "0 0 0 2px var(--card)" }}>
+            {badge}
+          </span>
+        ) : null}
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[16.5px] font-bold" style={{ letterSpacing: "-0.01em" }}>
+            {g.name}
+          </span>
+          {g.is_public ? null : (
+            <span className="shrink-0 muted" aria-label="Private">
+              <Padlock size={12} />
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 truncate text-[12.5px] muted">{card?.latest ?? (count <= 1 ? "Just you so far · invite a friend" : "Quiet today · nudge someone")}</span>
+        <span className="mt-2 flex items-center gap-2">
+          {members.length ? <AvatarStack people={members} size={22} ring="var(--card)" /> : null}
+          {card && card.streak > 0 ? (
+            <span className="num inline-flex h-[26px] items-center gap-[5px] rounded-full px-2.5 text-[12px] font-semibold" style={{ background: "var(--ember-bg)", color: "var(--ember)" }} title="Best current streak in the squad">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 21c3.6 0 6-2.4 6-5.8 0-3.4-2.6-5.2-3.6-8.2-.3 1.8-1.3 3-2.4 3.4.3-2.8-.8-5.6-3.2-7.4.3 3.2-3.8 6-3.8 12.2C5 18.6 8.4 21 12 21z" />
+              </svg>
+              {card.streak}
+            </span>
+          ) : (
+            <span className="inline-flex h-[26px] items-center rounded-full px-2.5 text-[12px] font-semibold muted" style={{ background: "var(--card2)" }}>
+              new
+            </span>
+          )}
+          {gold ? (
+            <span className="num inline-flex h-[26px] items-center rounded-full px-2.5 text-[12px] font-semibold" style={{ background: "rgba(168,130,58,.18)", color: "var(--gold-ink)" }}>
+              #1
+            </span>
+          ) : null}
+          {g.owner_id === me ? <span className="text-[11px] font-semibold muted">Owner</span> : null}
+        </span>
+      </span>
+      <span className="shrink-0 muted">
+        <ArrowRight />
+      </span>
+    </Link>
+  );
+}
+
+/** Overlapping avatars (up to four), each ringed in the surface colour. */
+function AvatarStack({ people, size, ring }: { people: { user_id: string; name: string; avatar_path: string | null }[]; size: number; ring: string }) {
+  return (
+    <span className="flex shrink-0" aria-hidden="true">
+      {people.slice(0, 4).map((m, i) => (
+        <span key={m.user_id} className="rounded-full" style={{ marginLeft: i ? -8 : 0, boxShadow: `0 0 0 2px ${ring}` }}>
+          <Avatar path={m.avatar_path} name={m.name} size={size} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function ArrowRight() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h13M13 6l6 6-6 6" />
+    </svg>
   );
 }
 

@@ -125,6 +125,7 @@ export function BottomSheet({
   onClose,
   children,
   primary,
+  action,
 }: {
   open: boolean;
   title: string;
@@ -132,13 +133,15 @@ export function BottomSheet({
   onClose: () => void;
   children?: React.ReactNode;
   primary?: { label: React.ReactNode; onClick: () => void; disabled?: boolean };
+  /** v2.16: a text button beside the title (the cover picker's "Done"). */
+  action?: { label: string; onClick: () => void };
 }) {
   const mounted = useSyncExternalStore(
     noopSubscribe,
     () => true,
     () => false,
   );
-  const sheet = <AnimatePresence>{open ? <SheetFrame title={title} subtitle={subtitle} onClose={onClose} primary={primary}>{children}</SheetFrame> : null}</AnimatePresence>;
+  const sheet = <AnimatePresence>{open ? <SheetFrame title={title} subtitle={subtitle} onClose={onClose} primary={primary} action={action}>{children}</SheetFrame> : null}</AnimatePresence>;
   // v2.13 scroll fix: the sheet renders into <body>. Inside a card with a transform / filter (the
   // v2.12 entrance animations, the scan result sheet) `position: fixed` pinned it to that card, so a
   // tall sheet ran off-screen and couldn't scroll ("What's new" was the worst case).
@@ -147,7 +150,7 @@ export function BottomSheet({
 
 const noopSubscribe = () => () => undefined;
 
-function SheetFrame({ title, subtitle, onClose, children, primary }: { title: string; subtitle?: React.ReactNode; onClose: () => void; children?: React.ReactNode; primary?: { label: React.ReactNode; onClick: () => void; disabled?: boolean } }) {
+function SheetFrame({ title, subtitle, onClose, children, primary, action }: { title: string; subtitle?: React.ReactNode; onClose: () => void; children?: React.ReactNode; primary?: { label: React.ReactNode; onClick: () => void; disabled?: boolean }; action?: { label: string; onClick: () => void } }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -180,9 +183,16 @@ function SheetFrame({ title, subtitle, onClose, children, primary }: { title: st
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full" style={{ background: "var(--hair)" }} />
-        <p className="shrink-0 text-[19px] font-extrabold leading-tight" style={{ letterSpacing: "-0.02em" }}>
-          {title}
-        </p>
+        <div className="flex shrink-0 items-baseline justify-between gap-3">
+          <p className="text-[19px] font-extrabold leading-tight" style={{ letterSpacing: "-0.02em" }}>
+            {title}
+          </p>
+          {action ? (
+            <button type="button" className="press -my-2 min-h-11 px-1 text-[14px] font-semibold" style={{ background: "none", border: 0, color: "var(--ember)" }} onClick={action.onClick}>
+              {action.label}
+            </button>
+          ) : null}
+        </div>
         {subtitle ? <div className="mt-0.5 shrink-0 text-[13px] muted">{subtitle}</div> : null}
         {children ? <div className="sheet-scroll -mx-1 mt-3 min-h-0 px-1">{children}</div> : null}
         {primary ? (

@@ -64,6 +64,14 @@
   --tier-gold: #8a5a12;
   --tier-silver: #6c6c75;
   --tier-bronze: #7a3d17;
+  --tier-platinum: #55606c;
+  /* v2.16 premium metals (spec): dark gold and silver, the same in both themes. */
+  --gold: #d9b872;
+  --gold-2: #a8823a;
+  --gold-deep: #5e4518;
+  --silver: #b9bec6;
+  --silver-2: #e6e8ec;
+  --gold-ink: #8a6a2c;
   --shadow: 0 6px 18px rgba(11, 11, 12, 0.07), 0 1px 3px rgba(11, 11, 12, 0.05);
   --shadow-sm: 0 3px 10px rgba(11, 11, 12, 0.06);
   --shadow-lg: 0 10px 30px rgba(11, 11, 12, 0.13);
@@ -127,6 +135,8 @@
     --tier-gold: #e2b04a;
     --tier-silver: #c9c9d1;
     --tier-bronze: #c97a42;
+    --tier-platinum: #cfd8e2;
+    --gold-ink: #d9b872;
     --shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
     --shadow-sm: 0 3px 10px rgba(0, 0, 0, 0.45);
     --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6);
@@ -190,6 +200,8 @@
   --tier-gold: #e2b04a;
   --tier-silver: #c9c9d1;
   --tier-bronze: #c97a42;
+  --tier-platinum: #cfd8e2;
+  --gold-ink: #d9b872;
   --shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 3px 10px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6);
@@ -913,4 +925,10 @@ button {
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.sphere-num small {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.8;
 }

@@ -73,7 +73,15 @@ export function CountUp({ value, decimals = 0, delay = 0, duration = 1800, forma
       else done.current = true;
     };
     raf = requestAnimationFrame(tick);
+    // v2.16: never leave a number mid-count (the BMI once sat at 19.0 instead of 27.0): whatever
+    // happens to animation frames (hidden tab, throttled webview), the final value lands on time.
+    const settle = setTimeout(() => {
+      cancelAnimationFrame(raf);
+      el.textContent = fmtN(value);
+      done.current = true;
+    }, delay + duration + 250);
     return () => {
+      clearTimeout(settle);
       cancelAnimationFrame(raf);
       el.textContent = fmtN(value);
     };

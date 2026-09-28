@@ -264,3 +264,35 @@
     --n: var(--to);
   }
 }
+
+/* v2.16 liquid spheres (Profile identity band): a wave strip twice the sphere's width drifts left forever. */
+@keyframes m-wave {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.m-wave {
+  animation: m-wave 3.2s linear infinite;
+}
+/* v2.16 tour spotlight outline. */
+@keyframes m-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.m-pulse {
+  animation: m-pulse 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-wave,
+  .m-pulse {
+    animation: none !important;
+  }
+}

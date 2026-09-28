@@ -18,6 +18,7 @@ import { UndoSnackbar, usePendingDeletes } from "./LogBits";
 import { ArrowLeft, Bowl, Chat, Check, ChevronRight, Crown, Dumbbell, Fist, Flame, Medal, People, Photo, Plus, Send, Target, Trash } from "./icons";
 import { ChallengesTab } from "./SquadChallenges";
 import { SquadRankRow } from "./SquadRankRow";
+import { SquadPodium } from "./SquadPodium";
 import { SquadIcon } from "./SquadIcon";
 import { AddReactionButton, ReactionBar, ReactionChips, ReactorsSheet, SeenSheet, Ticks, useLongPress } from "./SquadReactions";
 import { BottomSheet, BreathingFlame, ErrorNote } from "./ui";
@@ -321,7 +322,7 @@ export default function SquadRoom({ me, today, squad, chat: chat0, feed: feed0, 
       ) : tab === "feed" ? (
         <FeedTab me={me} today={today} squadId={squad.id} posts={feed.filter((p) => !dels.isPending(p.id))} reacting={reacting} shareStats={shareStats} isOwner={isOwner} onPhoto={() => photoRef.current?.click()} onChallenges={() => setTab("challenges")} onDelete={deletePost} />
       ) : tab === "leaderboard" ? (
-        <LeaderboardTab me={me} squadId={squad.id} rows={board} sentNudges={sentNudges} onError={setError} onOpenProfile={setProfileSheet} />
+        <LeaderboardTab me={me} squadId={squad.id} rows={board} challenges={challenges} boards={challengeBoards} sentNudges={sentNudges} onError={setError} onOpenProfile={setProfileSheet} />
       ) : (
         <BattleTab me={me} squad={squad} date={today} crown={crown} onError={setError} />
       )}
@@ -871,7 +872,9 @@ function PostMenu({ onDelete, align, up = false }: { onDelete: () => void; align
 
 /* ---------------- Leaderboard ---------------- */
 
-function LeaderboardTab({ me, squadId, rows, sentNudges, onError, onOpenProfile }: { me: string; squadId: string; rows: LeaderRow[]; sentNudges: string[]; onError: (e: string | null) => void; onOpenProfile: (row: LeaderRow) => void }) {
+/** v2.16: Members / Leaderboard segmented tabs; Leaderboard is the glass podium (SquadPodium). */
+function LeaderboardTab({ me, squadId, rows, challenges, boards, sentNudges, onError, onOpenProfile }: { me: string; squadId: string; rows: LeaderRow[]; challenges: Challenge[]; boards: Record<string, ChallengeBoardRow[]>; sentNudges: string[]; onError: (e: string | null) => void; onOpenProfile: (row: LeaderRow) => void }) {
+  const [view, setView] = useState<"members" | "leaderboard">("leaderboard");
   const [nudged, setNudged] = useState<Set<string>>(() => new Set(sentNudges));
   async function nudge(r: LeaderRow) {
     onError(null);
@@ -887,8 +890,34 @@ function LeaderboardTab({ me, squadId, rows, sentNudges, onError, onOpenProfile 
       onError(e instanceof Error ? e.message : "Could not send the nudge");
     }
   }
+  const seg = (
+    <div role="tablist" aria-label="Leaderboard view" className="flex rounded-2xl p-1" style={{ background: "color-mix(in srgb, var(--ink) 5%, transparent)", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent)" }}>
+      {(["members", "leaderboard"] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={view === v}
+          className="press h-10 flex-1 rounded-xl text-[14px] font-semibold"
+          style={{ border: 0, background: view === v ? "color-mix(in srgb, var(--ink) 10%, transparent)" : "transparent", boxShadow: view === v ? "inset 0 1px 0 rgba(255,255,255,.12)" : "none", color: view === v ? "var(--ink)" : "var(--muted)" }}
+          onClick={() => setView(v)}
+        >
+          {v === "members" ? "Members" : "Leaderboard"}
+        </button>
+      ))}
+    </div>
+  );
+  if (view === "leaderboard") {
+    return (
+      <div className="flex flex-col px-4 pb-10 pt-3" style={{ background: "radial-gradient(100% 320px at 50% 0%, rgba(168,130,58,.10), transparent 70%)" }}>
+        {seg}
+        <SquadPodium me={me} rows={rows} challenges={challenges} boards={boards} onOpenProfile={onOpenProfile} />
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-2.5 px-4 pb-10 pt-3">
+      {seg}
       {rows.map((r) => {
         const isMe = r.user_id === me;
         const already = nudged.has(r.user_id);

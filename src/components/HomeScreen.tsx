@@ -27,6 +27,9 @@ import TuneCard from "./home/TuneCard";
 import BuddyCard from "./home/BuddyCard";
 import DayGlow, { warmth } from "./home/DayGlow";
 import MilestoneFlood from "./home/MilestoneFlood";
+import GuidedTour from "./GuidedTour";
+import BadgeUnlock from "./BadgeUnlock";
+import type { BadgeProgress } from "@/lib/badges";
 
 /** Background saves already pulled in by a refresh (see PendingMeals); survives remounts of Home. */
 let handledSaves = 0;
@@ -56,9 +59,13 @@ type Props = {
   onboardedV2?: boolean | null;
   /** v2.14 milestone flood keys already shown (null = schema_v37 not applied, local storage only). */
   milestonesSeen?: string[] | null;
+  /** v2.16 (schema_v40): the account has seen the first-run tour. */
+  tourSeen?: boolean;
+  /** v2.16: badge progress, for the unlock moment when one is newly earned. */
+  badges?: BadgeProgress | null;
 };
 
-export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [], checkin = null, fast = null, onboardedV2 = null, milestonesSeen = null }: Props) {
+export default function HomeScreen({ today, profile, workouts, meals, exercises, weekStreak, dayStreak, thisWeek, celebrate, wrap, nudges, water = [], checkin = null, fast = null, onboardedV2 = null, milestonesSeen = null, tourSeen = false, badges = null }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState(today);
   const { pending, savedCount, error } = usePendingMeals();
@@ -137,6 +144,8 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
   return (
     <div className="flex flex-col gap-3.5">
       <DayGlow level={glow} />
+      <GuidedTour serverSeen={tourSeen} />
+      {badges ? <BadgeUnlock progress={badges} /> : null}
       <MilestoneFlood
         serverSeen={milestonesSeen}
         input={{ today, dayStreak, weightKg: profile.weight_kg, goalWeightKg: profile.goal_weight_kg, goalType: profile.goal_type, workouts }}
@@ -167,7 +176,9 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
 
       {/* v2.14: the coach's note, buddy streaks, and "Tune your plan" for existing users. */}
       {onboardedV2 === false ? <TuneCard /> : null}
-      <TodayNote />
+      <div data-tour="coach" className="flex flex-col gap-3.5 empty:hidden">
+        <TodayNote />
+      </div>
       <BuddyCard />
 
       <HomeBanner /> {/* v2.13 platform */}
@@ -181,6 +192,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       <Rise index={2}>
         <button
           type="button"
+          data-tour="calories"
           className="card press block w-full text-left"
           style={{ padding: 20, color: "var(--ink)" }}
           onClick={flip}
@@ -220,7 +232,7 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
       </Rise>
 
       <Rise index={3}>
-        <div className="grid grid-cols-3 gap-2.5">
+        <div data-tour="calories" className="grid grid-cols-3 gap-2.5">
           <MacroCard macro="Protein" consumed={totals.protein} target={profile.protein_target_g} color="var(--ember)" mode={mode} animate={flipped} onFlip={flip} draw={420} />
           <MacroCard macro="Carbs" consumed={totals.carbs} target={carbTarget} color="var(--ember)" mode={mode} animate={flipped} onFlip={flip} draw={590} />
           <MacroCard macro="Fat" consumed={totals.fat} target={fatTarget} color="var(--ember)" mode={mode} animate={flipped} onFlip={flip} draw={760} />
