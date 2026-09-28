@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saveProfile, signOut } from "@/lib/actions";
-import { ALL_BADGES, earnedCount, type BadgeProgress } from "@/lib/badges";
+import type { BadgeProgress } from "@/lib/badges";
 import { today as todayIso } from "@/lib/dates";
 import { onCount } from "@/lib/reminders";
 import { goalEta, goalFraction, monthDay, monthYear, slopePerDay, weightTrend } from "@/lib/progressStats";
@@ -12,17 +12,13 @@ import { ageFrom, type Profile, type WeightEntry } from "@/lib/types";
 import { APP_VERSION, CHANGELOG, compareVersions } from "@/lib/version";
 import { displayName, weightText } from "@/lib/display";
 import { AvatarPicker } from "./Avatar";
-import GraffitiWall from "./GraffitiWall";
-import { TierLabel } from "./Medal";
-import { jewelItems, nextJewel } from "@/lib/jewels";
+import TrophyWall from "./TrophyWall";
 import { COVER_STORAGE_KEY, DEFAULT_COVER, isCoverId } from "@/lib/covers";
 import { saveCoverPreset } from "@/lib/v216Actions";
 import type { MemberPlate } from "@/lib/memberPlate";
-import { Jewel } from "./Jewel";
 import { Cover } from "./Cover";
 import CoverPicker from "./CoverPicker";
 import BadgeUnlock from "./BadgeUnlock";
-import { NextUp } from "./BadgesScreen";
 import ProfileSetupSheet from "./ProfileSetupSheet";
 import { TeenGoalMigration } from "./Science";
 import { CountUp, MRise, md } from "./motion";
@@ -258,7 +254,7 @@ export default function ProfileScreen({
 
         {/* ---- badges ---- */}
         <MRise delay={850}>
-          <BadgeShelf progress={badges} />
+          <TrophyWall progress={badges} delay={850} />
         </MRise>
 
         {/* ---- goal ---- */}
@@ -315,10 +311,6 @@ export default function ProfileScreen({
             </div>
           </section>
         </MRise>
-
-        <div className="mt-3.5 empty:hidden">
-          <GraffitiWall />
-        </div>
 
         {/* ---- you ---- */}
         <MRise delay={1190}>
@@ -470,41 +462,6 @@ function Sphere({ label, tint, fill, aria, delay, children }: { label: string; t
 // ---------------------------------------------------------------- badges
 
 /** v2.16: every badge as a jewel (earned lit, locked dark with its ember progress line), then "Next up". */
-function BadgeShelf({ progress }: { progress: BadgeProgress }) {
-  const got = earnedCount(progress);
-  const items = jewelItems(progress);
-  const next = nextJewel(progress);
-  return (
-    <section aria-label="Badges" className="mt-[26px] flex flex-col gap-3.5 rounded-3xl px-3 pb-4 pt-[18px]" style={{ background: "var(--pcard)", boxShadow: "var(--pcard-ring)" }}>
-      <div className="flex items-center justify-between px-1.5">
-        <h2 className="text-[19px] font-semibold" style={{ letterSpacing: "-0.3px" }}>
-          Badges
-        </h2>
-        <Link href="/badges" className="press -my-2 inline-flex min-h-11 items-center gap-1 text-[14px] muted" aria-label={`All badges: ${got} of ${ALL_BADGES.length} earned`}>
-          <span className="num">
-            {got} of {ALL_BADGES.length}
-          </span>
-          <LineIcon name="chev" size={14} />
-        </Link>
-      </div>
-      <div className="grid grid-cols-4 gap-x-1 gap-y-3">
-        {items.map((x, i) => (
-          <Link key={x.id} href="/badges" className="press flex flex-col items-center gap-1 text-center" aria-label={x.got ? `${x.badge.name}, ${x.tier} badge` : `${x.badge.name}, locked: ${Math.min(x.value, x.badge.need)} of ${x.badge.need}`}>
-            <Jewel category={x.category} tier={x.tier} size={58} locked={!x.got} progress={x.fraction} delay={1300 + i * 60} />
-            {x.got ? <TierLabel tier={x.tier} /> : <TierLabel locked={`${Math.min(x.value, x.badge.need)} of ${x.badge.need}`} />}
-            <span className="line-clamp-2 text-[11.5px] font-medium leading-[14px]" style={{ color: x.got ? "var(--ink)" : "var(--muted)" }}>
-              {x.badge.name}
-            </span>
-          </Link>
-        ))}
-      </div>
-      <div className="mx-1.5 mt-0.5 border-t pt-3" style={{ borderColor: "var(--hair)" }}>
-        <NextUp next={next} bare />
-      </div>
-    </section>
-  );
-}
-
 // ---------------------------------------------------------------- member plate
 
 /**
