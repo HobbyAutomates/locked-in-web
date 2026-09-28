@@ -13,6 +13,7 @@
   --line: rgba(11, 11, 12, 0.1);
   --ember: #ff5b1f;
   --ember-2: #ff8b5e;
+  --ember-deep: #c2410c;
   --ember-bg: #fbe3d8;
   --ember-ink: #ffffff;
   /* Iris is the coach's voice and nothing else; mint only means "on track". */
@@ -78,6 +79,7 @@
     --line: rgba(244, 241, 234, 0.09);
     --ember: #ff5b1f;
     --ember-2: #ff8b5e;
+  --ember-deep: #c2410c;
     --ember-bg: rgba(255, 91, 31, 0.16);
     --ember-ink: #ffffff;
     --iris: #8b7bff;
@@ -140,6 +142,7 @@
   --line: rgba(244, 241, 234, 0.09);
   --ember: #ff5b1f;
   --ember-2: #ff8b5e;
+  --ember-deep: #c2410c;
   --ember-bg: rgba(255, 91, 31, 0.16);
   --ember-ink: #ffffff;
   --iris: #8b7bff;

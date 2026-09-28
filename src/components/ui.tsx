@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -229,9 +229,12 @@ export function Ring({
   stroke,
   children,
   draw,
+  gradientTo,
 }: {
   fraction: number;
   color: string;
+  /** v2.15: a subtle gradient along the arc, from `color` to this. */
+  gradientTo?: string;
   size: number;
   stroke: number;
   children?: React.ReactNode;
@@ -244,16 +247,25 @@ export function Ring({
   const reduce = useReducedMotion();
   // The first draw is the slow pen stroke; once it lands, later changes use the usual spring.
   const [slow, setSlow] = useState(draw != null);
+  const gid = `ring-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size, flex: "none" }}>
       <svg width={size} height={size} className="absolute -rotate-90" aria-hidden="true">
+        {gradientTo ? (
+          <defs>
+            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" style={{ stopColor: color }} />
+              <stop offset="100%" style={{ stopColor: gradientTo }} />
+            </linearGradient>
+          </defs>
+        ) : null}
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--track)" strokeWidth={stroke} />
         <motion.circle
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={color}
+          stroke={gradientTo ? `url(#${gid})` : color}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
