@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 import { applyVoiceAmounts, applyVoiceOil, dropUnpriced, foodTokens, matchItem, mergeVoice, parseVoice } from "../src/lib/food/voicePlate";
-import { HOME_RECIPES, homeRecipeAsOwn, homeRecipeItem, parseVoiceRecipe, searchHomeRecipes, unitLabel } from "../src/lib/food/homeRecipes";
+import { HOME_RECIPES, homeRecipeAsOwn, homeRecipeItem, ingredientFromItem, parseVoiceRecipe, searchHomeRecipes, unitLabel } from "../src/lib/food/homeRecipes";
 import { dayAccuracy, kcalRange, plusMinusLabel, rangeFromGrams, relUncertainty, totalPlusMinus } from "../src/lib/food/honesty";
 import { orderPlan, parseOrderText, planItems, type OrderDish } from "../src/lib/food/orderHelper";
 import { cleanScaleRef, fractionLabel, labelRealityGaps, leftoverActive, leftoverLine, normalizeShares, pickSwap, realityLine, scaleMealItem, sizedUsingLabel, splitEaten, splitShares, waterFromMeals, waterMl } from "../src/lib/food/foodBits";
@@ -110,6 +110,10 @@ assert.equal(v.name, "Nani ka rajma");
 assert.equal(v.servings, 6);
 assert.ok(v.ingredients.startsWith("2 cup rajma"));
 assert.equal(parseVoiceRecipe("1 katori poha").name, "");
+const ing = ingredientFromItem(meal("Toor dal", 150, 180, { protein_g: 9, micros: { fiber_g: 3 } }));
+assert.equal(ing.kcal, 180);
+assert.equal(ing.fiber_g, 3);
+assert.deepEqual(ing.per100, { kcal: 120, protein_g: 6, carbs_g: 13.3, fat_g: 3.3, micros: { fiber_g: 2 } });
 
 // ---------------------------------------------------------------- A3 honest ranges
 assert.equal(relUncertainty(meal("x", 100, 200, { user_verified: true })), 0.05);
@@ -250,3 +254,10 @@ assert.equal(pantryCategory("Paneer"), "dairy");
 assert.equal(pantryCategory("Onions"), "produce");
 
 console.log("check-v218-food: all good");
+// parity with Android: Devanagari "और" splits an utterance; a null label field is skipped, not 0
+{
+  const dv = mergeVoice([plate("roti", 40, 110), plate("rice", 200, 260)], "दो रोटी और आधा चावल");
+  if (dv.items[0].grams !== 80 || dv.items[1].grams !== 100) throw new Error("Devanagari split");
+  if (labelRealityGaps({ calories: null, protein_g: 20 }, { calories: 400, protein_g: 20 }).length !== 0) throw new Error("null label field");
+  console.log("check-v218-food: parity good");
+}

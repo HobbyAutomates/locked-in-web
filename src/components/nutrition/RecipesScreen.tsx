@@ -8,6 +8,7 @@ import { LineIcon } from "../lineIcons";
 import { MRise } from "../motion";
 import { fmt } from "../ui";
 import { ComingSoon, PCard } from "./kit";
+import { RecipeTopLinks, SquadRecipes } from "../food/RecipeExtras";
 
 /** v2.13 Log → Recipes (spec §8): your recipes with per-serving numbers, and "New recipe". */
 export default function RecipesScreen({ available, recipes, hideNumbers = false }: { available: boolean; recipes: Recipe[]; hideNumbers?: boolean }) {
@@ -26,6 +27,7 @@ export default function RecipesScreen({ available, recipes, hideNumbers = false 
               New recipe
             </Link>
           </MRise>
+          <RecipeTopLinks /> {/* v2.18 A2: Ghar ka khana + say a recipe */}
           {recipes.length === 0 ? (
             <MRise delay={120}>
               <PCard label="No recipes yet">
@@ -56,6 +58,7 @@ export default function RecipesScreen({ available, recipes, hideNumbers = false 
               </PCard>
             </MRise>
           )}
+          <SquadRecipes hideNumbers={hideNumbers} />
         </>
       )}
     </SubPage>

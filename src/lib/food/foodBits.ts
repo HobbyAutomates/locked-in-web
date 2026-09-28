@@ -123,6 +123,7 @@ export const REALITY_THRESHOLD = 0.2;
 export function labelRealityGaps(label: Per100, web: Per100): RealityGap[] {
   const out: RealityGap[] = [];
   for (const f of ["calories", "protein_g", "carbs_g", "fat_g"] as const) {
+    if (label[f] == null || web[f] == null) continue; // missing or null: nothing to compare
     const a = Number(label[f]);
     const b = Number(web[f]);
     if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0) continue;

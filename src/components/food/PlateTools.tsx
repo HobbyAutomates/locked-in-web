@@ -73,20 +73,17 @@ export function PlateVoice({ items, plateNote, onApply }: { items: PlateItem[]; 
     }
   }
 
-  // Released the mic with words: send them.
   const listening = voice.dictation.listening;
   const said = voice.value;
-  useEffect(() => {
-    if (!listening && said.trim() && !busy) void send(said);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per finished utterance
-  }, [listening, said]);
+  // Let go of the mic: wait for the last words, then send them.
+  const onStop = () => void voice.settle().then(() => send(voice.current()));
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2">
         {supported ? (
           <>
-            <HoldMic dictation={voice.dictation} label="Hold to add details by voice" size={40} />
+            <HoldMic dictation={voice.dictation} label="Hold to add details by voice" size={40} onStop={onStop} />
             <LangToggle dictation={voice.dictation} />
           </>
         ) : null}

@@ -14,6 +14,7 @@ import { Close, Search, Spinner } from "../icons";
 import { MRise, STAGGER } from "../motion";
 import { BottomSheet, ErrorNote, fmt } from "../ui";
 import { AccentButton, ComingSoon, GhostButton, Label, PCard } from "./kit";
+import { ShareRecipeButton } from "../food/RecipeExtras";
 
 function fromHit(h: FoodSearchHit): RecipeIngredient {
   const base: RecipeIngredient = {
@@ -254,6 +255,7 @@ export default function RecipeEditor({ available, recipe }: { available: boolean
         </AccentButton>
       </div>
       {recipe && dirty ? <p className="-mt-2 text-center text-[11px] muted">Save your changes to log a serving.</p> : null}
+      {recipe && !dirty ? <ShareRecipeButton recipeId={recipe.id} /> /* v2.18 A2 */ : null}
       {recipe ? (
         <button type="button" className="press self-center py-2 text-[13px] font-semibold" style={{ background: "none", border: 0, color: "var(--danger)" }} onClick={() => setConfirmDelete(true)}>
           Delete recipe

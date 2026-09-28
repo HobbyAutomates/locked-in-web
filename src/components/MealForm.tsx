@@ -1073,6 +1073,16 @@ function RecipePane({ onItem }: { onItem: (item: MealItem, label: string) => voi
           </span>
           <span className="text-[14px] font-semibold">New recipe</span>
         </Link>
+        {/* v2.18 A2: the home recipe library */}
+        <Link href="/recipes/library" className="card press flex w-full items-center gap-2.5" style={{ padding: 10, borderRadius: 16, minHeight: 60, color: "var(--ink)" }}>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]" style={{ background: "var(--card2)" }}>
+            <LineIcon name="bowl" size={20} />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="text-[14px] font-semibold">Ghar ka khana</span>
+            <span className="text-[12px] muted">Home recipes, by the katori</span>
+          </span>
+        </Link>
       </div>
       {state.recipes.length ? (
         <Link href="/recipes" className="press self-start px-1 text-[13px] font-semibold underline" style={{ color: "var(--ink)" }}>

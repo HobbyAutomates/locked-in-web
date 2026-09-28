@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { deleteScan, saveMeal } from "@/lib/actions";
@@ -299,6 +300,17 @@ export default function ScanScreen({ history, profile, recent = [] }: { history:
 
       <ErrorNote text={error} />
 
+      {onCamera && mode === "menu" ? (
+        <Rise index={2}>
+          <Link href="/order" className="card press flex items-center gap-3" style={{ padding: "12px 14px", color: "var(--ink)" }}>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-[14px] font-semibold">Ordering in?</span>
+              <span className="text-[12px] muted">Paste your Swiggy or Zomato order, or add a screenshot, for a plan that fits what&apos;s left.</span>
+            </span>
+            <ChevronDown size={16} style={{ transform: "rotate(-90deg)" }} />
+          </Link>
+        </Rise>
+      ) : null}
       {onCamera && recent.length ? (
         <Rise index={2}>
           <div className="flex flex-col gap-2.5">

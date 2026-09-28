@@ -146,7 +146,7 @@ function splitSegments(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[.!?;\n]+/g, ",")
-    .split(/,|\band\b|\baur\b|\bplus\b|&|\bthen\b|\balso\b|\bया\b|\bऔर\b/)
+    .split(/,|\band\b|\baur\b|\bplus\b|&|\bthen\b|\balso\b|(?:^|\s)(?:या|और)(?=\s|$)/)
     .map((s) => s.trim())
     .filter(Boolean);
 }

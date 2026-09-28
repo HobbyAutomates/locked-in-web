@@ -294,6 +294,9 @@ export default function NutritionGoalsScreen({
           {[
             { href: "/nutrition/micros", icon: "chart" as const, label: "Micronutrient dashboard", sub: "Iron, calcium, fibre and more, today and this week" },
             { href: "/recipes", icon: "bowl" as const, label: "Recipes", sub: "Build what you cook, log a serving in one tap" },
+            // v2.18 food: delivery orders and the weekly grocery list.
+            { href: "/order", icon: "ticket" as const, label: "Eating out", sub: "Paste a Swiggy or Zomato order, get a plan for what's left" },
+            { href: "/pantry", icon: "target" as const, label: "Pantry & groceries", sub: "A weekly list from what you eat and your targets" },
             // v2.13 fasting is hidden under 18 (spec §7).
             ...(isTeen(ageYears(profile.dob)) ? [] : [{ href: "/fasting", icon: "flame" as const, label: "Fasting timer", sub: "12:12 to 20:4, or your own" }]),
           ].map((r, i) => (

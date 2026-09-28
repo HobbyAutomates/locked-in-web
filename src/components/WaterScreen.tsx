@@ -13,6 +13,7 @@ import { Check, Minus, Plus, Spinner } from "./icons";
 import { litres, WaterBottle } from "./WaterBottle";
 import { BottomSheet, Card, ErrorNote, NumberField, Rise } from "./ui";
 import { DeletedRow, EditorDelete, usePendingDeletes } from "./LogBits";
+import WaterFromFoodCard from "./food/WaterFromFood";
 
 const GLASS_SIZES = [150, 200, 250, 300, 350, 400, 500];
 
@@ -284,6 +285,7 @@ export default function WaterScreen({ date, isToday, entries: initial, goalMl: i
 
       <Rise index={2}>
         <ReminderCard initial={reminder} />
+        <WaterFromFoodCard /> {/* v2.18 A10 */}
       </Rise>
 
       {confetti ? <ConfettiBurst key={confetti} /> : null}

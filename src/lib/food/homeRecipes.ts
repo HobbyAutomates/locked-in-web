@@ -162,3 +162,23 @@ export function parseVoiceRecipe(text: string): VoiceRecipe {
   rest = rest.replace(/^[,.:\s]+|[,.\s]+$/g, "").trim();
   return { name: name ? name.charAt(0).toUpperCase() + name.slice(1) : "", ingredients: rest, servings };
 }
+
+/** A priced meal item (from /api/parse-meal) as a recipe ingredient, with per-100 g so grams edits re-price it. */
+export function ingredientFromItem(it: MealItem): RecipeIngredient {
+  const g = Number(it.grams) || 0;
+  const per = (v: number) => (g > 0 ? Math.round(((v * 100) / g) * 10) / 10 : 0);
+  const micros: Record<string, number> = {};
+  for (const [k, v] of Object.entries(it.micros ?? {})) if (v != null && Number.isFinite(Number(v))) micros[k] = per(Number(v));
+  return {
+    name: it.name,
+    grams: g,
+    kcal: Math.round(Number(it.calories) || 0),
+    protein_g: r1(Number(it.protein_g) || 0),
+    carbs_g: r1(Number(it.carbs_g) || 0),
+    fat_g: r1(Number(it.fat_g) || 0),
+    fiber_g: r1(Number(it.micros?.fiber_g ?? 0) || 0),
+    food_id: it.food_id ?? null,
+    micros: it.micros ?? {},
+    per100: g > 0 ? { kcal: per(Number(it.calories) || 0), protein_g: per(Number(it.protein_g) || 0), carbs_g: per(Number(it.carbs_g) || 0), fat_g: per(Number(it.fat_g) || 0), micros } : undefined,
+  };
+}

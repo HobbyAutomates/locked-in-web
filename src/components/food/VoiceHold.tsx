@@ -50,7 +50,7 @@ type Dictation = ReturnType<typeof useDictation>;
 const HOLD_MS = 350;
 
 /** The round mic: hold to talk, tap to toggle. `tone` "dark" sits on the camera; "light" on a card. */
-export function HoldMic({ dictation, label = "Hold to add details", tone = "light", size = 44 }: { dictation: Dictation; label?: string; tone?: "light" | "dark"; size?: number }) {
+export function HoldMic({ dictation, label = "Hold to add details", tone = "light", size = 44, onStop }: { dictation: Dictation; label?: string; tone?: "light" | "dark"; size?: number; /** Called right after the person stops talking (release, or the second tap). */ onStop?: () => void }) {
   const downAt = useRef(0);
   const on = dictation.listening;
   const bg = on ? "var(--danger)" : tone === "dark" ? "rgba(28, 28, 30, 0.72)" : "var(--card2)";
@@ -72,8 +72,11 @@ export function HoldMic({ dictation, label = "Hold to add details", tone = "ligh
       onPointerUp={() => {
         // A long press is push-to-talk (release stops); a quick tap leaves it listening until the next tap.
         const held = Date.now() - downAt.current;
-        if (downAt.current && held >= HOLD_MS && dictation.listening) dictation.stop();
-        else if (downAt.current && held < HOLD_MS && on) dictation.stop();
+        const stopping = (downAt.current && held >= HOLD_MS && dictation.listening) || (downAt.current && held < HOLD_MS && on);
+        if (stopping) {
+          dictation.stop();
+          onStop?.();
+        }
         downAt.current = 0;
       }}
       onPointerCancel={() => {
@@ -85,6 +88,7 @@ export function HoldMic({ dictation, label = "Hold to add details", tone = "ligh
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           dictation.toggle();
+          if (on) onStop?.();
         }
       }}
     >
