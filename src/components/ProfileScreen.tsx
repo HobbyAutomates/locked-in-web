@@ -320,6 +320,8 @@ export default function ProfileScreen({
             {/* v2.14: the AI coach (chat, memory, style) and buddy streaks. */}
             <ListRow icon="spark" label="Coach" sub="Chat, style, what it knows" value="" href="/coach" />
             <ListRow icon="users" label="Buddy streak" sub="Log together, nudge each other" value="" href="/buddy" />
+            {/* v2.18 social stream: freezes, invites, wrapped, pledges, events, coach access, packs, export */}
+            <ListRow icon="award" label="Social and rewards" sub="Streak freezes, invites, wrapped, pledges and more" value="" href="/social" />
             <ListRow icon="user" label="Personal details" value={[age != null ? `${age}` : null, profile.height_cm ? `${Math.round(profile.height_cm)} cm` : null].filter(Boolean).join(" · ")} href="/profile/details" />
             <ListRow icon="target" label="Nutrition goals" value={profile.hide_numbers ? "Set" : `${profile.calorie_target.toLocaleString("en-IN")} kcal`} href="/profile/goals" />
             <ListRow icon="flame" label="Goal weight" value={goal != null ? weightText(goal, profile.units) : profile.goal_type.charAt(0).toUpperCase() + profile.goal_type.slice(1)} href="/profile/goal" />
