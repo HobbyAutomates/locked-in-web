@@ -15,6 +15,9 @@ import { localNow, type LocalNow } from "./notify";
 import { missingV37 } from "./coachSchema";
 import { effectiveCoachStyle } from "./onboardingV2";
 import type { FoodPreset, MealItem } from "./types";
+import { coachPlusContext, listSupplements, markTaken } from "./v218/coachPlusServer"; // v2.18 coach stream
+import { matchSupplement } from "./v218/supplements";
+import { VOICE_RULE } from "./v218/voice";
 import {
   cleanMemory,
   detectSafety,
@@ -220,6 +223,11 @@ export const TOOLS: Anthropic.Tool[] = [
     name: "add_memory",
     description: "Propose remembering a lasting fact the user shared (routine, preference, constraint). The user confirms it. Never about looks or body shape.",
     input_schema: { type: "object", properties: { kind: { type: "string", enum: ["goal", "food", "life", "body", "style"] }, text: { type: "string", description: "Short, third person, e.g. 'Hostel mess on weekdays'" } }, required: ["kind", "text"] },
+  },  // v2.18 B7: "took my creatine" ticks the supplement tracker.
+  {
+    name: "log_supplement",
+    description: "Tick off a supplement the user says they took today (from their supplement list). Never suggest doses.",
+    input_schema: { type: "object", properties: { name: { type: "string", description: "What they took, e.g. 'creatine'" } }, required: ["name"] },
   },
 ];
 
@@ -330,6 +338,15 @@ async function runTool(c: Ctx, name: string, input: Record<string, unknown>): Pr
       c.cards.push({ type: "fast_started", hours });
       return `Started a ${hours} h fast.`;
     }
+    case "log_supplement": {
+      const list = await listSupplements(c.admin, c.uid, localNow());
+      if (!list.available) return "The supplement tracker isn't available yet.";
+      const id = matchSupplement(list.items.filter((x) => x.active), String(input.name ?? ""));
+      if (!id) return `Not in their supplement list (${list.items.map((x) => x.name).join(", ") || "empty"}). Tell them to add it under Coach → Supplements.`;
+      const r = await markTaken(c.admin, c.uid, id, c.today, true);
+      const name = list.items.find((x) => x.id === id)?.name ?? "Supplement";
+      return r.ok ? `Ticked ${name} for today.` : "Couldn't tick it.";
+    }
     case "add_memory": {
       if (!c.p.remember) return "They turned memory off; don't store it.";
       const m = cleanMemory({ kind: input.kind, text: input.text });
@@ -383,7 +400,7 @@ async function extractMemories(admin: AdminClient, uid: string, userText: string
 
 export type ChatResult = { user: CoachMessage; reply: CoachMessage; learned: Memory[]; safety: boolean };
 
-export async function coachChat(admin: AdminClient, uid: string, input: { message: string; image?: string | null; mediaType?: string | null }): Promise<ChatResult> {
+export async function coachChat(admin: AdminClient, uid: string, input: { message: string; image?: string | null; mediaType?: string | null; voice?: boolean }): Promise<ChatResult> {
   const now = localNow();
   const today = now.date;
   const p = await loadCoachProfile(admin, uid, today);
@@ -405,14 +422,16 @@ export async function coachChat(admin: AdminClient, uid: string, input: { messag
     cards = [{ type: "helpline" }];
     await admin.from("coach_safety_flags").insert({ user_id: uid, kind: safety });
   } else {
-    const [days, memories, history] = await Promise.all([
+    const [days, memories, history, plus] = await Promise.all([
       loadDays(admin, uid, today),
       p.remember ? loadMemories(admin, uid, 40).then((ms) => ms.filter((m) => m.kept).slice(0, 20)) : Promise.resolve([] as Memory[]),
       admin.from("coach_messages").select("role, text").eq("user_id", uid).neq("id", userRow.data.id).order("created_at", { ascending: false }).limit(12),
+      coachPlusContext(admin, uid, now), // v2.18: check-in, recovery, festival, cycle, supplements
     ]);
     if (memories.length) void admin.from("coach_memory").update({ last_used_at: new Date().toISOString() }).in("id", memories.map((m) => m.id)).then(() => undefined);
-    const c: Ctx = { admin, uid, p, today, days, cards: [] };
-    const system = `${systemPrompt(p.style, { teen: p.teen, name: p.name, kind: "chat" })}\n\n${contextBlock(p, days, memories, now)}`;
+    const c: Ctx = { admin, uid, p: plus.bump ? { ...p, calorie_target: p.calorie_target + plus.bump } : p, today, days, cards: [] };
+    const extra = [...plus.lines, plus.tone, input.voice ? VOICE_RULE : ""].filter(Boolean).join("\n");
+    const system = `${systemPrompt(p.style, { teen: p.teen, name: p.name, kind: "chat" })}\n\n${contextBlock(c.p, days, memories, now)}${extra ? `\n${extra}` : ""}`;
     const past = ((history.data ?? []) as { role: string; text: string }[]).reverse();
     const messages: Anthropic.MessageParam[] = [];
     for (const m of past) {
@@ -513,7 +532,8 @@ async function writeNote(admin: AdminClient, uid: string, p: CoachProfile, kind:
   let text = "";
   if (process.env.ANTHROPIC_API_KEY) {
     try {
-      const res = await run<string>("coach_note", { kind: "text", system: systemPrompt(p.style, { teen: p.teen, name: p.name, kind: kind === "morning" ? "note" : kind }), text: contextBlock(p, days, memories, now), maxTokens: 250 });
+      const plus = await coachPlusContext(admin, uid, now); // v2.18
+      const res = await run<string>("coach_note", { kind: "text", system: [systemPrompt(p.style, { teen: p.teen, name: p.name, kind: kind === "morning" ? "note" : kind }), plus.tone].filter(Boolean).join("\n"), text: [contextBlock(p, days, memories, now), ...plus.lines].join("\n"), maxTokens: 250 });
       text = String(res.data ?? "").trim();
     } catch {
       text = "";

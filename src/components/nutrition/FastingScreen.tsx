@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ProNote } from "../platform/kit";
 import { useRouter } from "next/navigation";
 import { deleteFast, endFast, setFastingHours, startFast } from "@/lib/nutrition-actions";
+import IndianFasts from "@/components/v218/IndianFasts"; // v2.18 coach stream
 import { PROTOCOLS, STAGES, clampHours, clock, durationText, hoursBetween, stageAt, type FastingAccess } from "@/lib/fasting";
 import type { FastSession } from "@/lib/nutritionTypes";
 import type { EdFlag } from "@/lib/goals";
@@ -204,6 +205,13 @@ export default function FastingScreen({ access, flags, available, active, histor
           )}
         </PCard>
       </MRise>
+
+      {/* v2.18 B10: Navratri, Ramadan, Ekadashi, Jain presets on top of the timer. */}
+      {!active ? (
+        <MRise delay={STAGGER}>
+          <IndianFasts available={available} />
+        </MRise>
+      ) : null}
 
       <MRise delay={STAGGER}>
         <History items={history} onDelete={(id) => void remove(id)} />

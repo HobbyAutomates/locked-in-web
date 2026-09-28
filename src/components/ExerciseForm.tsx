@@ -348,6 +348,12 @@ export default function ExerciseForm({
             </div>
           </div>
         ) : null}
+        {/* v2.18 C3: cricket / football / badminton / kabaddi variants and steps, MET-priced. */}
+        {!typing && !editing && group === "sport" ? (
+          <a href="/train/sports" className="press self-start text-[12.5px] font-semibold underline muted">
+            Sport presets: gully cricket, 5-a-side, kabaddi, steps →
+          </a>
+        ) : null}
 
         {!typing && recent.length && group === "other" && !editing ? (
           <div>

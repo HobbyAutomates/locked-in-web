@@ -28,12 +28,12 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const { user, admin } = await apiUser(req);
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  const body = (await req.json().catch(() => ({}))) as { message?: unknown; image?: unknown; media_type?: unknown };
+  const body = (await req.json().catch(() => ({}))) as { message?: unknown; image?: unknown; media_type?: unknown; voice?: unknown };
   const message = typeof body.message === "string" ? body.message : "";
   const image = typeof body.image === "string" && body.image.length < 8_000_000 ? body.image : null;
   if (!message.trim() && !image) return NextResponse.json({ error: "Say something first" }, { status: 400 });
   try {
-    const out = await coachChat(admin, user.id, { message, image, mediaType: typeof body.media_type === "string" ? body.media_type : null });
+    const out = await coachChat(admin, user.id, { message, image, mediaType: typeof body.media_type === "string" ? body.media_type : null, voice: body.voice === true });
     return NextResponse.json({ available: true, ...out });
   } catch (e) {
     if (e instanceof CoachUnavailable) return NextResponse.json({ available: false, error: e.message }, { status: 503 });
