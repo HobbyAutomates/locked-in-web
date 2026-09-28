@@ -158,3 +158,5 @@ export function parseFreezeEvents(rows: { kind?: unknown; ref?: unknown; other_u
 
 /** Local key: the last day this device ran freeze_sync (once a day is plenty). */
 export const FREEZE_SYNC_KEY = "li-freeze-sync";
+/** Local key: the token count from the last sync (the Home chip reads it; also the event name). */
+export const FREEZE_TOKENS_KEY = "li-freeze-tokens";

@@ -1,5 +1,6 @@
 "use client";
 
+import FreezeChip from "./social/FreezeChip";
 import { withQueue } from "@/lib/social/offlineStore";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -175,6 +176,8 @@ export default function HomeScreen({ today, profile, workouts, meals, exercises,
 
       <Rise index={1}>
         <DayStreakPill days={dayStreak} loggedToday={loggedToday} />
+        {/* v2.18 D5: streak freezes (hidden until the first daily sync). */}
+        <FreezeChip />
       </Rise>
 
       {/* v2.14: the coach's note, buddy streaks, and "Tune your plan" for existing users. */}

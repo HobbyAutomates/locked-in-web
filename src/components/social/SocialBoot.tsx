@@ -6,7 +6,7 @@ import { logWater, saveExercise, saveMeal, saveWorkout } from "@/lib/actions";
 import { claimReferral, syncFreezes } from "@/lib/social/actions";
 import { cachedCount, flushQueue, readQueue } from "@/lib/social/offlineStore";
 import { OFFLINE_EVENT, type QueueItem } from "@/lib/social/offlineQueue";
-import { FREEZE_SYNC_KEY } from "@/lib/social/freezes";
+import { FREEZE_SYNC_KEY, FREEZE_TOKENS_KEY } from "@/lib/social/freezes";
 import { REF_STORAGE_KEY, claimMessage } from "@/lib/social/referrals";
 import { syncLabel, t, type Lang } from "@/lib/social/i18n";
 import { today } from "@/lib/dates";
@@ -132,6 +132,8 @@ export default function SocialBoot({ lang = "en" }: { lang?: Lang }) {
           return;
         }
         set(FREEZE_SYNC_KEY, d);
+        set(FREEZE_TOKENS_KEY, String(r.data.tokens));
+        window.dispatchEvent(new CustomEvent(FREEZE_TOKENS_KEY));
         if (r.data.used_now > 0) {
           say(r.data.used_now === 1 ? "A streak freeze covered yesterday. Streak safe." : `${r.data.used_now} streak freezes covered the missed days.`);
           router.refresh();

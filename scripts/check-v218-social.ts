@@ -24,6 +24,7 @@ import { regionalMatch, regionalQuery } from "../src/lib/social/regionalFoods";
 import { MAX_TRIES, afterAttempt, enqueue, isNetworkError, ordered, shouldQueue } from "../src/lib/social/offlineQueue";
 import { combinedCsv, mealRows, toCsv } from "../src/lib/social/exportData";
 import { deleteConfirmed, parseReason, passwordProblem, reportSnapshot, withoutBlocked } from "../src/lib/social/safety";
+import { MAX_FRAMES, frameCaption, reelLength, storyFrames, weightNear } from "../src/lib/social/story";
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -373,6 +374,31 @@ ok("export + safety", () => {
   assert.equal(passwordProblem("123456", "123456"), null);
   assert.deepEqual(withoutBlocked([{ user_id: "a" }, { user_id: "b" }], ["b"]), [{ user_id: "a" }]);
   assert.ok(reportSnapshot({ kind: "message", body: "hi", author_name: "Z", created_at: "2026-09-30T10:00:00Z" }).startsWith("by Z [message]"));
+});
+
+// ---------------------------------------------------------------- D10 transformation story
+ok("story", () => {
+  const weights = [{ date: "2026-06-01", weight_kg: 84 }, { date: "2026-09-25", weight_kg: 79.8 }];
+  assert.equal(weightNear("2026-06-04", weights), 84);
+  assert.equal(weightNear("2026-06-20", weights), null);
+  const f = storyFrames(
+    [
+      { date: "2026-09-28", url: "b", weight_kg: null },
+      { date: "2026-06-01", url: "a", weight_kg: null },
+      { date: "2026-07-01", url: null, weight_kg: 82 },
+    ],
+    weights,
+  );
+  assert.deepEqual(f.map((x) => [x.date, x.kg, x.delta, x.dayIndex]), [["2026-06-01", 84, 0, 0], ["2026-09-28", 79.8, -4.2, 119]]);
+  assert.deepEqual(frameCaption(f[1]), { day: "Day 120", change: "−4.2 kg" });
+  assert.deepEqual(frameCaption(f[0]), { day: "Day 1", change: null });
+  const many = Array.from({ length: 60 }, (_, i) => ({ date: addDays("2026-01-01", i), url: `u${i}`, weight_kg: null }));
+  const thin = storyFrames(many, []);
+  assert.equal(thin.length, MAX_FRAMES);
+  assert.equal(thin[0].date, "2026-01-01");
+  assert.equal(thin.at(-1)!.date, addDays("2026-01-01", 59));
+  assert.equal(reelLength(0), 0);
+  assert.equal(reelLength(2), 1600 + 2 * 1400 + 2200);
 });
 
 console.log(`check-v218-social: ${n} groups passed`);
