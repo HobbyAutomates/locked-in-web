@@ -103,3 +103,7 @@ revoke all on function bandlog.wipe_user(uuid) from public, anon, authenticated;
 grant execute on function bandlog.wipe_user(uuid) to service_role;
 
 notify pgrst, 'reload schema';
+
+-- Applied 2026-09-29 as migration v45b: pin search_path on the two v44 helpers (Supabase linter).
+alter function bandlog.soc_today() set search_path = bandlog;
+alter function bandlog.soc_trusted() set search_path = bandlog;

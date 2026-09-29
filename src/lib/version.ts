@@ -3,12 +3,29 @@
  * (matches the Android versionName) and add a CHANGELOG entry — iPhone users have no APK to update,
  * so this page is how they find out what changed.
  */
-export const APP_VERSION = "2.16";
+export const APP_VERSION = "2.18";
 
 export type ChangelogEntry = { version: string; date: string; lines: string[] };
 
 /** Newest first. Plain English, 1–3 lines each. */
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "2.18",
+    date: "2026-09-29",
+    lines: [
+      "Food: snap a photo and say what's in it, 80+ home recipes (save your own by voice), honest ± calories, a Swiggy/Zomato helper, leftovers, splitting a dish with friends, smart swaps, and a pantry with a grocery list.",
+      "Coach: talk to your coach hands-free, a 5-second sleep and stress check-in, supplements with reminders, a weekly review, plateau help, festival mode, Indian fasts, home workouts and an AI form check.",
+      "Squads and more: streak freezes you can gift, invite friends for a week of Pro, Wrapped, new reactions and clean/cheat stamps, pledges, seasonal badges, offline logging, Hinglish and Hindi, CSV/PDF export and account deletion.",
+    ],
+  },
+  {
+    version: "2.17",
+    date: "2026-09-29",
+    lines: [
+      "Log a scanned label, barcode or photo straight into Breakfast, Lunch, Dinner or Snacks, and re-add recent foods in one tap.",
+      "A new Trophy wall, \"Muscles this week\" near the top of Progress, and OG plates for the first 50 members.",
+    ],
+  },
   {
     version: "2.16",
     date: "2026-09-29",
